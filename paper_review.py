@@ -48,7 +48,7 @@ def pdf_to_images(pdf_path, max_pages=10):
     return page_images
 
 
-def review_article(file_path, research_area, max_pages=10):
+def start_review_article(file_path, research_area, max_pages=10):
     """
     Review a journal article and provide critical analysis
 
@@ -78,41 +78,47 @@ def review_article(file_path, research_area, max_pages=10):
     You goal is to make sure the logic in the paper is sound.
     
     In order to do this review we will go through the following steps in order to make a map of the paper's logical conclusions for proper consideration:
-    1) summarize the paper
-    2) determine the key findings associated with each figure
-    3) judge the findings of each figure
-    4) identify other supporting evidence that are only supported by text
-    5) judge this evidence
-    6) create a map of the logic that brings the author to their conclusions
-    7) evaluate the map to make a statement about what logical conclusions could be suspect and provide a recommendation as to how to address these concerns
+    1) summarize the paper's main findings and supporting evidence
+    2) determine how the findings are supported in the paper with either text or a figure
+    3) create a map of the logic that brings the author to their conclusions based on the required evidence
+    4) judge the logical steps individually
+    5) look for how the individual findings should align with one another and check for logical inconsistencies of suspicious behavior
+    6) evaluate the over all logical logical conclusions of the paper and provide a recommendation as to how to address any concerns
     
     We will do this in stages so that the I can give you feedback.  Let's start with step 1.  
 
     Please read the article and provide the following:
 
-    1. **Summary** (2-3 sentences)
-       - What is the main research question?
-       - What are the key findings?
-
-    2. **Figures**
-       - Tabulate what the key conclusions of each figure is 
-    2. **Key causal claims**
-       - What is the key causal claim in this paper?
-       - What are the key pieces of evidence that support this claim?
-       - What are the key citations that contribute to this claim?
+    1. **Summary** 
+       a) What is the main research question? (2-3 sentences in question form)
+       b) What the key finding? (1 sentence)
+       c) What are the main supporting findings? (1 sentence each, written in order of importance to the final conclusion)
        
-    3. **Supporting claims**
-       - What other cause-effect relationships must be true for the primary claim to hold?
-       - What are the key pieces of evidence that support each claim?
-       - Are there any citations that are required for these supporting claims?
-       
-    After you are done with these evaluations, double check, are there any claims that are asserted without direct evidence in this paper?
+    Please format your response like this:
+    1: <response to a)>,
+    2: <response to b)>,
+    3: <comma separated list response to c)>
 
     """
 
     result = agent.run(prompt, images=page_images)
     return result
 
+def prepare_for_step_2(review_previous_step):
+
+    split_review = review_previous_step.split('\n\n')
+    main_research_question = split_review[0].split('1. ')[1]
+    key_finding = split_review[1].split('2. ')[1]
+    supporting_findings = split_review[2].split(': ')[1].split(', ')
+
+    return main_research_question, key_finding, supporting_findings
+
+
+def execute_step_2(supporting_findings):
+
+    for supporting_finding in supporting_findings:
+        pass
+    
 
 # Example usage
 if __name__ == "__main__":
@@ -139,17 +145,13 @@ if __name__ == "__main__":
 
     try:
         # Get review
-        review = review_article(
+        review_step_1 = start_review_article(
             file_path=file_path,
             research_area=research_area,
             max_pages=max_pages
         )
 
-        print("\n" + "=" * 60)
-        print("ARTICLE REVIEW")
-        print("=" * 60)
-        print(review)
-        print("\n" + "=" * 60)
+        main_research_question, key_finding, supporting_findings = prepare_for_step_2(review_step_1)
 
     except Exception as e:
         print(f"\nError analyzing article: {e}")
