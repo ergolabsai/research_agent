@@ -16,7 +16,7 @@ os.environ["OPENROUTER_API_KEY"] = "sk-or-v1-5aa3132450dd5fca93585388fefc8ffdb24
 
 # Initialize the LLM model through OpenRouter
 model = LiteLLMModel(
-    model_id="openrouter/deepseek/deepseek-chat",
+    model_id="openrouter/anthropic/claude-3.5-sonnet",
     api_key=os.environ["OPENROUTER_API_KEY"],
     api_base="https://openrouter.ai/api/v1"
 )

@@ -1,0 +1,7 @@
+ultrafast physics
+
+/Users/chelsea/python_projects/project_files/acetylene_vinylidene.png
+
+The distribution of all C+/C+/D+/D+ coincidences is plotted as a function of the total kinetic energy release and the angle θ. The plot contains the data integrated over all time delays. The solid black line divides the vinylidene-like geometries (left) and acetylene-like ones (right). The data for the two isomers display a difference in both the peak KER and the width of its distribution, as shown on the right hand side.
+
+I am concluding that the energy distribution for the acetylene like configuration (larger CCD angle) is distinct from the vinylidene like configuration (smaller CCD angle), so that I can readily assign the population on the right hand side of the plot as acetylene like and the left hand population as vinylidene like.
