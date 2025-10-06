@@ -5,6 +5,7 @@ import PyPDF2
 import pymupdf
 from PIL import Image
 import json
+import re
 
 # Set up your OpenRouter API key
 os.environ["OPENROUTER_API_KEY"] = "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"
@@ -26,9 +27,10 @@ chosen_agent = ToolCallingAgent(
 )
 
 class ReviewSession:
-    def __init__(self, agent, page_images):
+    def __init__(self, agent, pdf_text, page_images):
         self.agent = agent
         self.page_images = page_images
+        self.pdf_text = pdf_text
         self.current_prompt = ''
         self.current_result = ''
         self.history = []
@@ -36,6 +38,7 @@ class ReviewSession:
         self.main_research_question = ''
         self.key_finding = ''
         self.supporting_findings = ''
+        self.current_json_response = ''
 
     def ask(self, include_history=True):
         """Ask a question with optional history context"""
@@ -58,7 +61,7 @@ class ReviewSession:
         })
 
 
-    def write_start_of_review_prompt(self, research_area, pdf_text):
+    def write_start_of_review_prompt(self, research_area):
 
         prompt = f"""
         Assume you are a seasoned {research_area} researcher who is really good at identifying problematic research and analysis techniques.
@@ -74,16 +77,6 @@ class ReviewSession:
         You goal is to make sure the logic in the paper is sound.
         Therefore, do not believe the author.  Instead, assume that they could be making intentional or unintentional logical errors.
 
-        In order to do this review we will go through the following steps:
-        1) summarize the paper's main findings and supporting evidence from the text - not the figures directly
-        2) create a map of the logic that brings the author to their conclusions based on the required evidence
-        3) evaluate the logical steps backed by a figure by analyzing each figure without help from the text and comparing it to what the text claims
-        4) evaluate the logical steps backed by a quoted value
-        5) look for how the individual findings should align with one another and check for logical inconsistencies or suspicious behavior
-        6) evaluate the over all logical conclusions of the paper and provide a recommendation as to how to address any concerns
-
-        We will do this in stages.  Let's start with step 1.  
-
         Please read the article and find the main question being asked, the article's answer to the question, and the supporting claims.
         For each claim, list the evidence for the claim.
         Include which figures are relevant, any specific numeric values quoted, and citations.
@@ -95,63 +88,38 @@ class ReviewSession:
         "supporting_claims": {{"3-4 word claim description",
             {{"description": "3-4 sentence description of claim.",
             "evidence_figures": ["Figure n", "Figure m"],
-            "evidence_numbers": {{"1-2 word description": {{"value": "number", "units": "unit", "source": "Figure, or citation"}},
-            "1-2 word description": {{"value": "number", "units": "unit", "source": "Figure, or citation"}}}},
+            "evidence_numbers": {{"1-2 word description": {{"value": "number", "units": "unit", "source": "Figure(s) or citation"}},
+            "1-2 word description": {{"value": "number", "units": "unit", "source": "Figure(s), or citation"}}}},
             "evidence_citations": ["Author year"],
             "importance": "number"}}}}}}
 
-        I am attaching the image of the document, and the text of the document: {pdf_text}
+        I am attaching the image of the document, and the text of the document: {self.pdf_text}
 
         """
 
         self.current_prompt = prompt
 
-    def separate_findings(self):
+    def ingest_findings(self):
 
-        split_review = self.current_result.split('\n\n')
-        self.main_research_question = split_review[0].split('.. ')[1]
-        self.key_finding = split_review[1].split('.. ')[1]
-        self.supporting_findings = split_review[2].split('.. ')[1].split(', ')
+        json_response = json.loads(review.current_result)
+
+        self.current_json_response = json_response
 
 
-    def write_identify_evidence_prompt(self, supporting_finding):
-
-        finding = supporting_finding.split('; ')[1]
+    def write_describe_figures_prompt(self):
 
         prompt = f"""
-        You will now identify the evidence for each supporting finding.  
-        For this portion, please focus on the individual supporting finding.  
-        We will compile them all together later.
+        Look at each figure and create a description of what is happening in the plot.  
+        Focus on constructing a description that is based on the figure itself, not how it is described in the text.
         
-        The finding you should focus on is: {finding}
+        Format your answer in ONLY JSON format (no markdown, no extra text) like this:
         
-        Please tell me how this finding is supported.  Examples could include:
-        - a figure
-        - a reference
-        - a quoted measurement in text format
-        
-        Please format your response like this:
-        1: description of evidence source #1
-        2: description of evidence source #2
-        ...
-        n: description of evidence source #n
-        summary: comma separated list of the n pieces of evidence summarized by 2-3 words
+        {{"figure number": "description in less than 10 sentences"}}
         
         """
 
         self.current_prompt = prompt
 
-    def connect_evidence_to_findings(self, findings_dict):
-
-        finding_evidence_dict = {}
-
-        for key, finding in findings_dict.items():
-            summary = finding.split('summary: ')
-            summary_list = summary.split(', ')
-            finding_evidence_dict[key] =  summary_list
-
-        self.findings_dict = findings_dict
-        self.finding_evidence_dict = finding_evidence_dict
 
 def extract_pdf_text(pdf_path):
 
@@ -216,24 +184,14 @@ if __name__ == "__main__":
 
     pdf_content = extract_pdf_content(file_path)
 
-    review = ReviewSession(chosen_agent, pdf_content['pages'])
+    review = ReviewSession(chosen_agent, pdf_content['text'], pdf_content['pages'])
 
-    review.write_start_of_review_prompt(research_area, pdf_content['text'])
+    review.write_start_of_review_prompt(research_area)
     review.ask()
 
-    json_response = json.loads(review.current_result)
+    review.write_describe_figures_prompt()
+    review.ask()
 
-    # review.separate_findings()
-    #
-    # separate_findings_results = {}
-    #
-    # for supporting_finding in review.supporting_findings:
-    #
-    #     review.write_identify_evidence_prompt(supporting_finding)
-    #     review.ask()
-    #
-    #     finding_key = supporting_finding.split('; ')[0]
-    #
-    #     separate_findings_results[finding_key] = review.current_result
+
 
 
