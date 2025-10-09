@@ -1,11 +1,7 @@
 import os
 from smolagents import ToolCallingAgent, DuckDuckGoSearchTool, LiteLLMModel
-from pdf2image import convert_from_path
-import PyPDF2
-import pymupdf
 from PIL import Image
 import json
-import re
 # import litellm
 # litellm._turn_on_debug()
 from pathlib import Path
@@ -17,11 +13,11 @@ os.environ["OPENROUTER_API_KEY"] = "sk-or-v1-5aa3132450dd5fca93585388fefc8ffdb24
 # Initialize the LLM model through OpenRouter
 # Using GPT-4o Mini - affordable and reliable
 model = LiteLLMModel(
-    model_id="openrouter/openai/gpt-4o-mini",
+    # model_id="openrouter/openai/gpt-4o-mini",
     # model_id="openai/gpt-4.1-mini",
-    # model_id="anthropic/claude-sonnet-4.5",
+    model_id="openrouter/anthropic/claude-3.5-sonnet",
     api_key=os.environ["OPENROUTER_API_KEY"],
-    api_base="https://openrouter.ai/api/v1"
+    # api_base="https://openrouter.ai/api/v1"
 )
 
 # Create the agent with search capabilities
@@ -45,6 +41,7 @@ class ReviewSession:
         self.key_finding = ''
         self.supporting_findings = ''
         self.current_json_response = ''
+        self.figure_descriptions = {}
 
         figure_names_text = ''
         for image_name in self.list_image_names:
@@ -105,15 +102,10 @@ Return the following in ONLY valid JSON (no markdown, no extra text):
 "answer": "the author's answer",
 "supporting_claims": {{"3-4 word claim description":
     {{"description": "3-4 sentence description of claim.",
-    "evidence_figures": ["Figure n", "Figure m"],
-    "evidence_numbers": {{"1-2 word description": {{"value": "number", "units": "unit", "source": "Figure(s) or citation"}},
-    "1-2 word description": {{"value": "number", "units": "unit", "source": "Figure(s), or citation"}}}},
-    "evidence_citations": ["Author year"],
-    "importance": "number"}}}}}}
+    "importance": "number",
+    "evidence_numbers": {{"1-2 word description": {{"value": "number", "units": "unit", "source": "Figure(s) or citation"}}}}}}}}}}
 
 Here is the text of the document in latex format: {self.pdf_text}
-
-I am attaching the images.  Their names, in order are: {self.figure_names_text}
 
         """
 
@@ -137,6 +129,19 @@ Here is the latex: {self.pdf_text}
         json_response = json.loads(review.current_result)
 
         self.current_json_response = json_response
+
+
+    def ingest_start_of_review(self):
+        self.ingest_findings()
+
+        self.question = self.current_json_response['question']
+        self.answer = self.current_json_response['answer']
+        self.supporting_findings = self.current_json_response['supporting_claims']
+        print('check')
+
+    def add_to_figure_descriptions(self, image_number):
+
+        self.figure_descriptions[self.list_image_names[image_number]] = self.current_result
 
 
 def load_txt_document(tex_folder):
@@ -193,12 +198,17 @@ if __name__ == "__main__":
 
     review.write_start_of_review_prompt(research_area)
     review.ask()
+    review.ingest_start_of_review()
 
     review.write_describe_figures_prompt()
 
     for image_number in range(len(review.page_images)):
+
         review.ask(include_image=image_number)
-        print('check')
+
+        review.add_to_figure_descriptions(image_number)
+        if image_number == 2:
+            print('check')
 
 
 
