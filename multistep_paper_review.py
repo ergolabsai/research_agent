@@ -7,15 +7,18 @@ import json
 from pathlib import Path
 import matplotlib.pyplot as plt
 
+import json_parsing
+
 # Set up your OpenRouter API key
 os.environ["OPENROUTER_API_KEY"] = "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"
 
 # Initialize the LLM model through OpenRouter
-# Using GPT-4o Mini - affordable and reliable
 model = LiteLLMModel(
     # model_id="openrouter/openai/gpt-4o-mini",
-    # model_id="openai/gpt-4.1-mini",
-    model_id="openrouter/anthropic/claude-3.5-sonnet",
+    # model_id="openrouter/anthropic/claude-3.5-sonnet",
+    # model_id="openrouter/anthropic/claude-sonnet-4.5",
+    model_id="openrouter/google/gemini-2.5-flash",
+    # model_id="openrouter/x-ai/grok-4-fast",
     api_key=os.environ["OPENROUTER_API_KEY"],
     # api_base="https://openrouter.ai/api/v1"
 )
@@ -126,7 +129,12 @@ Here is the latex: {self.pdf_text}
 
 
     def ingest_findings(self):
-        json_response = json.loads(review.current_result)
+        try:
+            json_response = json.loads(self.current_result)
+        except:
+            print('sending response back to LLM')
+            json_response = json_parsing.ask_llm_to_fix_json(self.current_result, self.agent)
+        # json_response = json_parsing.safe_json_parse(self.current_result)
 
         self.current_json_response = json_response
 
