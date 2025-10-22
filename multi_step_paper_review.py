@@ -1,12 +1,15 @@
 import os
 from pathlib import Path
 from PIL import Image
-from output_classes import FigureDescription
+from output_classes import *
 import instructor
 from anthropic import Anthropic
 from smolagents import LiteLLMModel, DuckDuckGoSearchTool, ToolCallingAgent
 import base64
 import io
+from pydantic import BaseModel
+from create_plots import ask_claude_for_plot
+import shutil
 
 # Set up your OpenRouter API key
 os.environ["OPENROUTER_API_KEY"] = "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"
@@ -16,10 +19,20 @@ class ReviewSession:
 
     def __init__(self):
         self.tex_folder = ''
-        self.client = instructor.from_anthropic(Anthropic(
-            api_key=os.environ.get("CLAUDE_API_KEY")
-        ))
+        self.client = instructor.from_anthropic(Anthropic(api_key=os.environ.get("CLAUDE_API_KEY")))
         self.model_id = "claude-sonnet-4-5-20250929"
+
+        self.text = ''
+        self.filenames = []
+        self.images = []
+        self.media_types = []
+        self.current_response_model = BaseModel
+        self.current_request = ""
+        self.current_media_type = []
+        self.current_image_data = []
+        self.current_response = ''
+        self.image_descriptions = {}
+        self.expected_descriptions = {}
 
     def load_document(self, tex_folder, max_dim=800):
         self.tex_folder = Path(tex_folder)
@@ -29,8 +42,8 @@ class ReviewSession:
 
         self.text = text
 
-        images = []
         filenames = []
+        images = []
         media_types = []
 
         image_folder = self.tex_folder / 'images'
@@ -45,50 +58,75 @@ class ReviewSession:
             images.append(img)
             media_types.append(media_type)
 
+        self.image_names = filenames
         self.images = images
         self.media_types = media_types
-        self.filenames = filenames
-
 
         return {'text': text, 'images': images, 'filenames': filenames, 'media_types': media_types}
 
     def ask(self):
-        self.current_response = self.client.messages.create(
-            model=self.model_id,
-            max_tokens=4096,
-            response_model=self.current_response_model,
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "image",
-                            "source": {
-                                "type": "base64",
-                                "media_type": self.current_media_type,
-                                "data": self.current_image_data,
-                            },
-                        },
-                        {
-                            "type": "text",
-                            "text": self.current_content
-                        }
-                    ],
-                }
-            ],
-        )
-    def describe_figures(self):
-        self.current_response_model = FigureDescription
-        self.current_content = "Make a description of this plot that could be used to reconstruct the image."
-        self.current_media_type = self.media_types[0]
-        self.current_image_data = self.images[0]
-        self.ask()
 
-    def create_expected_figure_description(self):
-        pass
+        content = [{"type": "text",
+                    "text": self.current_request}]
+        if self.current_image_data:
+            for image, media in zip(self.current_image_data, self.current_media_type):
+                content = content + [{"type": "image","source": {"type": "base64",
+                                                   "media_type": media,
+                                                   "data": image}}]
+
+
+        self.current_response = self.client.messages.create(model=self.model_id,
+                                                            max_tokens=4096,
+                                                            response_model=self.current_response_model,
+                                                            messages=[{"role": "user",
+                                                                       "content": content}])
+
+    def describe_figures(self):
+        # kk = 0
+        for image, media_type, image_name in zip(self.images, self.media_types, self.image_names):
+            # if kk > 0:
+            #     break
+            # kk = kk + 1
+            fig_descriptions = {1: '', 2: ''}
+            self.current_response_model = FigureDescription
+            self.current_request = "Make a description of this plot that could be used to reconstruct the image."
+            self.current_media_type = [media_type]
+            self.current_image_data = [image]
+            self.ask()
+            fig_descriptions[1] = self.current_response.description
+            ask_claude_for_plot(self.current_response.description)
+            img, mt = encode_image(Path('reconstructed_figure.jpg'))
+
+            destination_path = os.path.join('/Users/chelsea/python_projects/project_files/outputs',
+                                            'reconstruction_' + image_name)
+            shutil.move('reconstructed_figure.jpg', destination_path)
+
+            self.current_media_type = [media_type, mt]
+            self.current_image_data = [image, img]
+            self.current_response_model = FigureDescription
+            self.current_request = "The second image is a reconstruction of the first image based on this description: \n" + self.current_response.description + "\n improve the description to better match the original image."
+            self.ask()
+            fig_descriptions[2] = self.current_response.description
+            self.image_descriptions[image_name] = fig_descriptions
+            ask_claude_for_plot(self.current_response.description)
+
+            destination_path = os.path.join('/Users/chelsea/python_projects/project_files/outputs',
+                                            'reconstruction_2_' + image_name)
+            shutil.move('reconstructed_figure.jpg', destination_path)
+
+    def create_expected_figure_descriptions(self):
+        for image_name in self.image_names:
+            self.current_response_model = ExpectedFigureDescription
+            self.current_request = "Read the text for this paper and tell me what you expect the figure {} to look like.  Here is the text {}".format(image_name, self.text)
+            self.ask()
+            ask_claude_for_plot(self.current_response.description)
+            destination_path = os.path.join('/Users/chelsea/python_projects/project_files/outputs',
+                                            'expectation_' + image_name)
+            shutil.move('reconstructed_figure.jpg', destination_path)
+            self.expected_descriptions[image_name] = self.current_response.description
 
     def compare_figures_to_paper(self):
-        self.create_expected_figure_description()
+        self.create_expected_figure_descriptions()
         self.describe_figures()
 
     def get_supporting_findings(self):
