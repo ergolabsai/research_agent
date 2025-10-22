@@ -82,11 +82,11 @@ class ReviewSession:
                                                                        "content": content}])
 
     def describe_figures(self):
-        # kk = 0
+        kk = 0
         for image, media_type, image_name in zip(self.images, self.media_types, self.image_names):
-            # if kk > 0:
-            #     break
-            # kk = kk + 1
+            if kk > 0:
+                break
+            kk = kk + 1
             fig_descriptions = {1: '', 2: ''}
             self.current_response_model = FigureDescription
             self.current_request = "Make a description of this plot that could be used to reconstruct the image."
@@ -115,7 +115,11 @@ class ReviewSession:
             shutil.move('reconstructed_figure.jpg', destination_path)
 
     def create_expected_figure_descriptions(self):
+        kk=0
         for image_name in self.image_names:
+            if kk > 0:
+                break
+            kk = kk + 1
             self.current_response_model = ExpectedFigureDescription
             self.current_request = "Read the text for this paper and tell me what you expect the figure {} to look like.  Here is the text {}".format(image_name, self.text)
             self.ask()
