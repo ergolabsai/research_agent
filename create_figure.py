@@ -1,71 +1,115 @@
-import matplotlib.pyplot as plt
 import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib import colors
+from scipy.ndimage import gaussian_filter
 
-# Create figure and axis
-fig, ax = plt.subplots(figsize=(8, 6))
+# Set random seed for reproducibility
+np.random.seed(42)
 
-# Data points based on the description
-# 1. Vertical cluster near τ = -0.2, B₁/B₀ from 0.1 to 0.4
-tau_cluster1 = np.full(8, -0.2) + np.random.uniform(-0.02, 0.02, 8)
-b_cluster1 = np.linspace(0.1, 0.4, 8) + np.random.uniform(-0.02, 0.02, 8)
+# Create grid
+tau = np.linspace(-0.5, 1.5, 400)
+r = np.linspace(-20, 20, 300)
+TAU, R = np.meshgrid(tau, r)
 
-# 2. Two points near τ = 0, B₁/B₀ close to 1.0
-tau_top = np.array([0.0, 0.02])
-b_top = np.array([0.98, 0.95])
+# Create base intensity field
+intensity = np.zeros_like(TAU)
 
-# 3. Scattered points between τ = 0 and τ = 1.0, B₁/B₀ between 0 and 0.2
-tau_middle = np.random.uniform(0.05, 0.95, 25)
-b_middle = np.random.uniform(0.0, 0.2, 25)
+# Left region (tau < 0.5): Complex turbulent-like structures
+left_mask = TAU < 0.5
+# Create turbulent structures using multiple noise layers
+for i in range(5):
+    noise = np.random.randn(*TAU.shape) * 10000
+    noise = gaussian_filter(noise, sigma=[3 + i*2, 3 + i*2])
+    intensity += noise * left_mask
 
-# 4. Prominent point near τ = 1.1, B₁/B₀ ≈ 0.83
-tau_prominent = np.array([1.1])
-b_prominent = np.array([0.83])
+# Add some organized structures in left region
+for i in range(-3, 4):
+    intensity += left_mask * 15000 * np.exp(-((R - i*7)**2 / 50 + (TAU + 0.2)**2 / 0.05))
 
-# 5. Cluster near τ = 1.0 and beyond
-tau_cluster2 = np.array([0.98, 1.0, 1.02, 1.05, 1.08, 1.15, 1.2, 1.25, 1.3, 1.35])
-b_cluster2 = np.array([0.35, 0.45, 0.25, 0.60, 0.75, 0.50, 0.30, 0.65, 0.40, 0.20])
+# Right region (tau > 0.5): Higher values, more uniform yellow-orange
+right_mask = TAU > 0.5
+base_right = 80000 + 20000 * np.exp(-(R**2) / 300)
+# Add some variation
+noise_right = np.random.randn(*TAU.shape) * 5000
+noise_right = gaussian_filter(noise_right, sigma=[5, 5])
+intensity += right_mask * (base_right + noise_right)
 
-# Combine all data points
-tau_all = np.concatenate([tau_cluster1, tau_top, tau_middle, tau_prominent, tau_cluster2])
-b_all = np.concatenate([b_cluster1, b_top, b_middle, b_prominent, b_cluster2])
+# Create transition zone around tau = 0.5-1.0 with blue intermediate values
+transition_width = 0.3
+transition_center = 0.7
+transition_profile = np.exp(-((TAU - transition_center)**2) / (2 * transition_width**2))
 
-# Create scatter plot
-ax.scatter(tau_all, b_all, color='black', s=20, zorder=3)
+# Add diagonal feature (upper right to lower right)
+diagonal_effect = np.exp(-((TAU - 0.7 - R/40)**2) / 0.05)
+intensity += diagonal_effect * 30000 * (1 - right_mask * 0.5)
 
-# Add vertical dashed lines at τ = 0 and τ = 1.0
-ax.axvline(x=0, color='black', linestyle='--', linewidth=1, zorder=2)
-ax.axvline(x=1.0, color='black', linestyle='--', linewidth=1, zorder=2)
+# Create sharp transition with blue contours
+transition_zone = (TAU > 0.4) & (TAU < 1.0)
+intensity[transition_zone] = intensity[transition_zone] * 0.6 + 25000 * transition_profile[transition_zone]
+
+# Ensure values are in reasonable range (0 to ~1.2e5)
+intensity = np.clip(intensity, 0, 120000)
+
+# Smooth the data slightly
+intensity = gaussian_filter(intensity, sigma=[1.5, 1.5])
+
+# Create the figure
+fig, ax = plt.subplots(figsize=(10, 7))
+
+# Create custom colormap: black/brown -> red -> orange -> yellow with blue for intermediate
+from matplotlib.colors import LinearSegmentedColormap
+colors_list = [
+    (0.0, '#000000'),   # black
+    (0.05, '#1a0a00'),  # dark brown
+    (0.15, '#4a0000'),  # dark red
+    (0.25, '#1a1a4a'),  # blue (intermediate values)
+    (0.35, '#2a2a8a'),  # blue
+    (0.45, '#8a0000'),  # red
+    (0.6, '#ff4500'),   # orange-red
+    (0.75, '#ff8c00'),  # dark orange
+    (0.85, '#ffa500'),  # orange
+    (0.95, '#ffff00'),  # yellow
+    (1.0, '#ffff99')    # light yellow
+]
+n_bins = 256
+cmap = LinearSegmentedColormap.from_list('custom', colors_list, N=n_bins)
+
+# Create contour plot
+levels = np.linspace(0, 120000, 50)
+contour = ax.contourf(TAU, R, intensity, levels=levels, cmap=cmap, extend='neither')
+
+# Add contour lines for better definition
+contour_lines = ax.contour(TAU, R, intensity, levels=15, colors='black', alpha=0.2, linewidths=0.5)
+
+# Add colorbar
+cbar = plt.colorbar(contour, ax=ax, label='')
+# Format colorbar ticks in scientific notation
+cbar.ax.yaxis.set_major_formatter(plt.FuncFormatter(lambda x, p: f'{x/1e4:.1f}'))
+cbar.set_label('×10⁴', rotation=0, labelpad=20, y=1.05)
+
+# Set axis labels
+ax.set_xlabel('τ', fontsize=14)
+ax.set_ylabel('r (mm)', fontsize=14)
 
 # Set axis limits
 ax.set_xlim(-0.5, 1.5)
-ax.set_ylim(0, 1.0)
+ax.set_ylim(-20, 20)
 
-# Set labels
-ax.set_xlabel('τ', fontsize=14)
-ax.set_ylabel('B₁/B₀', fontsize=14)
+# Add pressure label in bottom right corner
+ax.text(1.35, -16, '3500 Torr', fontsize=12, 
+        bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
 
-# Add text label "5800 Torr" in top right corner
-ax.text(0.95, 0.95, '5800 Torr', transform=ax.transAxes, 
-        fontsize=12, verticalalignment='top', horizontalalignment='right')
-
-# Set frame style
-ax.spines['top'].set_color('black')
-ax.spines['bottom'].set_color('black')
-ax.spines['left'].set_color('black')
-ax.spines['right'].set_color('black')
-
-# Ensure tick marks are visible
-ax.tick_params(direction='in', length=6, width=1, colors='black')
-
-# Add grid (optional, can be removed if not desired)
-ax.grid(False)
+# Add grid
+ax.grid(True, alpha=0.3, linestyle='--', linewidth=0.5)
 
 # Tight layout
 plt.tight_layout()
 
-# Save figure
-plt.savefig('reconstructed_figure.jpg', dpi=300, bbox_inches='tight', 
-            facecolor='white', edgecolor='none')
+# Save the figure
+plt.savefig('reconstructed_figure.jpg', dpi=300, bbox_inches='tight', format='jpg')
 print("Figure saved as reconstructed_figure.jpg")
 
-plt.close()
+# Also display some statistics
+print(f"Intensity range: {intensity.min():.2e} to {intensity.max():.2e}")
+print(f"Figure dimensions: {fig.get_size_inches()}")
+

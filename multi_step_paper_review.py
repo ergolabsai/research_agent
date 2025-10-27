@@ -11,6 +11,8 @@ from pydantic import BaseModel
 from create_plots import ask_claude_for_plot
 import shutil
 
+SIMPLIFY = True
+
 # Set up your OpenRouter API key
 os.environ["OPENROUTER_API_KEY"] = "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"
 os.environ["CLAUDE_API_KEY"] = "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"
@@ -31,8 +33,9 @@ class ReviewSession:
         self.current_media_type = []
         self.current_image_data = []
         self.current_response = ''
-        self.image_descriptions = {}
+        self.figure_descriptions = {}
         self.expected_descriptions = {}
+        self.figure_differences = {}
 
     def load_document(self, tex_folder, max_dim=800):
         self.tex_folder = Path(tex_folder)
@@ -64,11 +67,11 @@ class ReviewSession:
 
         return {'text': text, 'images': images, 'filenames': filenames, 'media_types': media_types}
 
-    def ask(self):
+    def ask(self, use_image=False):
 
         content = [{"type": "text",
                     "text": self.current_request}]
-        if self.current_image_data:
+        if use_image:
             for image, media in zip(self.current_image_data, self.current_media_type):
                 content = content + [{"type": "image","source": {"type": "base64",
                                                    "media_type": media,
@@ -84,35 +87,38 @@ class ReviewSession:
     def describe_figures(self):
         kk = 0
         for image, media_type, image_name in zip(self.images, self.media_types, self.image_names):
-            if kk > 0:
-                break
-            kk = kk + 1
+            if SIMPLIFY:
+                if kk > 0:
+                    break
+                kk = kk + 1
             fig_descriptions = {1: '', 2: ''}
             self.current_response_model = FigureDescription
             self.current_request = "Make a description of this plot that could be used to reconstruct the image."
             self.current_media_type = [media_type]
             self.current_image_data = [image]
-            self.ask()
+            self.ask(use_image=True)
             fig_descriptions[1] = self.current_response.description
-            ask_claude_for_plot(self.current_response.description)
-            img, mt = encode_image(Path('reconstructed_figure.jpg'))
+            if not SIMPLIFY:
+                ask_claude_for_plot(self.current_response.description)
+                img, mt = encode_image(Path('reconstructed_figure.jpg'))
 
-            destination_path = os.path.join('/Users/chelsea/python_projects/project_files/outputs',
-                                            'reconstruction_' + image_name)
-            shutil.move('reconstructed_figure.jpg', destination_path)
+                destination_path = os.path.join('/Users/chelsea/python_projects/project_files/outputs',
+                                                'reconstruction_' + image_name)
+                shutil.move('reconstructed_figure.jpg', destination_path)
 
-            self.current_media_type = [media_type, mt]
-            self.current_image_data = [image, img]
-            self.current_response_model = FigureDescription
-            self.current_request = "The second image is a reconstruction of the first image based on this description: \n" + self.current_response.description + "\n improve the description to better match the original image."
-            self.ask()
+                self.current_media_type = [media_type, mt]
+                self.current_image_data = [image, img]
+                self.current_response_model = FigureDifferences
+                self.current_request = "The second image is a reconstruction of the first image based on this description: \n" + self.current_response.description + "\n improve the description to better match the original image."
+                self.ask(use_image=True)
             fig_descriptions[2] = self.current_response.description
-            self.image_descriptions[image_name] = fig_descriptions
-            ask_claude_for_plot(self.current_response.description)
+            self.figure_descriptions[image_name] = fig_descriptions
+            if not SIMPLIFY:
+                ask_claude_for_plot(self.current_response.description)
 
-            destination_path = os.path.join('/Users/chelsea/python_projects/project_files/outputs',
-                                            'reconstruction_2_' + image_name)
-            shutil.move('reconstructed_figure.jpg', destination_path)
+                destination_path = os.path.join('/Users/chelsea/python_projects/project_files/outputs',
+                                                'reconstruction_2_' + image_name)
+                shutil.move('reconstructed_figure.jpg', destination_path)
 
     def create_expected_figure_descriptions(self):
         kk=0
@@ -123,45 +129,88 @@ class ReviewSession:
             self.current_response_model = ExpectedFigureDescription
             self.current_request = "Read the text for this paper and tell me what you expect the figure {} to look like.  Here is the text {}".format(image_name, self.text)
             self.ask()
-            ask_claude_for_plot(self.current_response.description)
-            destination_path = os.path.join('/Users/chelsea/python_projects/project_files/outputs',
-                                            'expectation_' + image_name)
-            shutil.move('reconstructed_figure.jpg', destination_path)
+            if not SIMPLIFY:
+                ask_claude_for_plot(self.current_response.description)
+                destination_path = os.path.join('/Users/chelsea/python_projects/project_files/outputs',
+                                                'expectation_' + image_name)
+                shutil.move('reconstructed_figure.jpg', destination_path)
             self.expected_descriptions[image_name] = self.current_response.description
 
     def compare_figures_to_paper(self):
         self.create_expected_figure_descriptions()
         self.describe_figures()
+        kk = 0
+        for image_name in self.image_names:
+            if SIMPLIFY:
+                if kk > 0:
+                    break
+                kk = kk + 1
+            self.current_request = """
+The following is a description of a figure: {}
+The following is a description of what we were expecting this figure to look like: {}
+What are the key differences between these two descriptions that would affect the interpretation of the physics.
+Give your answer as a list of the key differences.
+""".format(self.figure_descriptions[image_name][2], self.expected_descriptions[image_name])
+            self.current_response_model = FigureDifferences
+            self.current_image_data = False
+            self.ask()
+            self.figure_differences[image_name] = self.current_response.differences
 
     def get_supporting_findings(self):
-        pass
+        figure_names = ", ".join(self.image_names)
+        self.current_request = """
+Please read the article and find the main question being asked, the article's answer to the question, and the supporting claims.
+For each claim, list the evidence for the claim.
+Include which figures are relevant, any specific numeric values quoted, and citations.
+Finally assign an importance score from 1 to n, where n is the number of claims and 1 is the most important claim.
+Return the following as a dictionary in the form:
 
-    def check_supporting_findings(self):
-        pass
+("question": "the main question in 2-3 sentences",
+"answer": "the author's answer",
+"supporting_claims": ("importance score":
+    ("description": "3-4 sentence description of claim.",
+    "Figure": "value": "number", "units": "unit", "source": ))))
+
+When you list the figure, write the name of the figure from this list: {}
+
+Here is the text of the document in latex format:
+""".format(figure_names) + self.text
+        self.current_response_model = ResearchAnalysis
+        self.ask()
+        self.supporting_claims_dict = self.current_response.supporting_claims
+
+    def find_claims_for_figure(self, figure_name):
+        figure_claims_list = []
+        for claim in self.supporting_claims_dict.values():
+            for figure in claim.figures:
+                if figure.name == figure_name:
+                    figure_claims_list = figure_claims_list + [claim.description]
+
+        return figure_claims_list
 
     def combine_figure_findings_and_supporting_findings(self):
-        pass
-
-    def cross_reference_supporting_findings(self):
-        pass
+        kk = 0
+        for figure_name in self.image_names:
+            if SIMPLIFY:
+                if kk > 0:
+                    break
+                kk = kk + 1
+            claims_list = self.find_claims_for_figure(figure_name)
+            for claim in claims_list:
+                self.current_request = """The following claim in a paper you are reviewing are made using evidence from the figure {}:
+{}
+You have previously compared this figure to how the text describes it.  These are the key differences you found: {}
+Do you think the differences change the validity of the claim?""".format(figure_name, claim, self.figure_differences[figure_name])
+                self.current_response_model = ClaimValidity
+                self.ask()
 
     def evaluated_supporting_findings(self):
         self.get_supporting_findings()
-        self.check_supporting_findings()
         self.combine_figure_findings_and_supporting_findings()
-        self.cross_reference_supporting_findings()
-
-    def look_for_unstated_issues(self):
-        pass
 
     def discuss_reliability(self):
         pass
 
-    def make_figure_visualization(self):
-        pass
-
-    def make_logic_visualization(self):
-        pass
 
 
 def encode_image(image_path: Path, max_size=800) -> tuple[str, str]:
@@ -209,7 +258,4 @@ if __name__ == '__main__':
     review.load_document('/Users/chelsea/python_projects/project_files/shumlak2009_latex')
     review.compare_figures_to_paper()
     review.evaluated_supporting_findings()
-    review.look_for_unstated_issues()
     review.discuss_reliability()
-    review.make_figure_visualization()
-    review.make_logic_visualization()
