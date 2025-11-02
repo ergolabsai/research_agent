@@ -1,5 +1,9 @@
 from pydantic import BaseModel, Field
-from typing import Dict
+from typing import Dict, List
+
+class ContextString(BaseModel):
+    context: str = Field(description="context for future API calls")
+
 
 class FigureDescription(BaseModel):
     description: str = Field(description="description of the image")
@@ -7,6 +11,18 @@ class FigureDescription(BaseModel):
 
 class ExpectedFigureDescription(BaseModel):
     description: str = Field(description="expected figure description")
+
+
+class Comparison(BaseModel):
+    """Comparison results with differences and confirmations."""
+    differences: List[str] = Field(
+        description="List of differences found",
+        default_factory=list
+    )
+    confirmations: List[str] = Field(
+        description="List of confirmations found",
+        default_factory=list
+    )
 
 
 class FigureDifferences(BaseModel):
@@ -36,4 +52,6 @@ class ResearchAnalysis(BaseModel):
     )
 
 class ClaimValidity(BaseModel):
-    validity: str = Field(description="how does the validity change")
+    validity_statements: list[str] = Field(
+        description="A list of differences that would impact the validity of the supporting statement."
+    )

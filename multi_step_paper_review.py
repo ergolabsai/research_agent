@@ -24,8 +24,9 @@ class ReviewSession:
         self.client = instructor.from_anthropic(Anthropic(api_key=os.environ.get("CLAUDE_API_KEY")))
         self.model_id = "claude-sonnet-4-5-20250929"
 
+        self.context = ''
+        self.current_context = None
         self.text = ''
-        self.filenames = []
         self.images = []
         self.media_types = []
         self.current_response_model = BaseModel
@@ -33,11 +34,32 @@ class ReviewSession:
         self.current_media_type = []
         self.current_image_data = []
         self.current_response = ''
-        self.figure_descriptions = {}
         self.expected_descriptions = {}
         self.figure_differences = {}
+        self.figure_confirmations = {}
+
+    def ask(self, use_image=False, use_context=False):
+
+        content = [{"type": "text",
+                    "text": self.current_request}]
+        if use_image:
+            for image, media in zip(self.current_image_data, self.current_media_type):
+                content = content + [{"type": "image", "source": {"type": "base64", "media_type": media, "data": image}}]
+
+        api_params = {
+            "model": self.model_id,
+            "max_tokens": 4096,
+            "response_model": self.current_response_model,
+            "messages": [{"role": "user", "content": content}]
+        }
+
+        if use_context:
+            api_params["system"] = [{"type": "text", "text": self.current_context}]
+
+        self.current_response = self.client.messages.create(**api_params)
 
     def load_document(self, tex_folder, max_dim=800):
+        print('loading document')
         self.tex_folder = Path(tex_folder)
         txt_file = self.tex_folder / 'main_text.tex'
         with open(txt_file, 'r', encoding='utf-8', errors='ignore') as f:
@@ -46,8 +68,8 @@ class ReviewSession:
         self.text = text
 
         filenames = []
-        images = []
-        media_types = []
+        images = {}
+        media_types = {}
 
         image_folder = self.tex_folder / 'images'
 
@@ -58,8 +80,8 @@ class ReviewSession:
             img, media_type = encode_image(img_path)
 
             filenames.append(img_path.name)
-            images.append(img)
-            media_types.append(media_type)
+            images[img_path.name] = img
+            media_types[img_path.name] = media_type
 
         self.image_names = filenames
         self.images = images
@@ -67,61 +89,19 @@ class ReviewSession:
 
         return {'text': text, 'images': images, 'filenames': filenames, 'media_types': media_types}
 
-    def ask(self, use_image=False):
-
-        content = [{"type": "text",
-                    "text": self.current_request}]
-        if use_image:
-            for image, media in zip(self.current_image_data, self.current_media_type):
-                content = content + [{"type": "image","source": {"type": "base64",
-                                                   "media_type": media,
-                                                   "data": image}}]
-
-
-        self.current_response = self.client.messages.create(model=self.model_id,
-                                                            max_tokens=4096,
-                                                            response_model=self.current_response_model,
-                                                            messages=[{"role": "user",
-                                                                       "content": content}])
-
-    def describe_figures(self):
-        kk = 0
-        for image, media_type, image_name in zip(self.images, self.media_types, self.image_names):
-            if SIMPLIFY:
-                if kk > 0:
-                    break
-                kk = kk + 1
-            fig_descriptions = {1: '', 2: ''}
-            self.current_response_model = FigureDescription
-            self.current_request = "Make a description of this plot that could be used to reconstruct the image."
-            self.current_media_type = [media_type]
-            self.current_image_data = [image]
-            self.ask(use_image=True)
-            fig_descriptions[1] = self.current_response.description
-            if not SIMPLIFY:
-                ask_claude_for_plot(self.current_response.description)
-                img, mt = encode_image(Path('reconstructed_figure.jpg'))
-
-                destination_path = os.path.join('/Users/chelsea/python_projects/project_files/outputs',
-                                                'reconstruction_' + image_name)
-                shutil.move('reconstructed_figure.jpg', destination_path)
-
-                self.current_media_type = [media_type, mt]
-                self.current_image_data = [image, img]
-                self.current_response_model = FigureDifferences
-                self.current_request = "The second image is a reconstruction of the first image based on this description: \n" + self.current_response.description + "\n improve the description to better match the original image."
-                self.ask(use_image=True)
-            fig_descriptions[2] = self.current_response.description
-            self.figure_descriptions[image_name] = fig_descriptions
-            if not SIMPLIFY:
-                ask_claude_for_plot(self.current_response.description)
-
-                destination_path = os.path.join('/Users/chelsea/python_projects/project_files/outputs',
-                                                'reconstruction_2_' + image_name)
-                shutil.move('reconstructed_figure.jpg', destination_path)
+    def create_context(self):
+        print('creating context')
+        self.current_request = """You are reviewing a paper for publication.  
+You are going to use Claude to assist you.  You want to create context for claude requests.  
+Please generate context that would be helpful to you in future API calls but that would not bias you towards the author's conclusions and instead would help you generate useful answers about the figures without having to read the text.
+Here is my text {}""".format(self.text)
+        self.current_response_model = ContextString
+        self.ask()
+        self.context = self.current_response.context
 
     def create_expected_figure_descriptions(self):
-        kk=0
+        print('creating expected figure descriptions')
+        kk = 0
         for image_name in self.image_names:
             if kk > 0:
                 break
@@ -136,27 +116,34 @@ class ReviewSession:
                 shutil.move('reconstructed_figure.jpg', destination_path)
             self.expected_descriptions[image_name] = self.current_response.description
 
-    def compare_figures_to_paper(self):
-        self.create_expected_figure_descriptions()
-        self.describe_figures()
-        kk = 0
+    def compare_expected_figure_to_figure(self):
+        print('comparing expected figure descriptions')
+        kk=0
         for image_name in self.image_names:
-            if SIMPLIFY:
-                if kk > 0:
-                    break
-                kk = kk + 1
+            if kk > 0:
+                break
+            kk = kk + 1
             self.current_request = """
-The following is a description of a figure: {}
-The following is a description of what we were expecting this figure to look like: {}
-What are the key differences between these two descriptions that would affect the interpretation of the physics.
-Give your answer as a list of the key differences.
-""".format(self.figure_descriptions[image_name][2], self.expected_descriptions[image_name])
-            self.current_response_model = FigureDifferences
-            self.current_image_data = False
-            self.ask()
+You are reviewing a paper and have created an description of what you expect the figure {} to look like.
+{}
+Evaluate which features are confirmed in the figure and where the expected figure and original figure disagree.
+Return your answer as a dictionary of differences and confirmations.""".format(image_name, self.expected_descriptions[image_name])
+            self.current_response_model = Comparison
+            self.current_image_data = [self.images[image_name]]
+            self.current_media_type = [self.media_types[image_name]]
+            self.current_context = self.context
+            self.ask(use_image=True, use_context=True)
+            self.figure_confirmations[image_name] = self.current_response.confirmations
             self.figure_differences[image_name] = self.current_response.differences
 
+    def make_figure_differences_and_confirmations(self):
+        print('making figure differences and confirmations')
+        self.create_context()
+        self.create_expected_figure_descriptions()
+        self.compare_expected_figure_to_figure()
+
     def get_supporting_findings(self):
+        print('getting supporting findings')
         figure_names = ", ".join(self.image_names)
         self.current_request = """
 Please read the article and find the main question being asked, the article's answer to the question, and the supporting claims.
@@ -189,6 +176,7 @@ Here is the text of the document in latex format:
         return figure_claims_list
 
     def combine_figure_findings_and_supporting_findings(self):
+        print('combining figure findings and supporting findings')
         kk = 0
         for figure_name in self.image_names:
             if SIMPLIFY:
@@ -200,11 +188,14 @@ Here is the text of the document in latex format:
                 self.current_request = """The following claim in a paper you are reviewing are made using evidence from the figure {}:
 {}
 You have previously compared this figure to how the text describes it.  These are the key differences you found: {}
-Do you think the differences change the validity of the claim?""".format(figure_name, claim, self.figure_differences[figure_name])
+Here are the key confirmed observations: {}
+List how these differences and confirmations impact the validity of the claim.  
+Do not include confirmations or differences that are not scientifically impactful such as formatting.""".format(figure_name, claim, self.figure_differences[figure_name], self.figure_confirmations[figure_name])
                 self.current_response_model = ClaimValidity
                 self.ask()
 
-    def evaluated_supporting_findings(self):
+    def evaluate_supporting_findings(self):
+        print('evaluating supporting findings')
         self.get_supporting_findings()
         self.combine_figure_findings_and_supporting_findings()
 
@@ -256,6 +247,8 @@ if __name__ == '__main__':
     review = ReviewSession()
 
     review.load_document('/Users/chelsea/python_projects/project_files/shumlak2009_latex')
-    review.compare_figures_to_paper()
-    review.evaluated_supporting_findings()
-    review.discuss_reliability()
+    review.make_figure_differences_and_confirmations()
+    review.evaluate_supporting_findings()
+    # review.discuss_reliability()
+
+#What do you think was happening tp create the differences
