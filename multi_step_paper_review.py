@@ -37,6 +37,8 @@ class ReviewSession:
         self.expected_descriptions = {}
         self.figure_differences = {}
         self.figure_confirmations = {}
+        self.claim_confirmations = {}
+        self.claim_contradictions = {}
 
     def ask(self, use_image=False, use_context=False):
 
@@ -168,15 +170,17 @@ Here is the text of the document in latex format:
 
     def find_claims_for_figure(self, figure_name):
         figure_claims_list = []
-        for claim in self.supporting_claims_dict.values():
-            for figure in claim.figures:
+        for key in self.supporting_claims_dict.keys():
+            for figure in self.supporting_claims_dict[key].figures:
                 if figure.name == figure_name:
-                    figure_claims_list = figure_claims_list + [claim.description]
+                    figure_claims_list = figure_claims_list + [key]
 
         return figure_claims_list
 
     def combine_figure_findings_and_supporting_findings(self):
         print('combining figure findings and supporting findings')
+        self.claim_confirmations = {i: {} for i in self.supporting_claims_dict.keys()}
+        self.claim_contradictions = {i: {} for i in self.supporting_claims_dict.keys()}
         kk = 0
         for figure_name in self.image_names:
             if SIMPLIFY:
@@ -185,14 +189,17 @@ Here is the text of the document in latex format:
                 kk = kk + 1
             claims_list = self.find_claims_for_figure(figure_name)
             for claim in claims_list:
-                self.current_request = """The following claim in a paper you are reviewing are made using evidence from the figure {}:
+                self.current_request = """The following is a claim from a paper you are reviewing using evidence from the figure {}:
 {}
 You have previously compared this figure to how the text describes it.  These are the key differences you found: {}
 Here are the key confirmed observations: {}
-List how these differences and confirmations impact the validity of the claim.  
-Do not include confirmations or differences that are not scientifically impactful such as formatting.""".format(figure_name, claim, self.figure_differences[figure_name], self.figure_confirmations[figure_name])
+Create a list of how differences undermine the claim validity.
+Make a list of how confirmations support the claim validity.  
+Do not include confirmations or differences that are not scientifically impactful such as formatting.""".format(figure_name, self.supporting_claims_dict[claim].description, self.figure_differences[figure_name], self.figure_confirmations[figure_name])
                 self.current_response_model = ClaimValidity
                 self.ask()
+                self.claim_confirmations[claim].update({figure_name: self.current_response.confirmations})
+                self.claim_contradictions[claim].update({figure_name: self.current_response.contradictions})
 
     def evaluate_supporting_findings(self):
         print('evaluating supporting findings')

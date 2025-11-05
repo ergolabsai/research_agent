@@ -52,6 +52,9 @@ class ResearchAnalysis(BaseModel):
     )
 
 class ClaimValidity(BaseModel):
-    validity_statements: list[str] = Field(
-        description="A list of differences that would impact the validity of the supporting statement."
+    confirmations: list[str] = Field(
+        description="A list of confirmations that support the the validity of the supporting statement."
+    )
+    contradictions: list[str] = Field(
+        description="A list of differences that undermine the the validity of the supporting statement."
     )
