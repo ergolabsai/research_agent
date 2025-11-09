@@ -11,7 +11,8 @@ from pydantic import BaseModel
 from create_plots import ask_claude_for_plot
 import shutil
 
-SIMPLIFY = True
+SIMPLIFY = False
+MAKE_PLOTS = False
 
 # Set up your OpenRouter API key
 os.environ["OPENROUTER_API_KEY"] = "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"
@@ -36,9 +37,15 @@ class ReviewSession:
         self.current_response = ''
         self.expected_descriptions = {}
         self.figure_differences = {}
-        self.figure_confirmations = {}
+        self.figure_similarities = {}
         self.claim_confirmations = {}
         self.claim_contradictions = {}
+        self.question = ''
+        self.answer = ''
+        self.review = ''
+        self.supporting_claims_dict = {}
+        self.image_names = []
+
 
     def ask(self, use_image=False, use_context=False):
 
@@ -105,13 +112,14 @@ Here is my text {}""".format(self.text)
         print('creating expected figure descriptions')
         kk = 0
         for image_name in self.image_names:
-            if kk > 0:
-                break
-            kk = kk + 1
+            if SIMPLIFY:
+                if kk > 0:
+                    break
+                kk = kk + 1
             self.current_response_model = ExpectedFigureDescription
             self.current_request = "Read the text for this paper and tell me what you expect the figure {} to look like.  Here is the text {}".format(image_name, self.text)
             self.ask()
-            if not SIMPLIFY:
+            if MAKE_PLOTS:
                 ask_claude_for_plot(self.current_response.description)
                 destination_path = os.path.join('/Users/chelsea/python_projects/project_files/outputs',
                                                 'expectation_' + image_name)
@@ -122,24 +130,25 @@ Here is my text {}""".format(self.text)
         print('comparing expected figure descriptions')
         kk=0
         for image_name in self.image_names:
-            if kk > 0:
-                break
-            kk = kk + 1
+            if SIMPLIFY:
+                if kk > 0:
+                    break
+                kk = kk + 1
             self.current_request = """
 You are reviewing a paper and have created an description of what you expect the figure {} to look like.
 {}
-Evaluate which features are confirmed in the figure and where the expected figure and original figure disagree.
-Return your answer as a dictionary of differences and confirmations.""".format(image_name, self.expected_descriptions[image_name])
+Evaluate which features are similar between the figure and where the expected figure and original figure are different.
+Return your answer as a dictionary of differences and similarties.""".format(image_name, self.expected_descriptions[image_name])
             self.current_response_model = Comparison
             self.current_image_data = [self.images[image_name]]
             self.current_media_type = [self.media_types[image_name]]
             self.current_context = self.context
             self.ask(use_image=True, use_context=True)
-            self.figure_confirmations[image_name] = self.current_response.confirmations
+            self.figure_similarities[image_name] = self.current_response.similarities
             self.figure_differences[image_name] = self.current_response.differences
 
-    def make_figure_differences_and_confirmations(self):
-        print('making figure differences and confirmations')
+    def make_figure_differences_and_similarities(self):
+        print('making figure differences and similarities')
         self.create_context()
         self.create_expected_figure_descriptions()
         self.compare_expected_figure_to_figure()
@@ -166,6 +175,8 @@ Here is the text of the document in latex format:
 """.format(figure_names) + self.text
         self.current_response_model = ResearchAnalysis
         self.ask()
+        self.question = self.current_response.question
+        self.answer = self.current_response.answer
         self.supporting_claims_dict = self.current_response.supporting_claims
 
     def find_claims_for_figure(self, figure_name):
@@ -195,7 +206,7 @@ You have previously compared this figure to how the text describes it.  These ar
 Here are the key confirmed observations: {}
 Create a list of how differences undermine the claim validity.
 Make a list of how confirmations support the claim validity.  
-Do not include confirmations or differences that are not scientifically impactful such as formatting.""".format(figure_name, self.supporting_claims_dict[claim].description, self.figure_differences[figure_name], self.figure_confirmations[figure_name])
+Do not include confirmations or differences that are not scientifically impactful such as formatting.""".format(figure_name, self.supporting_claims_dict[claim].description, self.figure_differences[figure_name], self.figure_similarities[figure_name])
                 self.current_response_model = ClaimValidity
                 self.ask()
                 self.claim_confirmations[claim].update({figure_name: self.current_response.confirmations})
@@ -207,8 +218,24 @@ Do not include confirmations or differences that are not scientifically impactfu
         self.combine_figure_findings_and_supporting_findings()
 
     def discuss_reliability(self):
-        pass
+        print('building claim request')
+        claim_request = """The following are a set of claims made in a paper you are reviewing.  
+Along with each claim is a set of a set of confirmations and contradictions of the claim based on a separate review of the relevant figures.
+Use these observations to evaluate the overall validity of the author's final conclusion, which is:
+{}
+""".format(self.answer)
+        for claim_key in self.supporting_claims_dict.keys():
+            claim_request = claim_request + 'first claim: ' + self.supporting_claims_dict[claim_key].description
+            for figure_key in self.claim_confirmations[claim_key].keys():
+                claim_request = claim_request + '\nRelevant confirmations from figure {}:  '.format(figure_key) + ".  ".join(self.claim_confirmations[claim_key][figure_key])
+            for figure_key in self.claim_contradictions[claim_key].keys():
+                claim_request = claim_request + '\nRelevant contradictions from figure {}:  '.format(figure_key) + ".  ".join(self.claim_contradictions[claim_key][figure_key])
 
+        self.current_request = claim_request
+        self.current_response_model = OverAllReview
+        self.current_context = self.context
+        self.ask(use_context=True)
+        self.review = self.current_response.review
 
 
 def encode_image(image_path: Path, max_size=800) -> tuple[str, str]:
@@ -245,7 +272,6 @@ def encode_image(image_path: Path, max_size=800) -> tuple[str, str]:
     img.save(buffer, format=img_format)
     image_data = base64.standard_b64encode(buffer.getvalue()).decode("utf-8")
 
-
     return image_data, media_type
 
 
@@ -254,8 +280,7 @@ if __name__ == '__main__':
     review = ReviewSession()
 
     review.load_document('/Users/chelsea/python_projects/project_files/shumlak2009_latex')
-    review.make_figure_differences_and_confirmations()
+    review.make_figure_differences_and_similarities()
     review.evaluate_supporting_findings()
-    # review.discuss_reliability()
+    review.discuss_reliability()
 
-#What do you think was happening tp create the differences

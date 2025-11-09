@@ -14,21 +14,16 @@ class ExpectedFigureDescription(BaseModel):
 
 
 class Comparison(BaseModel):
-    """Comparison results with differences and confirmations."""
+    """Comparison results with differences and similarities."""
     differences: List[str] = Field(
         description="List of differences found",
         default_factory=list
     )
-    confirmations: List[str] = Field(
-        description="List of confirmations found",
+    similarities: List[str] = Field(
+        description="List of similarities found",
         default_factory=list
     )
 
-
-class FigureDifferences(BaseModel):
-    differences: list[str] = Field(
-        description="A list where each item is one distinct difference between the descriptions"
-    )
 
 class FigureInfo(BaseModel):
     """Numerical evidence from a figure or source."""
@@ -51,6 +46,7 @@ class ResearchAnalysis(BaseModel):
         description="Dictionary of supporting claims where keys are importance scores (e.g., '1', '2', 'n' where 'n' is the number of supporting claims)"
     )
 
+
 class ClaimValidity(BaseModel):
     confirmations: list[str] = Field(
         description="A list of confirmations that support the the validity of the supporting statement."
@@ -58,3 +54,7 @@ class ClaimValidity(BaseModel):
     contradictions: list[str] = Field(
         description="A list of differences that undermine the the validity of the supporting statement."
     )
+
+
+class OverAllReview(BaseModel):
+    review: str = Field(description="Review of the paper")
