@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FileText, Target, Upload, X, Image } from 'lucide-react';
+import { FileText, Target, Upload, X, CheckCircle, AlertCircle } from 'lucide-react';
 
 export default function PaperEditor() {
   const [draft, setDraft] = useState('');
@@ -7,6 +7,7 @@ export default function PaperEditor() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [images, setImages] = useState([]);
+  const [error, setError] = useState(null);
 
   const handleImageUpload = async (e) => {
     const files = Array.from(e.target.files);
@@ -33,6 +34,7 @@ export default function PaperEditor() {
       setImages([...images, ...newImages]);
     } catch (error) {
       console.error('Error loading images:', error);
+      setError('Failed to load images. Please try again.');
     }
   };
 
@@ -43,6 +45,7 @@ export default function PaperEditor() {
   const handleSubmit = async () => {
     setLoading(true);
     setResult(null);
+    setError(null);
 
     try {
       const response = await fetch("http://localhost:5001/api/analyze", {
@@ -60,17 +63,19 @@ export default function PaperEditor() {
         })
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        throw new Error(`API error: ${response.status}`);
+        throw new Error(data.error || `Server error: ${response.status}`);
       }
 
-      const data = await response.json();
       setResult(data);
-    } catch (error) {
-      setResult({ error: error.message });
+    } catch (err) {
+      setError(err.message);
+      console.error('Error:', err);
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   return (
@@ -81,9 +86,14 @@ export default function PaperEditor() {
         <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
           <div className="flex items-center gap-3">
             <FileText className="w-8 h-8 text-purple-600" />
-            <h1 className="text-2xl font-bold text-gray-900">
-              Research Paper Helper
-            </h1>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">
+                Research Paper Helper
+              </h1>
+              <p className="text-sm text-gray-600">
+                Get AI-powered feedback on your research draft
+              </p>
+            </div>
           </div>
         </div>
 
@@ -99,6 +109,9 @@ export default function PaperEditor() {
             placeholder="sk-ant-..."
             className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
           />
+          <p className="mt-2 text-xs text-gray-500">
+            Your API key is only used for this request and is not stored
+          </p>
         </div>
 
         {/* Draft Text */}
@@ -109,9 +122,12 @@ export default function PaperEditor() {
           <textarea
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            className="w-full h-64 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
+            className="w-full h-64 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none font-mono text-sm"
             placeholder="Paste your draft text here..."
           />
+          <p className="mt-2 text-xs text-gray-500">
+            {draft.length} characters
+          </p>
         </div>
 
         {/* Image Upload */}
@@ -187,15 +203,43 @@ export default function PaperEditor() {
           )}
         </button>
 
+        {/* Error Display */}
+        {error && (
+          <div className="mt-6 bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+            <div>
+              <h3 className="font-semibold text-red-900">Error</h3>
+              <p className="text-sm text-red-700 mt-1">{error}</p>
+            </div>
+          </div>
+        )}
+
         {/* Result Display */}
-        {result && (
+        {result && result.success && (
           <div className="mt-6 bg-white rounded-lg shadow-lg p-6">
-            {result.error ? (
-              <div className="text-red-600">Error: {result.error}</div>
-            ) : (
-              <pre className="whitespace-pre-wrap text-sm">
-                {JSON.stringify(result, null, 2)}
-              </pre>
+            <div className="flex items-center gap-2 mb-4">
+              <CheckCircle className="w-6 h-6 text-green-600" />
+              <h2 className="text-xl font-bold text-gray-900">Analysis Complete</h2>
+            </div>
+            
+            {/* Analysis Text */}
+            <div className="prose max-w-none">
+              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                <div className="whitespace-pre-wrap text-sm text-gray-800">
+                  {result.analysis}
+                </div>
+              </div>
+            </div>
+
+            {/* Usage Stats */}
+            {result.usage && (
+              <div className="mt-4 pt-4 border-t border-gray-200">
+                <p className="text-xs text-gray-500">
+                  Model: {result.model} | 
+                  Input tokens: {result.usage.input_tokens.toLocaleString()} | 
+                  Output tokens: {result.usage.output_tokens.toLocaleString()}
+                </p>
+              </div>
             )}
           </div>
         )}
