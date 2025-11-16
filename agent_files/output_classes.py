@@ -2,7 +2,9 @@ from pydantic import BaseModel, Field
 from typing import Dict, List
 
 class ContextString(BaseModel):
-    context: str = Field(description="context for future API calls")
+    context: List[str] = Field(
+        description="context for future API calls",
+        default_factory=list)
 
 
 class FigureDescription(BaseModel):

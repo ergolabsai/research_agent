@@ -3,7 +3,7 @@ from flask_cors import CORS
 import anthropic
 import json
 import os
-import base64
+from agent_files.multi_step_paper_review import ReviewSession
 
 app = Flask(__name__)
 CORS(app, origins=['http://localhost:5173'])
@@ -16,93 +16,34 @@ def analyze_paper():
     """
     try:
         data = request.get_json()
-        
+
         api_key = data.get('apiKey')
         draft = data.get('draft')
         images = data.get('images', [])
-        
+
         if not api_key:
             # Try to get from environment if not provided
             api_key = os.environ.get('CLAUDE_API_KEY')
-            
+
+        os.environ["CLAUDE_API_KEY"] = api_key
+
         if not api_key:
             print("ERROR: No API key provided")
             return jsonify({'error': 'API key is required'}), 400
-            
+
         if not draft:
             print("ERROR: No draft text provided")
             return jsonify({'error': 'Draft text is required'}), 400
-        
-        # Initialize Anthropic client
-        client = anthropic.Anthropic(api_key=api_key)
-        
-        # Build the message content
-        content = []
-        
-        # Add the draft text with instructions
-        content.append({
-            "type": "text",
-            "text": f"""You are a research paper reviewer. Analyze the following draft and provide constructive feedback:
 
-Draft Text:
-{draft}
+        review_session = ReviewSession()
+        review_session.text = draft
 
-Please provide:
-1. Overall assessment of the draft
-2. Strengths of the paper
-3. Areas that need improvement
-4. Specific suggestions for revision
-5. Comments on clarity and organization
+        review_session.create_context()
 
-If images are provided, also comment on:
-- How well the images support the text
-- Whether the images are clear and well-labeled
-- Suggestions for improving the figures"""
-        })
-        
-        # Add images if provided
-        for img in images:
-            content.append({
-                "type": "image",
-                "source": {
-                    "type": "base64",
-                    "media_type": img.get('type', 'image/jpeg'),
-                    "data": img.get('data')
-                }
-            })
-        
-        print(f"Analyzing draft with {len(images)} images...")
-        
-        # Call Claude API
-        message = client.messages.create(
-            model="claude-sonnet-4-20250514",
-            max_tokens=4096,
-            messages=[
-                {
-                    "role": "user",
-                    "content": content
-                }
-            ]
-        )
-        
-        # Extract the response text
-        response_text = ""
-        for block in message.content:
-            if block.type == "text":
-                response_text += block.text
-        
-        result = {
-            "success": True,
-            "analysis": response_text,
-            "model": message.model,
-            "usage": {
-                "input_tokens": message.usage.input_tokens,
-                "output_tokens": message.usage.output_tokens
-            }
-        }
-        
-        return jsonify(result)
-        
+        print(review_session.context)
+
+        result = {'success': True, 'items': review_session.context}
+
     except anthropic.APIError as e:
         print(f"ERROR: Anthropic API error - {str(e)}")
         return jsonify({'error': f'API error: {str(e)}'}), 500
@@ -115,6 +56,8 @@ If images are provided, also comment on:
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+
+    return jsonify(result)
 
 
 @app.route('/api/health', methods=['GET'])

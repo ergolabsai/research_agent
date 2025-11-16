@@ -1,22 +1,22 @@
 import os
 from pathlib import Path
 from PIL import Image
-from output_classes import *
+from .output_classes import *
 import instructor
 from anthropic import Anthropic
 from smolagents import LiteLLMModel, DuckDuckGoSearchTool, ToolCallingAgent
 import base64
 import io
 from pydantic import BaseModel
-from create_plots import ask_claude_for_plot
+from .create_plots import ask_claude_for_plot
 import shutil
 
 SIMPLIFY = False
 MAKE_PLOTS = False
 
 # Set up your OpenRouter API key
-os.environ["OPENROUTER_API_KEY"] = "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"
-os.environ["CLAUDE_API_KEY"] = "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"
+# os.environ["OPENROUTER_API_KEY"] = "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"
+# os.environ["CLAUDE_API_KEY"] = "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"
 
 class ReviewSession:
 
@@ -103,10 +103,12 @@ class ReviewSession:
         self.current_request = """You are reviewing a paper for publication.  
 You are going to use Claude to assist you.  You want to create context for claude requests.  
 Please generate context that would be helpful to you in future API calls but that would not bias you towards the author's conclusions and instead would help you generate useful answers about the figures without having to read the text.
+I am going to ask the author to confirm your generated context.  Therefore, return your response as a list of concepts for the author to look through.  
 Here is my text {}""".format(self.text)
         self.current_response_model = ContextString
         self.ask()
         self.context = self.current_response.context
+        print('context made')
 
     def create_expected_figure_descriptions(self):
         print('creating expected figure descriptions')
