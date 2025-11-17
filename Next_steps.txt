@@ -1,0 +1,5 @@
+Look through the code and fix variable names and clean it up.
+Make the front end look less stupid.
+Get the claims.
+Put claims up on the front end.
+Fix the bash thing in the terminal.

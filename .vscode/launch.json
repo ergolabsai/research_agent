@@ -1,0 +1,23 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: Flask",
+            "type": "debugpy",
+            "request": "launch",
+            "module": "flask",
+            "env": {
+                "FLASK_APP": "agent_server.py"
+            },
+            "args": [
+                "run",
+                "--host=127.0.0.1",
+                "--port=5001",  // Change this from 5000 to 5001
+                "--no-debugger",
+                "--no-reload"
+            ],
+            "jinja": true,
+            "console": "integratedTerminal"
+        }
+    ]
+}

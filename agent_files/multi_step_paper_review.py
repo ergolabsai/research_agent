@@ -107,7 +107,7 @@ Please generate context that would be helpful to you in future API calls but tha
 I am going to ask the author to confirm your generated context.  Therefore, return your response as a list of concepts for the author to look through.  
 I emphasize, you should not include any context that would bias you towards the author's conclusions.  
 You are very skeptical of the conclusions.
-Here is my text {}""".format(self.text)
+Here is the paper draft: {}""".format(self.text)
         self.current_response_model = ContextList
         self.ask()
         self.context = ', '.join(self.current_response.context)
@@ -119,12 +119,15 @@ Here is my text {}""".format(self.text)
 You are highly skeptical of the author's results.
 You are going to use Claude to assist you.  You want to create context for claude requests.  
 You have previously created a list of context items that a human as looked at and edited.  
-Look over their results and make sure that none of the new context would bias you towards the author's conclusions.  
+Look over the context and delete any context so that will bias future Claude calls towards the author's conclusions.  
+Do not include anything but the new context.
 You are very skeptical of the conclusions.
-Here are the context items {}
-Here is my text {}""".format(new_context, self.text)
+Here are the context items: {}
+Here is the paper draft: {}""".format(new_context, self.text)
         self.current_response_model = ContextString
+        self.ask()
         self.context = self.current_response.context
+        print('context edited')
 
     def create_expected_figure_descriptions(self):
         print('creating expected figure descriptions')

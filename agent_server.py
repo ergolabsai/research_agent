@@ -83,6 +83,8 @@ def process_selected():
             # Try to get from environment if not provided
             api_key = os.environ.get('CLAUDE_API_KEY')
 
+        os.environ["CLAUDE_API_KEY"] = api_key
+
         if not api_key:
             print("ERROR: No API key provided")
             return jsonify({'error': 'API key is required'}), 400
@@ -110,14 +112,20 @@ def process_selected():
         print("END OF SELECTED ITEMS")
         print("=" * 80 + "\n")
 
-        # TODO: Add your Claude API call here to process the selected items
-        # For now, just return a success response
+        review_session = ReviewSession()
+        review_session.text = original_draft
+
+        new_context = [item['text'] for item in selected_items]
+        new_context = '. '.join(new_context)
+
+        review_session.regenerate_context(new_context)
 
         result = {
             'success': True,
-            'message': f'Received {len(selected_items)} selected items',
-            'items_count': len(selected_items)
+            'context': review_session.context,
         }
+
+        print(result)
 
         return jsonify(result)
 
@@ -142,4 +150,10 @@ if __name__ == '__main__':
     print("🐍 Python Agent Server starting...")
     print("✅ Server running on http://localhost:5001")
     print("✅ Ready to accept requests from http://localhost:5173")
-    app.run(host='0.0.0.0', port=5001, debug=True)
+    # app.run(host='0.0.0.0', port=5001, debug=True)
+    app.run(
+    debug=False,  # Set to False when using VS Code debugger
+    use_reloader=False,  # Must be False for debugging
+    host='127.0.0.1',  # Or '0.0.0.0' if accessing from another machine
+    port=5001
+    )
