@@ -1,10 +1,14 @@
 from pydantic import BaseModel, Field
 from typing import Dict, List
 
-class ContextString(BaseModel):
+class ContextList(BaseModel):
     context: List[str] = Field(
         description="context for future API calls",
         default_factory=list)
+
+
+class ContextString(BaseModel):
+    context: str = Field(description="context for future API calls")
 
 
 class FigureDescription(BaseModel):
