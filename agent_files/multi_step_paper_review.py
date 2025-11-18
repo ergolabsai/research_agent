@@ -1,14 +1,18 @@
 import os
 from pathlib import Path
 from PIL import Image
-from .output_classes import *
+if __name__ == "__main__":
+    from output_classes import *
+    from create_plots import ask_claude_for_plot
+else:
+    from .output_classes import *
+    from .create_plots import ask_claude_for_plot
 import instructor
 from anthropic import Anthropic
 from smolagents import LiteLLMModel, DuckDuckGoSearchTool, ToolCallingAgent
 import base64
 import io
 from pydantic import BaseModel
-from .create_plots import ask_claude_for_plot
 import shutil
 
 SIMPLIFY = True
@@ -16,7 +20,8 @@ MAKE_PLOTS = False
 
 # Set up your OpenRouter API key
 # os.environ["OPENROUTER_API_KEY"] = "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"
-# os.environ["CLAUDE_API_KEY"] = "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"
+if __name__ == '__main__':
+    os.environ["CLAUDE_API_KEY"] = "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"
 
 class ReviewSession:
 
@@ -98,6 +103,22 @@ class ReviewSession:
 
         return {'text': text, 'images': images, 'filenames': filenames, 'media_types': media_types}
 
+    def load_images(self, image_list):
+
+        filenames = []
+        images = {}
+        media_types = {}
+
+        for img in image_list:
+
+            filenames.append(img['name'])
+            images[img['name']] = img['data']
+            media_types[img['name']] = img['type']
+
+        self.image_names = filenames
+        self.images = images
+        self.media_types = media_types
+
     def create_context(self):
         print('creating context')
         self.current_request = """You are reviewing a paper for publication.  
@@ -129,29 +150,29 @@ Here is the paper draft: {}""".format(new_context, self.text)
         self.context = self.current_response.context
         print('context edited')
 
-    def create_expected_figure_descriptions(self):
+    def create_expected_figure_descriptions(self, make_plots=MAKE_PLOTS, simplify=SIMPLIFY):
         print('creating expected figure descriptions')
         kk = 0
         for image_name in self.image_names:
-            if SIMPLIFY:
+            if simplify:
                 if kk > 0:
                     break
                 kk = kk + 1
             self.current_response_model = ExpectedFigureDescription
             self.current_request = "Read the text for this paper and tell me what you expect the figure {} to look like.  Here is the text {}".format(image_name, self.text)
             self.ask()
-            if MAKE_PLOTS:
+            if make_plots:
                 ask_claude_for_plot(self.current_response.description)
                 destination_path = os.path.join('/Users/chelsea/python_projects/project_files/outputs',
                                                 'expectation_' + image_name)
                 shutil.move('reconstructed_figure.jpg', destination_path)
             self.expected_descriptions[image_name] = self.current_response.description
 
-    def compare_expected_figure_to_figure(self):
+    def compare_expected_figure_to_figure(self, simplify=SIMPLIFY):
         print('comparing expected figure descriptions')
         kk=0
         for image_name in self.image_names:
-            if SIMPLIFY:
+            if simplify:
                 if kk > 0:
                     break
                 kk = kk + 1
@@ -208,13 +229,13 @@ Here is the text of the document in latex format:
 
         return figure_claims_list
 
-    def combine_figure_findings_and_supporting_findings(self):
+    def combine_figure_findings_and_supporting_findings(self, simplify=SIMPLIFY):
         print('combining figure findings and supporting findings')
         self.claim_confirmations = {i: {} for i in self.supporting_claims_dict.keys()}
         self.claim_contradictions = {i: {} for i in self.supporting_claims_dict.keys()}
         kk = 0
         for figure_name in self.image_names:
-            if SIMPLIFY:
+            if simplify:
                 if kk > 0:
                     break
                 kk = kk + 1

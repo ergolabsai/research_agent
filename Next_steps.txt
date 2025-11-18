@@ -1,2 +1,1 @@
-Get the claims.
-Put claims up on the front end.
+Create expected images and display.

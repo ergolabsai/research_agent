@@ -45,25 +45,21 @@ export default function PaperEditor() {
     setImages(images.filter((_, i) => i !== index));
   };
 
-  const handleSubmit = async () => {
+  const createContext = async () => {
     setLoading(true);
     setResult(null);
     setError(null);
     setCheckedItems({});
 
     try {
-      const response = await fetch("http://localhost:5001/api/make_context", {
+      const response = await fetch("http://localhost:5001/api/create_context", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
         },
         body: JSON.stringify({
           apiKey: apiKey,
-          draft: draft,
-          images: images.map(img => ({
-            type: img.type,
-            data: img.data
-          }))
+          draft: draft
         })
       });
 
@@ -167,13 +163,68 @@ export default function PaperEditor() {
       // Handle the response from the agent
       console.log('Agent response:', data);
 
-      // You can update the UI with the new results here
-      // For example, you might want to show the agent's response
-      // setResult(data) or create a new state for agent responses
+      // Update result with the refined context
+      setResult(prev => ({
+        ...prev,
+        context: data.context
+      }));
 
     } catch (err) {
       setError(err.message);
       console.error('Error sending to agent:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const analyzeImages = async () => {
+    if (images.length === 0) return;
+
+    // Check if we have refined context available
+    if (!result?.context) {
+      setError('Please refine context before analyzing images');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch("http://localhost:5001/api/analyze_images", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          apiKey: apiKey,
+          draft: draft,
+          context: result.context, // This comes from refine_context
+          images: images.map(img => ({
+            type: img.type,
+            data: img.data,
+            name: img.name
+          }))
+        })
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || `Server error: ${response.status}`);
+      }
+
+      // Handle the response - update the UI with image analysis results
+      console.log('Image analysis response:', data);
+
+      // Store the image analysis results in the result object
+      setResult(prev => ({
+        ...prev,
+        imageAnalysis: data
+      }));
+
+    } catch (err) {
+      setError(err.message);
+      console.error('Error analyzing images:', err);
     } finally {
       setLoading(false);
     }
@@ -235,7 +286,27 @@ export default function PaperEditor() {
               </p>
             </div>
 
-            {/* Image Upload */}
+            {/* Create Context Button */}
+            <button
+              onClick={createContext}
+              disabled={!draft || !apiKey || loading}
+              className="w-full bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white font-semibold py-3 px-6 rounded-lg transition-colors flex items-center justify-center gap-2"
+            >
+              {loading ? (
+                <>
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  Creating Context...
+                </>
+              ) : (
+                <>
+                  <Target className="w-5 h-5" />
+                  Create Context
+                </>
+              )}
+            </button>
+
+            {/* Image Upload - only show after refine context */}
+            {result && result.context && (
             <div className="bg-white rounded-lg shadow-lg p-6">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Upload Images (Optional)
@@ -279,26 +350,29 @@ export default function PaperEditor() {
                   ))}
                 </div>
               )}
-            </div>
 
-            {/* Submit Button */}
-            <button
-              onClick={handleSubmit}
-              disabled={!draft || !apiKey || loading}
-              className="w-full bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white font-semibold py-3 px-6 rounded-lg transition-colors flex items-center justify-center gap-2"
-            >
-              {loading ? (
-                <>
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  Analyzing...
-                </>
-              ) : (
-                <>
-                  <Target className="w-5 h-5" />
-                  Analyze Draft
-                </>
+              {/* Analyze Images Button */}
+              {images.length > 0 && (
+                <button
+                  onClick={analyzeImages}
+                  disabled={loading}
+                  className="w-full mt-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-semibold py-3 px-6 rounded-lg transition-colors flex items-center justify-center gap-2"
+                >
+                  {loading ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                      Analyzing Images...
+                    </>
+                  ) : (
+                    <>
+                      <Target className="w-5 h-5" />
+                      Analyze Images
+                    </>
+                  )}
+                </button>
               )}
-            </button>
+            </div>
+            )}
           </div>
 
           {/* Right Column - Results */}
