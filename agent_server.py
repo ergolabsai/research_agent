@@ -9,8 +9,8 @@ app = Flask(__name__)
 CORS(app, origins=['http://localhost:5173'])
 
 
-@app.route('/api/analyze', methods=['POST'])
-def analyze_paper():
+@app.route('/api/make_context', methods=['POST'])
+def make_context():
     """
     API endpoint that receives draft text and images and returns analysis
     """
@@ -67,8 +67,8 @@ def analyze_paper():
     return jsonify(result)
 
 
-@app.route('/api/process-selected', methods=['POST'])
-def process_selected():
+@app.route('/api/refine_context', methods=['POST'])
+def refine_context():
     """
     API endpoint that receives selected context items and processes them with Claude
     """
@@ -77,7 +77,7 @@ def process_selected():
 
         api_key = data.get('apiKey')
         selected_items = data.get('selectedItems', [])
-        original_draft = data.get('originalDraft', '')
+        draft = data.get('draft', '')
 
         if not api_key:
             # Try to get from environment if not provided
@@ -93,27 +93,8 @@ def process_selected():
             print("ERROR: No selected items provided")
             return jsonify({'error': 'Selected items are required'}), 400
 
-        # Print out the received data
-        print("\n" + "=" * 80)
-        print("RECEIVED SELECTED CONTEXT ITEMS:")
-        print("=" * 80)
-        print(f"\nNumber of selected items: {len(selected_items)}")
-        print(f"\nOriginal draft length: {len(original_draft)} characters")
-        print("\nSelected Items:")
-        print("-" * 80)
-
-        for idx, item in enumerate(selected_items, 1):
-            print(f"\n[Item {idx}]")
-            print(f"ID: {item.get('id')}")
-            print(f"Text: {item.get('text')}")
-            print("-" * 80)
-
-        print("\n" + "=" * 80)
-        print("END OF SELECTED ITEMS")
-        print("=" * 80 + "\n")
-
         review_session = ReviewSession()
-        review_session.text = original_draft
+        review_session.text = draft
 
         new_context = [item['text'] for item in selected_items]
         new_context = '. '.join(new_context)

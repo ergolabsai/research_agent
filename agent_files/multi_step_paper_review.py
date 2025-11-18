@@ -11,7 +11,7 @@ from pydantic import BaseModel
 from .create_plots import ask_claude_for_plot
 import shutil
 
-SIMPLIFY = False
+SIMPLIFY = True
 MAKE_PLOTS = False
 
 # Set up your OpenRouter API key
@@ -170,7 +170,6 @@ Return your answer as a dictionary of differences and similarties.""".format(ima
 
     def make_figure_differences_and_similarities(self):
         print('making figure differences and similarities')
-        self.create_context()
         self.create_expected_figure_descriptions()
         self.compare_expected_figure_to_figure()
 
@@ -301,6 +300,7 @@ if __name__ == '__main__':
     review = ReviewSession()
 
     review.load_document('/Users/chelsea/python_projects/project_files/shumlak2009_latex')
+    review.create_context()
     review.make_figure_differences_and_similarities()
     review.evaluate_supporting_findings()
     review.discuss_reliability()

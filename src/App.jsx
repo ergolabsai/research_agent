@@ -52,7 +52,7 @@ export default function PaperEditor() {
     setCheckedItems({});
 
     try {
-      const response = await fetch("http://localhost:5001/api/analyze", {
+      const response = await fetch("http://localhost:5001/api/make_context", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -132,7 +132,7 @@ export default function PaperEditor() {
     setEditingItems(prev => ({ ...prev, [itemId]: false }));
   };
 
-  const sendToAgent = async () => {
+  const refineContext = async () => {
     if (!result?.items) return;
 
     const checkedItemsList = result.items.filter(item => checkedItems[item.id]);
@@ -146,7 +146,7 @@ export default function PaperEditor() {
     setError(null);
 
     try {
-      const response = await fetch("http://localhost:5001/api/process-selected", {
+      const response = await fetch("http://localhost:5001/api/refine_context", {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -154,7 +154,7 @@ export default function PaperEditor() {
         body: JSON.stringify({
           apiKey: apiKey,
           selectedItems: checkedItemsList,
-          originalDraft: draft
+          draft: draft
         })
       });
 
@@ -182,7 +182,7 @@ export default function PaperEditor() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 p-8">
-      <div className="max-w-6xl mx-auto">
+      <div className="w-full px-8">
 
         {/* Header */}
         <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
@@ -344,12 +344,12 @@ export default function PaperEditor() {
                     Deselect All
                   </button>
                   <button
-                    onClick={sendToAgent}
+                    onClick={refineContext}
                     disabled={Object.values(checkedItems).filter(Boolean).length === 0 || loading}
                     className="px-3 py-1 text-sm bg-blue-100 text-blue-700 rounded hover:bg-blue-200 disabled:bg-gray-100 disabled:text-gray-400 flex items-center gap-1"
                   >
                     <Target className="w-4 h-4" />
-                    Send to Agent
+                    Refine Context
                   </button>
                 </div>
 
