@@ -4,7 +4,7 @@ import subprocess
 import json
 
 
-def ask_claude_for_plot(description, verbose=False):
+def ask_claude_to_plot(description, verbose=False):
     """
     Ask Claude to perform a task that may require code execution and file operations.
 

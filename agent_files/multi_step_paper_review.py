@@ -3,10 +3,10 @@ from pathlib import Path
 from PIL import Image
 if __name__ == "__main__":
     from output_classes import *
-    from create_plots import ask_claude_for_plot
+    from create_plots import ask_claude_to_plot
 else:
     from .output_classes import *
-    from .create_plots import ask_claude_for_plot
+    from .create_plots import ask_claude_to_plot
 import instructor
 from anthropic import Anthropic
 from smolagents import LiteLLMModel, DuckDuckGoSearchTool, ToolCallingAgent
@@ -41,6 +41,7 @@ class ReviewSession:
         self.current_image_data = []
         self.current_response = ''
         self.expected_descriptions = {}
+        self.expected_images = {}
         self.figure_differences = {}
         self.figure_similarities = {}
         self.claim_confirmations = {}
@@ -162,10 +163,10 @@ Here is the paper draft: {}""".format(new_context, self.text)
             self.current_request = "Read the text for this paper and tell me what you expect the figure {} to look like.  Here is the text {}".format(image_name, self.text)
             self.ask()
             if make_plots:
-                ask_claude_for_plot(self.current_response.description)
-                destination_path = os.path.join('/Users/chelsea/python_projects/project_files/outputs',
-                                                'expectation_' + image_name)
-                shutil.move('reconstructed_figure.jpg', destination_path)
+                ask_claude_to_plot(self.current_response.description)
+                img, media_type = encode_image(Path('reconstructed_figure.jpg'))
+                self.expected_images[image_name] = {'data': img, 'media_type': media_type}
+                os.remove('reconstructed_figure.jpg')
             self.expected_descriptions[image_name] = self.current_response.description
 
     def compare_expected_figure_to_figure(self, simplify=SIMPLIFY):

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { FileText, Target, Upload, X, CheckCircle, AlertCircle, Filter, Edit2, Save, XCircle } from 'lucide-react';
+import { FileText, Target, Upload, X, CheckCircle, AlertCircle, Filter, Edit2, Save, XCircle, Image as ImageIcon } from 'lucide-react';
 
 export default function PaperEditor() {
   const [draft, setDraft] = useState('');
@@ -11,6 +11,7 @@ export default function PaperEditor() {
   const [checkedItems, setCheckedItems] = useState({});
   const [editingItems, setEditingItems] = useState({});
   const [editedTexts, setEditedTexts] = useState({});
+  const [comparisonResults, setComparisonResults] = useState(null);
 
   const handleImageUpload = async (e) => {
     const files = Array.from(e.target.files);
@@ -198,7 +199,7 @@ export default function PaperEditor() {
         body: JSON.stringify({
           apiKey: apiKey,
           draft: draft,
-          context: result.context, // This comes from refine_context
+          context: result.context,
           images: images.map(img => ({
             type: img.type,
             data: img.data,
@@ -213,14 +214,10 @@ export default function PaperEditor() {
         throw new Error(data.error || `Server error: ${response.status}`);
       }
 
-      // Handle the response - update the UI with image analysis results
       console.log('Image analysis response:', data);
 
-      // Store the image analysis results in the result object
-      setResult(prev => ({
-        ...prev,
-        imageAnalysis: data
-      }));
+      // Store the comparison results
+      setComparisonResults(data);
 
     } catch (err) {
       setError(err.message);
@@ -230,30 +227,21 @@ export default function PaperEditor() {
     }
   };
 
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50 p-8">
-      <div className="w-full px-8">
-
-        {/* Header */}
-        <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
-          <div className="flex items-center gap-3">
-            <FileText className="w-8 h-8 text-purple-600" />
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">
-                Research Paper Helper
-              </h1>
-              <p className="text-sm text-gray-600">
-                Get AI-powered feedback on your research draft
-              </p>
-            </div>
-          </div>
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 to-blue-50">
+      <div className="container mx-auto px-4 py-8">
+        <div className="mb-8 text-center">
+          <h1 className="text-4xl font-bold text-gray-900 mb-2 flex items-center justify-center gap-3">
+            <FileText className="w-10 h-10 text-purple-600" />
+            Paper Review Assistant
+          </h1>
+          <p className="text-gray-600">Analyze your paper draft with AI-powered insights</p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
           {/* Left Column - Input */}
           <div className="space-y-6">
-            {/* API Key */}
+            {/* API Key Input */}
             <div className="bg-white rounded-lg shadow-lg p-6">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Anthropic API Key
@@ -263,27 +251,22 @@ export default function PaperEditor() {
                 value={apiKey}
                 onChange={(e) => setApiKey(e.target.value)}
                 placeholder="sk-ant-..."
-                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
               />
-              <p className="mt-2 text-xs text-gray-500">
-                Your API key is only used for this request and is not stored
-              </p>
             </div>
 
-            {/* Draft Text */}
+            {/* Draft Text Input */}
             <div className="bg-white rounded-lg shadow-lg p-6">
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Draft Text
+                Paper Draft
               </label>
               <textarea
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
-                className="w-full h-64 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none font-mono text-sm"
-                placeholder="Paste your draft text here..."
+                placeholder="Paste your paper draft here..."
+                rows={8}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
               />
-              <p className="mt-2 text-xs text-gray-500">
-                {draft.length} characters
-              </p>
             </div>
 
             {/* Create Context Button */}
@@ -375,7 +358,7 @@ export default function PaperEditor() {
             )}
           </div>
 
-          {/* Right Column - Results */}
+          {/* Right Column - Context Results (Compact) */}
           <div className="space-y-6">
             {error && (
               <div className="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
@@ -427,25 +410,25 @@ export default function PaperEditor() {
                   </button>
                 </div>
 
-                {/* Items List */}
-                <div className="space-y-3 max-h-[600px] overflow-y-auto pr-2">
+                {/* Items List - COMPACT VERSION */}
+                <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2">
                   {result.items.map((item) => (
                     <div
                       key={item.id}
-                      className={`border rounded-lg p-4 transition-all ${
+                      className={`border rounded p-3 transition-all ${
                         checkedItems[item.id]
                           ? 'bg-purple-50 border-purple-300'
                           : 'bg-white border-gray-200 hover:border-gray-300'
                       }`}
                     >
-                      <div className="flex items-start gap-3">
+                      <div className="flex items-start gap-2">
                         <input
                           type="checkbox"
                           checked={checkedItems[item.id] || false}
                           onChange={() => toggleItem(item.id)}
-                          className="mt-1 w-5 h-5 text-purple-600 rounded focus:ring-2 focus:ring-purple-500"
+                          className="mt-0.5 w-4 h-4 text-purple-600 rounded focus:ring-2 focus:ring-purple-500"
                         />
-                        <div className="flex-1">
+                        <div className="flex-1 min-w-0">
                           {editingItems[item.id] ? (
                             <div className="space-y-2">
                               <textarea
@@ -454,34 +437,34 @@ export default function PaperEditor() {
                                   ...prev,
                                   [item.id]: e.target.value
                                 }))}
-                                className="w-full p-2 border border-gray-300 rounded text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
-                                rows={4}
+                                className="w-full p-2 border border-gray-300 rounded text-xs focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none"
+                                rows={3}
                               />
                               <div className="flex gap-2">
                                 <button
                                   onClick={() => saveEdit(item.id)}
-                                  className="px-3 py-1 text-sm bg-green-100 text-green-700 rounded hover:bg-green-200 flex items-center gap-1"
+                                  className="px-2 py-1 text-xs bg-green-100 text-green-700 rounded hover:bg-green-200 flex items-center gap-1"
                                 >
-                                  <Save className="w-4 h-4" />
+                                  <Save className="w-3 h-3" />
                                   Save
                                 </button>
                                 <button
                                   onClick={() => cancelEditing(item.id)}
-                                  className="px-3 py-1 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 flex items-center gap-1"
+                                  className="px-2 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200 flex items-center gap-1"
                                 >
-                                  <XCircle className="w-4 h-4" />
+                                  <XCircle className="w-3 h-3" />
                                   Cancel
                                 </button>
                               </div>
                             </div>
                           ) : (
                             <div>
-                              <p className="text-sm text-gray-700 whitespace-pre-wrap">
+                              <p className="text-xs text-gray-700 whitespace-pre-wrap line-clamp-3">
                                 {item.text}
                               </p>
                               <button
                                 onClick={() => startEditing(item.id, item.text)}
-                                className="mt-2 px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 flex items-center gap-1"
+                                className="mt-1 px-2 py-0.5 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 flex items-center gap-1"
                               >
                                 <Edit2 className="w-3 h-3" />
                                 Edit
@@ -493,20 +476,105 @@ export default function PaperEditor() {
                     </div>
                   ))}
                 </div>
-
-                {result.usage && (
-                  <div className="mt-4 pt-4 border-t border-gray-200">
-                    <p className="text-xs text-gray-500">
-                      Model: {result.model} |
-                      Input: {result.usage.input_tokens.toLocaleString()} tokens |
-                      Output: {result.usage.output_tokens.toLocaleString()} tokens
-                    </p>
-                  </div>
-                )}
               </div>
             )}
           </div>
         </div>
+
+        {/* Image Comparison Results - Full Width Below */}
+        {comparisonResults && comparisonResults.success && (
+          <div className="bg-white rounded-lg shadow-lg p-6">
+            <div className="flex items-center gap-2 mb-6">
+              <ImageIcon className="w-6 h-6 text-blue-600" />
+              <h2 className="text-2xl font-bold text-gray-900">
+                Figure Analysis
+              </h2>
+            </div>
+
+            <div className="space-y-8">
+              {images.map((originalImage, index) => {
+                const expectedImageData = comparisonResults.expected_images?.[index];
+                const mediaType = comparisonResults.expected_media_types?.[index];
+                const similarities = comparisonResults.figure_similarities?.[index];
+                const differences = comparisonResults.figure_differences?.[index];
+
+                return (
+                  <div key={index} className="border border-gray-200 rounded-lg p-6">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                      {originalImage.name}
+                    </h3>
+
+                    {/* Side-by-side images */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                      {/* Original Image */}
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-700 mb-2">
+                          Original Figure
+                        </h4>
+                        <div className="border border-gray-300 rounded-lg overflow-hidden bg-gray-50">
+                          <img
+                            src={originalImage.preview}
+                            alt={`Original ${originalImage.name}`}
+                            className="w-full h-auto"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Expected Image */}
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-700 mb-2">
+                          Expected Figure (Generated)
+                        </h4>
+                        <div className="border border-gray-300 rounded-lg overflow-hidden bg-gray-50">
+                          {expectedImageData && mediaType ? (
+                            <img
+                              src={`data:${mediaType};base64,${expectedImageData}`}
+                              alt={`Expected ${originalImage.name}`}
+                              className="w-full h-auto"
+                            />
+                          ) : (
+                            <div className="w-full h-64 flex items-center justify-center text-gray-400">
+                              No expected image generated
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Similarities and Differences */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      {/* Similarities */}
+                      <div>
+                        <h4 className="text-sm font-semibold text-green-700 mb-2 flex items-center gap-2">
+                          <CheckCircle className="w-4 h-4" />
+                          Similarities
+                        </h4>
+                        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                          <p className="text-sm text-gray-700 whitespace-pre-wrap">
+                            {similarities || 'No similarities analysis available'}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Differences */}
+                      <div>
+                        <h4 className="text-sm font-semibold text-orange-700 mb-2 flex items-center gap-2">
+                          <AlertCircle className="w-4 h-4" />
+                          Differences
+                        </h4>
+                        <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                          <p className="text-sm text-gray-700 whitespace-pre-wrap">
+                            {differences || 'No differences analysis available'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
 
       </div>
     </div>

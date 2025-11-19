@@ -127,6 +127,7 @@ def analyze_images():
         api_key = data.get('apiKey')
         draft = data.get('draft')
         images = data.get('images', [])
+        context = data.get('context', [])
 
         if not api_key:
             # Try to get from environment if not provided
@@ -146,9 +147,17 @@ def analyze_images():
         review_session.text = draft
 
         review_session.load_images(images)
+        review_session.create_expected_figure_descriptions(simplify=True, make_plots=True)
+        review_session.context = context
+        review_session.compare_expected_figure_to_figure(simplify=True)
 
-
-        result = {'success': True, 'items': True}
+        result = {'success': True, 
+                  'expected_images': review_session.expected_images,
+                  'expected_media_types': review_session.media_types,
+                  'figure_differences': review_session.figure_differences,
+                  'figure_similarities': review_session.figure_similarities}
+        
+        print(result)
 
     except anthropic.APIError as e:
         print(f"ERROR: Anthropic API error - {str(e)}")
