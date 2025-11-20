@@ -8,7 +8,7 @@ from agent_files.multi_step_paper_review import ReviewSession
 app = Flask(__name__)
 CORS(app, origins=['http://localhost:5173'])
 
-
+SIMPLIFY = False
 @app.route('/api/create_context', methods=['POST'])
 def create_context():
     """
@@ -147,15 +147,21 @@ def analyze_images():
         review_session.text = draft
 
         review_session.load_images(images)
-        review_session.create_expected_figure_descriptions(simplify=True, make_plots=True)
+        review_session.create_expected_figure_descriptions(simplify=SIMPLIFY, make_plots=True)
         review_session.context = context
-        review_session.compare_expected_figure_to_figure(simplify=True)
+        review_session.compare_expected_figure_to_figure(simplify=SIMPLIFY)
+
+        keys = review_session.expected_images.keys()
+        expected_images = [review_session.expected_images[key] for key in keys]
+        expected_media_types = [review_session.expected_media_types[key] for key in keys]
+        figure_differences = [review_session.figure_differences[key] for key in keys]
+        figure_similarities = [review_session.figure_similarities[key] for key in keys]
 
         result = {'success': True, 
-                  'expected_images': review_session.expected_images,
-                  'expected_media_types': review_session.media_types,
-                  'figure_differences': review_session.figure_differences,
-                  'figure_similarities': review_session.figure_similarities}
+                  'expected_images': expected_images,
+                  'expected_media_types': expected_media_types,
+                  'figure_differences': figure_differences,
+                  'figure_similarities': figure_similarities}
         
         print(result)
 

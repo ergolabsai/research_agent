@@ -1,3 +1,2 @@
-I think I need to change from dictionaries to lists.
-Create expected images and display.
-Fix up the width of boxes.
+Enforce the axes being the same
+Fix the initial width

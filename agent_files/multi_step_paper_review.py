@@ -42,6 +42,7 @@ class ReviewSession:
         self.current_response = ''
         self.expected_descriptions = {}
         self.expected_images = {}
+        self.expected_media_types = {}
         self.figure_differences = {}
         self.figure_similarities = {}
         self.claim_confirmations = {}
@@ -141,7 +142,7 @@ Here is the paper draft: {}""".format(self.text)
 You are highly skeptical of the author's results.
 You are going to use Claude to assist you.  You want to create context for claude requests.  
 You have previously created a list of context items that a human as looked at and edited.  
-Look over the context and delete any context so that will bias future Claude calls towards the author's conclusions.  
+Look over the context and delete any context that will bias future Claude calls towards the author's conclusions.  
 Do not include anything but the new context.
 You are very skeptical of the conclusions.
 Here are the context items: {}
@@ -164,8 +165,11 @@ Here is the paper draft: {}""".format(new_context, self.text)
             self.ask()
             if make_plots:
                 ask_claude_to_plot(self.current_response.description)
+                if not Path('reconstructed_figure.jpg').exists():
+                    ask_claude_to_plot(self.current_response.description)
                 img, media_type = encode_image(Path('reconstructed_figure.jpg'))
-                self.expected_images[image_name] = {'data': img, 'media_type': media_type}
+                self.expected_images[image_name] = img
+                self.expected_media_types[image_name] = media_type
                 os.remove('reconstructed_figure.jpg')
             self.expected_descriptions[image_name] = self.current_response.description
 
