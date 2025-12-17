@@ -1,2 +1,8 @@
 Enforce the axes being the same
-Fix the initial width
+Send results of figure analysis to review agent
+Change button behavior when an action is occuring
+Get rid of (optional) next to image uploader
+Clean up names of everything to make more sense
+
+What companies that are using LLMs on their backends?
+Using the success or rejection of proposals/papers to help train the agent

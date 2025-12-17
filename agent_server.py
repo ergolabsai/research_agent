@@ -180,6 +180,64 @@ def analyze_images():
 
     return jsonify(result)
 
+@app.route('/api/refine_figure_analysis', methods=['POST'])
+def evaluate_supporting_findings():
+    try:
+        data = request.get_json()
+
+        api_key = data.get('apiKey')
+        draft = data.get('draft')
+        context = data.get('context', [])
+        figure_information = data.get('processedFigures', [])
+        
+        figure_differences = {}
+        figure_similarities = {}
+        figure_names = []
+
+        for figure_info in figure_information:
+            figure_differences[figure_info['imageName']] = figure_info.get('differences', '')
+            figure_similarities[figure_info['imageName']] = figure_info.get('similarities', '')
+            figure_names = figure_names + [figure_info['imageName']]
+
+        if not api_key:
+            # Try to get from environment if not provided
+            api_key = os.environ.get('CLAUDE_API_KEY')
+
+        os.environ["CLAUDE_API_KEY"] = api_key
+
+        if not api_key:
+            print("ERROR: No API key provided")
+            return jsonify({'error': 'API key is required'}), 400
+
+        if not draft:
+            print("ERROR: No draft text provided")
+            return jsonify({'error': 'Draft text is required'}), 400
+
+        review_session = ReviewSession()
+        review_session.text = draft
+        review_session.context = context
+        review_session.figure_differences = figure_differences
+        review_session.figure_similarities = figure_similarities
+        review_session.image_names = figure_names
+        review_session.evaluate_supporting_findings()
+        review_session.discuss_reliability()
+
+        result = {'success': True, 'review': review_session.review}
+
+        print(review_session.review)
+
+    except json.JSONDecodeError as e:
+        print(f"ERROR: JSON decode error - {str(e)}")
+        return jsonify({'error': f'Failed to parse request: {str(e)}'}), 400
+    except Exception as e:
+        print(f"ERROR: Unexpected error - {str(e)}")
+        print(f"ERROR Type: {type(e).__name__}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+    return jsonify(result)
+
 
 @app.route('/api/health', methods=['GET'])
 def health_check():

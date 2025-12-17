@@ -1,20 +1,23 @@
 import React, { useState } from 'react';
 import { FileText, Target, Upload, X, CheckCircle, AlertCircle, Filter, Edit2, Save, XCircle, Image as ImageIcon, ChevronDown, ChevronRight, MessageSquare } from 'lucide-react';
 
-// AnnotatableItem Component
-function AnnotatableItem({ text, itemId, annotation, onStatusChange, onNoteChange, openNotes, onToggleNote }) {
-  const [noteText, setNoteText] = useState(annotation?.note || '');
-  const isNoteOpen = openNotes[itemId];
+// EditableTextItem Component
+function EditableTextItem({ text, itemId, annotation, onStatusChange, onTextChange, isEditing, onStartEdit, onCancelEdit }) {
+  const [localText, setLocalText] = useState(text);
   const status = annotation?.status || 'default';
+  const editedText = annotation?.editedText;
 
-  const handleSaveNote = () => {
-    onNoteChange(itemId, noteText);
-    onToggleNote(itemId, false);
+  React.useEffect(() => {
+    setLocalText(editedText || text);
+  }, [editedText, text]);
+
+  const handleSave = () => {
+    onTextChange(itemId, localText);
   };
 
-  const handleCancelNote = () => {
-    setNoteText(annotation?.note || '');
-    onToggleNote(itemId, false);
+  const handleCancel = () => {
+    setLocalText(editedText || text);
+    onCancelEdit(itemId);
   };
 
   // Determine styling based on status
@@ -38,79 +41,67 @@ function AnnotatableItem({ text, itemId, annotation, onStatusChange, onNoteChang
 
   return (
     <div className={`border rounded-lg p-3 transition-all ${getItemStyle()}`}>
-      <p className={`text-sm mb-2 ${getTextStyle()}`}>
-        {text}
-      </p>
-
-      {/* Action Buttons */}
-      <div className="flex items-center gap-2 mb-2">
-        <button
-          onClick={() => onStatusChange(itemId, status === 'dismissed' ? 'default' : 'dismissed')}
-          className={`px-2 py-1 text-xs rounded transition-colors ${
-            status === 'dismissed'
-              ? 'bg-gray-400 text-white'
-              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-          }`}
-        >
-          {status === 'dismissed' ? 'Undismiss' : 'Dismiss'}
-        </button>
-        <button
-          onClick={() => onStatusChange(itemId, status === 'important' ? 'default' : 'important')}
-          className={`px-2 py-1 text-xs rounded transition-colors ${
-            status === 'important'
-              ? 'bg-yellow-500 text-white'
-              : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
-          }`}
-        >
-          {status === 'important' ? 'Unmark' : 'Important'}
-        </button>
-        <button
-          onClick={() => onToggleNote(itemId, !isNoteOpen)}
-          className="px-2 py-1 text-xs bg-blue-100 text-blue-700 hover:bg-blue-200 rounded transition-colors flex items-center gap-1"
-        >
-          <MessageSquare className="w-3 h-3" />
-          {annotation?.note ? 'Edit Note' : 'Add Note'}
-        </button>
-      </div>
-
-      {/* Note Display (when saved and not editing) */}
-      {annotation?.note && !isNoteOpen && (
-        <div className="bg-blue-50 border border-blue-200 rounded p-2 mt-2">
-          <p className="text-xs text-blue-900">
-            💬 <strong>Note:</strong> {annotation.note}
-          </p>
-        </div>
-      )}
-
-      {/* Note Textbox (when editing) */}
-      {isNoteOpen && (
-        <div className="mt-2 space-y-2">
+      {isEditing ? (
+        <div className="space-y-2">
           <textarea
-            value={noteText}
-            onChange={(e) => setNoteText(e.target.value)}
-            placeholder="Add your explanation or context here..."
-            className="w-full p-2 text-xs border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-            rows={3}
+            value={localText}
+            onChange={(e) => setLocalText(e.target.value)}
+            className="w-full p-2 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+            rows={4}
           />
           <div className="flex items-center gap-2">
             <button
-              onClick={handleSaveNote}
+              onClick={handleSave}
               className="px-3 py-1 text-xs bg-green-600 text-white rounded hover:bg-green-700 flex items-center gap-1"
             >
               <Save className="w-3 h-3" />
-              Save Note
+              Save
             </button>
             <button
-              onClick={handleCancelNote}
+              onClick={handleCancel}
               className="px-3 py-1 text-xs bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
             >
               Cancel
             </button>
-            <span className="text-xs text-gray-500 ml-auto">
-              {noteText.length} characters
-            </span>
           </div>
         </div>
+      ) : (
+        <>
+          <p className={`text-sm mb-2 ${getTextStyle()}`}>
+            {editedText || text}
+          </p>
+
+          {/* Action Buttons */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => onStatusChange(itemId, status === 'dismissed' ? 'default' : 'dismissed')}
+              className={`px-2 py-1 text-xs rounded transition-colors ${
+                status === 'dismissed'
+                  ? 'bg-gray-400 text-white'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              {status === 'dismissed' ? 'Undismiss' : 'Dismiss'}
+            </button>
+            <button
+              onClick={() => onStatusChange(itemId, status === 'important' ? 'default' : 'important')}
+              className={`px-2 py-1 text-xs rounded transition-colors ${
+                status === 'important'
+                  ? 'bg-yellow-500 text-white'
+                  : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
+              }`}
+            >
+              {status === 'important' ? 'Unmark' : 'Important'}
+            </button>
+            <button
+              onClick={() => onStartEdit(itemId)}
+              className="px-2 py-1 text-xs bg-blue-100 text-blue-700 hover:bg-blue-200 rounded transition-colors flex items-center gap-1"
+            >
+              <Edit2 className="w-3 h-3" />
+              Edit
+            </button>
+          </div>
+        </>
       )}
     </div>
   );
@@ -127,9 +118,10 @@ function AnnotationSection({
   onToggleExpand,
   annotations,
   onStatusChange,
-  onNoteChange,
-  openNotes,
-  onToggleNote
+  onTextChange,
+  editingItems,
+  onStartEdit,
+  onCancelEdit
 }) {
   const colorClass = sectionType === 'similarities' ? 'text-green-700' : 'text-orange-700';
   const bgClass = sectionType === 'similarities' ? 'bg-green-50' : 'bg-orange-50';
@@ -164,15 +156,16 @@ function AnnotationSection({
             items.map((item, idx) => {
               const itemId = `${imageName}-${sectionType}-${idx}`;
               return (
-                <AnnotatableItem
+                <EditableTextItem
                   key={itemId}
                   text={item}
                   itemId={itemId}
                   annotation={annotations[itemId]}
                   onStatusChange={onStatusChange}
-                  onNoteChange={onNoteChange}
-                  openNotes={openNotes}
-                  onToggleNote={onToggleNote}
+                  onTextChange={onTextChange}
+                  isEditing={editingItems[itemId]}
+                  onStartEdit={onStartEdit}
+                  onCancelEdit={onCancelEdit}
                 />
               );
             })
@@ -194,11 +187,11 @@ export default function PaperEditor() {
   const [editingItems, setEditingItems] = useState({});
   const [editedTexts, setEditedTexts] = useState({});
   const [comparisonResults, setComparisonResults] = useState(null);
+  const [finalReview, setFinalReview] = useState(null);
   
   // New state for annotations
   const [expandedSections, setExpandedSections] = useState({});
   const [annotations, setAnnotations] = useState({});
-  const [openNotes, setOpenNotes] = useState({});
 
   // Parse text into individual items
   const parseItems = (text) => {
@@ -232,22 +225,35 @@ export default function PaperEditor() {
   };
 
   // Handle note changes
-  const handleNoteChange = (itemId, noteText) => {
+  const handleTextChange = (itemId, newText) => {
     setAnnotations(prev => ({
       ...prev,
       [itemId]: {
         ...prev[itemId],
-        note: noteText,
+        editedText: newText,
         timestamp: new Date().toISOString()
       }
     }));
+    // Close editing mode after saving
+    setEditingItems(prev => ({
+      ...prev,
+      [itemId]: false
+    }));
   };
 
-  // Toggle note textbox open/close
-  const handleToggleNote = (itemId, isOpen) => {
-    setOpenNotes(prev => ({
+  // Start editing an item
+  const handleStartEdit = (itemId) => {
+    setEditingItems(prev => ({
       ...prev,
-      [itemId]: isOpen
+      [itemId]: true
+    }));
+  };
+
+  // Cancel editing an item
+  const handleCancelEdit = (itemId) => {
+    setEditingItems(prev => ({
+      ...prev,
+      [itemId]: false
     }));
   };
 
@@ -262,6 +268,59 @@ export default function PaperEditor() {
     setError(null);
 
     try {
+      // Process similarities and differences for each image
+      const processedFigures = images.map((img, imgIndex) => {
+        const similarities = comparisonResults.figure_similarities?.[imgIndex] || [];
+        const differences = comparisonResults.figure_differences?.[imgIndex] || [];
+        
+        // Helper function to process items (filter dismissed, apply edits, mark important)
+        const processItems = (items, sectionType) => {
+          return items
+            .map((item, idx) => {
+              const itemId = `${img.name}-${sectionType}-${idx}`;
+              const annotation = annotations[itemId];
+              
+              // Skip dismissed items
+              if (annotation?.status === 'dismissed') {
+                return null;
+              }
+              
+              // Use edited text if available, otherwise original
+              const text = annotation?.editedText || item;
+              
+              // Check if marked as important
+              const isImportant = annotation?.status === 'important';
+              
+              return {
+                text: text,
+                important: isImportant,
+                originalIndex: idx
+              };
+            })
+            .filter(item => item !== null); // Remove dismissed items
+        };
+        
+        const processedSimilarities = processItems(similarities, 'similarities');
+        const processedDifferences = processItems(differences, 'differences');
+        
+        // Get indices of important items in the filtered arrays
+        const importantSimilarityIndices = processedSimilarities
+          .map((item, idx) => item.important ? idx : -1)
+          .filter(idx => idx !== -1);
+        
+        const importantDifferenceIndices = processedDifferences
+          .map((item, idx) => item.important ? idx : -1)
+          .filter(idx => idx !== -1);
+        
+        return {
+          imageName: img.name,
+          similarities: processedSimilarities.map(item => item.text),
+          differences: processedDifferences.map(item => item.text),
+          importantSimilarities: importantSimilarityIndices,
+          importantDifferences: importantDifferenceIndices
+        };
+      });
+
       const response = await fetch("http://localhost:5001/api/refine_figure_analysis", {
         method: "POST",
         headers: {
@@ -270,13 +329,8 @@ export default function PaperEditor() {
         body: JSON.stringify({
           apiKey: apiKey,
           draft: draft,
-          images: images.map(img => ({
-            type: img.type,
-            data: img.data,
-            name: img.name
-          })),
-          annotations: annotations,
-          previousResults: comparisonResults
+          context: result?.context || '',
+          processedFigures: processedFigures
         })
       });
 
@@ -288,12 +342,17 @@ export default function PaperEditor() {
 
       console.log('Refined analysis response:', data);
 
+      // Store the final review
+      if (data.success && data.review) {
+        setFinalReview(data.review);
+      }
+
       // Update with refined results
       setComparisonResults(data);
       
       // Clear annotations after successful refinement
       setAnnotations({});
-      setOpenNotes({});
+      setEditingItems({});
 
     } catch (err) {
       setError(err.message);
@@ -857,9 +916,10 @@ export default function PaperEditor() {
                         onToggleExpand={() => toggleSection(originalImage.name, 'similarities')}
                         annotations={annotations}
                         onStatusChange={handleStatusChange}
-                        onNoteChange={handleNoteChange}
-                        openNotes={openNotes}
-                        onToggleNote={handleToggleNote}
+                        onTextChange={handleTextChange}
+                        editingItems={editingItems}
+                        onStartEdit={handleStartEdit}
+                        onCancelEdit={handleCancelEdit}
                       />
 
                       {/* Differences Section */}
@@ -873,9 +933,10 @@ export default function PaperEditor() {
                         onToggleExpand={() => toggleSection(originalImage.name, 'differences')}
                         annotations={annotations}
                         onStatusChange={handleStatusChange}
-                        onNoteChange={handleNoteChange}
-                        openNotes={openNotes}
-                        onToggleNote={handleToggleNote}
+                        onTextChange={handleTextChange}
+                        editingItems={editingItems}
+                        onStartEdit={handleStartEdit}
+                        onCancelEdit={handleCancelEdit}
                       />
                     </div>
                   </div>
@@ -902,6 +963,25 @@ export default function PaperEditor() {
                   </>
                 )}
               </button>
+            </div>
+          </div>
+        )}
+
+        {/* Final Review Section */}
+        {finalReview && (
+          <div className="bg-white rounded-lg shadow-lg p-6 mt-6">
+            <div className="flex items-center gap-2 mb-4">
+              <MessageSquare className="w-6 h-6 text-purple-600" />
+              <h2 className="text-2xl font-bold text-gray-900">
+                Final Review
+              </h2>
+            </div>
+            <div className="prose max-w-none">
+              <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
+                <p className="text-gray-800 whitespace-pre-wrap leading-relaxed">
+                  {finalReview}
+                </p>
+              </div>
             </div>
           </div>
         )}
