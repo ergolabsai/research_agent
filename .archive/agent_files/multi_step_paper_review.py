@@ -325,7 +325,7 @@ if __name__ == '__main__':
 
     review = ReviewSession()
 
-    review.load_document('/Users/chelsea/python_projects/project_files/shumlak2009_latex')
+    review.load_document('agent_files\\inputs.txt')
     review.create_context()
     review.make_figure_differences_and_similarities()
     review.evaluate_supporting_findings()
