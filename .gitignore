@@ -20,6 +20,9 @@ frontend/build/
 .vscode/
 *.swp
 
+# Github
+.github/
+
 # OS
 .DS_Store
 Thumbs.db
