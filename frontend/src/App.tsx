@@ -10,7 +10,7 @@ function App() {
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
-      <Box></Box>>
+      <Box></Box>
     </ThemeProvider>
   );
 }
