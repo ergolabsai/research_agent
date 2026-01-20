@@ -1,18 +1,35 @@
 // frontend/src/App.tsx
 
-import React from "react";
-import { Box } from "@mui/material";
+// == Imports =====================================================================================
+import { useState } from "react";
 import { ThemeProvider } from "@mui/material/styles";
 import CssBaseline from "@mui/material/CssBaseline";
-import { theme } from "./utils/theme";
+import { Box } from "@mui/material";
 
-function App() {
+import { darkTheme, lightTheme } from "./utils/theme";
+import Header from "./components/generic/Header";
+
+// == Types & Constants ===========================================================================
+
+// == Main Component ==============================================================================
+export default function App() {
+  // -- State Management --------------------------------------------------------------------------
+  const [darkMode, setDarkMode] = useState(true);
+
+  // -- Handlers / Callbacks ----------------------------------------------------------------------
+
+  // -- Effect Management -------------------------------------------------------------------------
+
+  // -- Function Constants ------------------------------------------------------------------------
+
+  // -- Render ------------------------------------------------------------------------------------
   return (
-    <ThemeProvider theme={theme}>
+    <ThemeProvider theme={darkMode ? darkTheme : lightTheme}>
       <CssBaseline />
-      <Box></Box>
+
+      <Header darkMode={darkMode} onToggleTheme={setDarkMode} />
+
+      <Box sx={{ p: 3 }}>Page content goes here okay.</Box>
     </ThemeProvider>
   );
 }
-
-export default App;
