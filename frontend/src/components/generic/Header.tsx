@@ -10,10 +10,11 @@ import {
   MenuItem,
   Switch,
   Box,
-  Divider,
+  Typography,
 } from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
 import { MoreHoriz } from "@mui/icons-material";
+import { ErgoSpinner } from "./ErgoSpinner";
 
 // == Types & Constants ===========================================================================
 interface HeaderProps {
@@ -52,7 +53,17 @@ export default function Header({ darkMode, onToggleTheme }: HeaderProps) {
         </IconButton>
 
         {/* == Center Placeholder ==*/}
-        <Box sx={{ flexGrow: 1 }} />
+        <Box
+          sx={{
+            flexGrow: 1,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 2,
+          }}
+        >
+          <ErgoSpinner />
+        </Box>
 
         {/* == Settings Menu ==*/}
         <IconButton
