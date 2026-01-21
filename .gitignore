@@ -34,3 +34,7 @@ Thumbs.db
 # Logs
 *.log
 logs/
+
+# PIDS
+api/.api.pid
+frontend/.frontend.pid
