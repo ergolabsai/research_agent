@@ -36,9 +36,24 @@ export default function Header({ darkMode, onToggleTheme }: HeaderProps) {
   // -- Effect Management -------------------------------------------------------------------------
 
   // -- Function Constants ------------------------------------------------------------------------
-  const SettingsMenu = () => {
-    return (
-      <>
+
+  // -- Render ------------------------------------------------------------------------------------
+  return (
+    <AppBar
+      position="static"
+      elevation={0}
+      sx={{ bgcolor: "background.default" }}
+    >
+      <Toolbar variant="dense">
+        {/* == Burger Menu ==*/}
+        <IconButton edge="start" aria-label="menu" sx={{ mr: 2 }}>
+          <MenuIcon />
+        </IconButton>
+
+        {/* == Center Placeholder ==*/}
+        <Box sx={{ flexGrow: 1 }} />
+
+        {/* == Settings Menu ==*/}
         <IconButton onClick={handleMenuOpen}>
           <MoreHoriz />
         </IconButton>
@@ -49,28 +64,6 @@ export default function Header({ darkMode, onToggleTheme }: HeaderProps) {
             <Switch checked={darkMode} onChange={handleThemeToggle} />
           </MenuItem>
         </Menu>
-      </>
-    );
-  };
-  const BurgerMenu = () => {
-    return (
-      <IconButton edge="start" aria-label="menu" sx={{ mr: 2 }}>
-        <MenuIcon />
-      </IconButton>
-    );
-  };
-
-  // -- Render ------------------------------------------------------------------------------------
-  return (
-    <AppBar
-      position="static"
-      elevation={0}
-      sx={{ bgcolor: "background.default" }}
-    >
-      <Toolbar variant="dense">
-        <BurgerMenu />
-        <Box sx={{ flexGrow: 1 }} />
-        <SettingsMenu />
       </Toolbar>
     </AppBar>
   );
