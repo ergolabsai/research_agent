@@ -1,9 +1,47 @@
 // frontend/utils/theme.ts
 import { createTheme } from "@mui/material/styles";
 
+/* ---------- Generic THEME ---------- */
+const theme = {
+  components: {
+    MuiTouchRipple: {
+      styleOverrides: {
+        root: {
+          borderRadius: '8px',
+          '& span': {
+            borderRadius: '8px !important',
+          },
+        },
+      },
+    },
+    MuiIconButton: {
+      styleOverrides: {
+        root: {
+          borderRadius: '8px',
+        },
+      },
+    },
+    MuiMenu: {
+      styleOverrides: {
+        paper: {
+          backgroundImage: 'none',
+        },
+      },
+    },
+    MuiPaper: {
+      styleOverrides: {
+        root: {
+          backgroundImage: 'none',
+        },
+      },
+    },
+  },
+};
+
 /* ---------- DARK THEME ---------- */
 
 export const darkTheme = createTheme({
+  ...theme,
   palette: {
     mode: "dark",
 
@@ -39,7 +77,7 @@ export const darkTheme = createTheme({
 
     background: {
       default: "#121212", // app background
-      paper: "#1e1e1e",   // cards, modals, menus
+      paper: "rgba(255, 255, 255, 0.04)",  // cards, modals, menus
     },
 
     text: {
@@ -64,6 +102,7 @@ export const darkTheme = createTheme({
 /* ---------- LIGHT THEME ---------- */
 
 export const lightTheme = createTheme({
+  ...theme,
   palette: {
     mode: "light",
 
@@ -99,7 +138,7 @@ export const lightTheme = createTheme({
 
     background: {
       default: "#f5f5f5", // app background
-      paper: "#ffffff",   // cards
+      paper: "rgba(0, 0, 0, 0.04)",   // cards
     },
 
     text: {

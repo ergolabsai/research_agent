@@ -10,6 +10,7 @@ import {
   MenuItem,
   Switch,
   Box,
+  Divider,
 } from "@mui/material";
 import MenuIcon from "@mui/icons-material/Menu";
 import { MoreHoriz } from "@mui/icons-material";
@@ -54,12 +55,38 @@ export default function Header({ darkMode, onToggleTheme }: HeaderProps) {
         <Box sx={{ flexGrow: 1 }} />
 
         {/* == Settings Menu ==*/}
-        <IconButton onClick={handleMenuOpen}>
+        <IconButton
+          onClick={handleMenuOpen}
+          sx={{ backgroundColor: open ? "action.hover" : "transparent" }}
+        >
           <MoreHoriz />
         </IconButton>
 
-        <Menu anchorEl={anchorEl} open={open} onClose={handleMenuClose}>
-          <MenuItem>
+        <Menu
+          anchorEl={anchorEl}
+          open={open}
+          onClose={handleMenuClose}
+          anchorOrigin={{
+            vertical: "bottom",
+            horizontal: "right",
+          }}
+          transformOrigin={{
+            vertical: "top",
+            horizontal: "right",
+          }}
+          slotProps={{
+            paper: {
+              sx: {
+                mt: 1,
+                border: 1,
+                borderColor: "divider",
+              },
+            },
+          }}
+        >
+          <MenuItem
+            sx={{ display: "flex", justifyContent: "space-between", gap: 2 }}
+          >
             Dark Mode
             <Switch checked={darkMode} onChange={handleThemeToggle} />
           </MenuItem>
