@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Box, Tabs, Tab, Paper, TextField, useTheme } from "@mui/material";
 import ReactMarkdown from "react-markdown";
 import remarkMath from "remark-math";
@@ -25,8 +25,8 @@ const LaTexEditor = ({
         onChange={(_, n) => setTabIndex(n)}
         sx={{ borderBottom: 1, borderColor: "divider" }}
       >
-        <Tab label="Raw Edit" />
-        <Tab label="Final Preview" />
+        <Tab label="Raw" />
+        <Tab label="Preview" />
       </Tabs>
 
       <Box sx={{ p: 2, minHeight: 400 }}>
@@ -38,23 +38,25 @@ const LaTexEditor = ({
             variant="standard"
             value={content}
             onChange={(e) => setContent(e.target.value)}
-            InputProps={{
-              disableUnderline: true,
-              style: {
-                fontFamily: "monospace",
-                color: theme.palette.text.primary,
+            slotProps={{
+              input: {
+                disableUnderline: true,
+                style: {
+                  fontFamily: "monospace",
+                  color: theme.palette.text.primary,
+                },
               },
             }}
           />
         ) : (
-          /* THIS IS THE PREVIEW - It will be perfectly themed */
+          /* THIS IS THE PREVIEW  */
           <Box
             sx={{
               color: "text.primary",
-              bgcolor: "background.default", // Matches your theme background
+              bgcolor: "background.default",
               p: 3,
               borderRadius: 1,
-              "& .katex": { color: "inherit" }, // Forces math to match text color
+              "& .katex": { color: "inherit" },
               "& img": { maxWidth: "100%", borderRadius: 2 },
             }}
           >

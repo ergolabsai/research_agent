@@ -7,9 +7,9 @@ const theme = {
     MuiTouchRipple: {
       styleOverrides: {
         root: {
-          borderRadius: '8px',
-          '& span': {
-            borderRadius: '8px !important',
+          borderRadius: "8px",
+          "& span": {
+            borderRadius: "8px !important",
           },
         },
       },
@@ -17,21 +17,21 @@ const theme = {
     MuiIconButton: {
       styleOverrides: {
         root: {
-          borderRadius: '8px',
+          borderRadius: "8px",
         },
       },
     },
     MuiMenu: {
       styleOverrides: {
         paper: {
-          backgroundImage: 'none',
+          backgroundImage: "none",
         },
       },
     },
     MuiPaper: {
       styleOverrides: {
         root: {
-          backgroundImage: 'none',
+          backgroundImage: "none",
         },
       },
     },
@@ -77,7 +77,7 @@ export const darkTheme = createTheme({
 
     background: {
       default: "#121212", // app background
-      paper: "rgba(255, 255, 255, 0.04)",  // cards, modals, menus
+      paper: "#1e1e1e", // cards, modals, menus
     },
 
     text: {
@@ -138,7 +138,7 @@ export const lightTheme = createTheme({
 
     background: {
       default: "#f5f5f5", // app background
-      paper: "rgba(0, 0, 0, 0.04)",   // cards
+      paper: "rgba(0, 0, 0, 0.04)", // cards
     },
 
     text: {
