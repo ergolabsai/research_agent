@@ -42,6 +42,18 @@ def create_doc(
     session.refresh(db_doc)
     return db_doc
 
+@router.delete("/docs/{doc_id}", response_model=dict)
+def delete_doc(
+    doc_id: int,
+    session: Session = Depends(get_session),
+):
+    db_doc = session.get(Document, doc_id)
+    if not db_doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    session.delete(db_doc)
+    session.commit()
+    return {"detail": "Document deleted"}
+
 @router.get("/docs", response_model=List[Document])
 def list_docs(session: Session = Depends(get_session)):
     docs = session.exec(select(Document)).all()
