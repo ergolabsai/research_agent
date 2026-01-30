@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+sqlmodel
+pydantic
+pydantic-settings
+python-jose[cryptography]
+bcrypt>=4.0.1
+python-multipart
+python-dotenv

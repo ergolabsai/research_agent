@@ -1,4 +1,0 @@
-fastapi
-celery
-uvicorn
-sqlmodel
