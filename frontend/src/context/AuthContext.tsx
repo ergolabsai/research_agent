@@ -12,6 +12,7 @@ interface AuthContextType {
     username: string,
     password: string,
   ) => Promise<void>;
+  tryItNow: () => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -102,6 +103,28 @@ export function AuthProvider({ children }: AuthProviderProps) {
     [],
   );
 
+  const tryItNow = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const tokens = await authAPI.tryItNow();
+      setCurrentAccessToken(tokens.access_token);
+
+      const userData = await authAPI.me(tokens.access_token);
+      setUser(userData);
+      setError(null);
+    } catch (err: any) {
+      const message =
+        err?.response?.data?.detail || err?.message || "Try it now failed";
+      setError(message);
+      setUser(null);
+      setCurrentAccessToken(null);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   const logout = useCallback(async () => {
     try {
       await authAPI.logout();
@@ -121,6 +144,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         error,
         login,
         register,
+        tryItNow,
         logout,
       }}
     >

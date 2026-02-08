@@ -113,6 +113,11 @@ export const authAPI = {
     return data;
   },
 
+  async tryItNow() {
+    const { data } = await api.post<AuthTokens>("/auth/try", {});
+    return data;
+  },
+
   async logout() {
     await api.post("/auth/logout");
   },

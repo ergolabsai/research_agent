@@ -13,11 +13,14 @@ import {
   Palette as PaletteIcon,
   Logout as LogoutIcon,
   Person as PersonIcon,
+  PersonAdd as PersonAddIcon,
   DarkMode as DarkModeIcon,
   LightMode as LightModeIcon,
 } from "@mui/icons-material";
 import { ThemeName, themeGroups, themeColors } from "../theme/themes";
 import { useTheme as useAppTheme } from "../theme";
+import { useAuth } from "../context/AuthContext";
+import { useNavigate } from "react-router-dom";
 
 interface SettingsMenuProps {
   anchor: HTMLElement | null;
@@ -35,9 +38,15 @@ export const SettingsMenu = ({
   themeName: currentThemeName,
 }: SettingsMenuProps) => {
   const theme = useTheme();
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const { setThemeName } = useAppTheme();
   const isDark = currentThemeName.startsWith("dark");
   const availableThemes = isDark ? themeGroups.dark : themeGroups.light;
+  const isGuestUser = Boolean(
+    user &&
+    (user.email.startsWith("guest+") || user.username.startsWith("guest_")),
+  );
 
   const getThemeLabel = (name: ThemeName) => {
     const parts = name.split("-");
@@ -205,6 +214,22 @@ export const SettingsMenu = ({
       </Box>
 
       <Divider sx={{ my: 0.5 }} />
+
+      {isGuestUser && (
+        <MenuItem
+          onClick={() => {
+            onClose();
+            navigate("/auth/register");
+          }}
+          sx={{
+            gap: 1.5,
+            py: 1.5,
+          }}
+        >
+          <PersonAddIcon fontSize="small" />
+          <Typography variant="body2">Register</Typography>
+        </MenuItem>
+      )}
 
       {/* Logout */}
       <MenuItem

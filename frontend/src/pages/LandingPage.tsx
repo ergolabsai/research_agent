@@ -7,14 +7,20 @@ import {
   useTheme,
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 
 export const LandingPage = () => {
   const theme = useTheme();
   const navigate = useNavigate();
+  const { tryItNow } = useAuth();
 
-  const handleTryItNow = () => {
-    // For now, just go to login
-    navigate("/auth/login");
+  const handleTryItNow = async () => {
+    try {
+      await tryItNow();
+      navigate("/app/dashboard");
+    } catch {
+      navigate("/auth/login");
+    }
   };
 
   const handleLogin = () => {
