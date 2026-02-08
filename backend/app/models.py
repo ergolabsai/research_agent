@@ -12,8 +12,8 @@ class UserBase(SQLModel):
 class User(UserBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     hashed_password: str
-    created_at: datetime = Field(default_factory=datetime.utcnow, sa_column=Column(DateTime))
-    updated_at: datetime = Field(default_factory=datetime.utcnow, sa_column=Column(DateTime))
+    created_at: datetime = Field(default_factory=datetime.now, sa_column=Column(DateTime))
+    updated_at: datetime = Field(default_factory=datetime.now, sa_column=Column(DateTime))
 
 
 class UserCreate(UserBase):
@@ -35,8 +35,8 @@ class DocumentBase(SQLModel):
 
 class Document(DocumentBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    created_at: datetime = Field(default_factory=datetime.utcnow, sa_column=Column(DateTime))
-    updated_at: datetime = Field(default_factory=datetime.utcnow, sa_column=Column(DateTime))
+    created_at: datetime = Field(default_factory=datetime.now, sa_column=Column(DateTime))
+    updated_at: datetime = Field(default_factory=datetime.now, sa_column=Column(DateTime))
 
 
 class DocumentCreate(SQLModel):
@@ -63,8 +63,8 @@ class WorkspaceBase(SQLModel):
 class Workspace(WorkspaceBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     created_by: int = Field(foreign_key="user.id", index=True)
-    created_at: datetime = Field(default_factory=datetime.utcnow, sa_column=Column(DateTime))
-    updated_at: datetime = Field(default_factory=datetime.utcnow, sa_column=Column(DateTime))
+    created_at: datetime = Field(default_factory=datetime.now, sa_column=Column(DateTime))
+    updated_at: datetime = Field(default_factory=datetime.now, sa_column=Column(DateTime))
 
 
 class WorkspaceCreate(WorkspaceBase):
@@ -86,7 +86,7 @@ class WorkspaceMemberBase(SQLModel):
 
 class WorkspaceMember(WorkspaceMemberBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    joined_at: datetime = Field(default_factory=datetime.utcnow, sa_column=Column(DateTime))
+    joined_at: datetime = Field(default_factory=datetime.now, sa_column=Column(DateTime))
 
 
 class WorkspaceMemberCreate(SQLModel):
@@ -107,7 +107,7 @@ class DocumentShareBase(SQLModel):
 
 class DocumentShare(DocumentShareBase, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
-    shared_at: datetime = Field(default_factory=datetime.utcnow, sa_column=Column(DateTime))
+    shared_at: datetime = Field(default_factory=datetime.now, sa_column=Column(DateTime))
 
 
 class DocumentShareCreate(SQLModel):
