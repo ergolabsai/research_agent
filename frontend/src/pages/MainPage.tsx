@@ -142,12 +142,15 @@ export const MainPage = ({ children }: MainPageProps) => {
   };
 
   const handleCreateDocument = async () => {
-    if (!newDocTitle.trim()) return;
+    const title = newDocTitle.trim() || "Untitled Document";
     try {
-      await documentsAPI.create(newDocTitle);
+      const { data } = await documentsAPI.create(title);
       setNewDocDialogOpen(false);
       setNewDocTitle("");
       onDocumentCreated();
+      if (data?.id) {
+        navigate(`/app/editor/${data.id}`);
+      }
     } catch (err) {
       console.error("Failed to create document");
     }
