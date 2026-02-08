@@ -12,6 +12,7 @@ from app.security import (
     create_refresh_token, verify_token, ACCESS_TOKEN_EXPIRE_MINUTES, get_session,
     get_current_user_id, REFRESH_TOKEN_EXPIRE_DAYS
 )
+from app.time import now
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -70,7 +71,7 @@ def register(
         guest_user.email = user_create.email
         guest_user.username = user_create.username
         guest_user.hashed_password = hashed_password
-        guest_user.updated_at = datetime.now()
+        guest_user.updated_at = now()
         session.add(guest_user)
         session.commit()
         session.refresh(guest_user)

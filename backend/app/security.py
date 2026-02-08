@@ -1,10 +1,11 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 from sqlmodel import create_engine, Session, select
 from jose import JWTError, jwt
 from fastapi import HTTPException, status, Header
 import bcrypt
 import os
+from app.time import APP_TIMEZONE, now
 
 # Security configuration
 SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-in-production")
@@ -35,10 +36,10 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
         to_encode["sub"] = str(to_encode["sub"])
     
     if expires_delta:
-        expire = datetime.now() + expires_delta
+        expire = now() + expires_delta
     else:
-        expire = datetime.now() + timedelta(minutes=15)
-    to_encode.update({"exp": expire})
+        expire = now() + timedelta(minutes=15)
+    to_encode.update({"exp": expire.astimezone(timezone.utc)})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
@@ -49,8 +50,8 @@ def create_refresh_token(data: dict) -> str:
     if "sub" in to_encode:
         to_encode["sub"] = str(to_encode["sub"])
     
-    expire = datetime.now() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
-    to_encode.update({"exp": expire, "type": "refresh"})
+    expire = now() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+    to_encode.update({"exp": expire.astimezone(timezone.utc), "type": "refresh"})
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
