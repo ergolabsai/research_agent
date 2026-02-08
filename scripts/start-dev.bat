@@ -1,11 +1,12 @@
 @echo off
-REM Start backend in new command window
 echo Starting backend...
-cd /d "%~dp0.."
+
+REM Go to backend directory
+cd /d "%~dp0..\backend"
 REM Activate virtual environment
 call .venv\Scripts\activate.bat
-cd /d "%~dp0..\backend"
-start cmd /k "%~dp0..\\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --port 8000"
+REM Start backend in new command window
+start cmd /k ""%CD%\.venv\Scripts\python.exe" -m uvicorn app.main:app --reload --port 8000"
 
 REM Wait a moment for backend to start
 timeout /t 2
