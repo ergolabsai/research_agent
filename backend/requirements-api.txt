@@ -3,7 +3,6 @@ lancedb
 pandas
 pydantic
 pydantic-settings
-pylance
 python-jose[cryptography]
 bcrypt>=4.0.1
 python-multipart
