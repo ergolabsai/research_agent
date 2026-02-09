@@ -1,6 +1,7 @@
+# backend/app/models.py
 from datetime import datetime
 from typing import Optional
-from sqlmodel import SQLModel, Field, Column, String
+from sqlmodel import SQLModel, Field, Column
 from sqlalchemy import DateTime
 from app.time import now
 

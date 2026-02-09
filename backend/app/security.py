@@ -1,11 +1,15 @@
-from datetime import datetime, timedelta, timezone
+# backend/app/security.py
+from datetime import timedelta, timezone
 from typing import Optional
-from sqlmodel import create_engine, Session, select
+from sqlmodel import create_engine, Session
 from jose import JWTError, jwt
 from fastapi import HTTPException, status, Header
 import bcrypt
 import os
 from app.time import APP_TIMEZONE, now
+import dotenv
+
+dotenv.load_dotenv()
 
 # Security configuration
 SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-in-production")
@@ -13,7 +17,10 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 15
 REFRESH_TOKEN_EXPIRE_DAYS = 7
 
-sqlite_url = "sqlite:///./app.db"
+if not os.path.exists("data"):
+    print("Creating data directory...")
+    os.makedirs("data")
+sqlite_url = os.getenv("DATABASE_URL", "sqlite:///./data/app.db")
 engine = create_engine(sqlite_url, connect_args={"check_same_thread": False})
 
 

@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+# backend/app/routes/users.py
+from fastapi import APIRouter, Depends
 from sqlmodel import Session, select
 from app.models import User, UserResponse
 from app.security import get_session
