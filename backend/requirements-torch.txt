@@ -1,0 +1,10 @@
+ijson
+lancedb
+numpy
+pandas
+python-dotenv
+tantivy
+torch
+torchvision
+torchaudio
+transformers

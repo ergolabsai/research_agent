@@ -1,10 +1,13 @@
 fastapi
-uvicorn
-sqlmodel
+lancedb
+pandas
 pydantic
 pydantic-settings
+pylance
 python-jose[cryptography]
 bcrypt>=4.0.1
 python-multipart
 python-dotenv
+sqlmodel
 tzdata
+uvicorn

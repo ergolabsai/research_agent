@@ -1,31 +1,36 @@
 #!/bin/bash
+set -e  # Exit immediately if a command fails
 
-# Start backend in background
 echo "Starting backend..."
-cd "$(dirname "$0")"/.. || exit 1
 
-# Activate virtual environment
-source .venv/bin/activate
+# Navigate to backend directory
+cd "$(dirname "$0")/../backend"
 
-cd backend || exit 1
+# Activate Python virtual environment
+if [ -f ".venv/api/bin/activate" ]; then
+    source .venv/api/bin/activate
+else
+    echo "Virtual environment not found! Please create it first."
+    exit 1
+fi
+
+# Start backend (uvicorn)
+# Run in background so frontend can start
 python -m uvicorn app.main:app --reload --port 8000 &
-BACKEND_PID=$!
 
-# Wait for backend to start
+# Wait a moment for backend to start
 sleep 2
 
-# Start frontend
 echo "Starting frontend..."
-cd ../frontend
 
-# Check if dependencies are installed
+# Navigate to frontend directory
+cd "$(dirname "$0")/../frontend"
+
+# Install dependencies if needed
 if [ ! -d "node_modules" ]; then
     echo "Installing frontend dependencies..."
     npm install
 fi
 
+# Start frontend
 npm run dev
-
-# Cleanup on exit
-echo "Cleaning up..."
-kill $BACKEND_PID
