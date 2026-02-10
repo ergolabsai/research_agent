@@ -1,21 +1,21 @@
-from typing import Dict, Any, Optional
+from typing import Callable, Dict, Any, Optional
 from pathlib import Path
 import json
 
-from agents.paper_reader_agent import PaperReaderAgent
-from agents.evidence_finder_agent import EvidenceFinderAgent
-from agents.figure_evaluator_agent import FigureEvaluatorAgent
-from agents.math_evaluator_agent import MathEvaluatorAgent
-from agents.citation_checker_agent import CitationCheckerAgent
-from agents.results_compiler_agent import ResultsCompilerAgent
+from advisor_pipeline.agents.paper_reader_agent import PaperReaderAgent
+from advisor_pipeline.agents.evidence_finder_agent import EvidenceFinderAgent
+from advisor_pipeline.agents.figure_evaluator_agent import FigureEvaluatorAgent
+from advisor_pipeline.agents.math_evaluator_agent import MathEvaluatorAgent
+from advisor_pipeline.agents.citation_checker_agent import CitationCheckerAgent
+from advisor_pipeline.agents.results_compiler_agent import ResultsCompilerAgent
 
-from models.schemas import (
+from advisor_pipeline.models.schemas import (
     PaperDocument,
     ValidationResult,
     PaperStructure,
     StepEvidence
 )
-from database import Database
+from advisor_pipeline.database import Database
 
 
 class AdvisorPipeline:
@@ -31,14 +31,21 @@ class AdvisorPipeline:
     6. Results Compiler - synthesize final assessment
     """
     
-    def __init__(self, mcp_client=None, db: Database = None):
+    def __init__(
+        self,
+        mcp_client=None,
+        db: Database = None,
+        on_step: Callable[[int, str], None] | None = None,
+    ):
         """
         Initialize the pipeline with all agents.
-        
+
         Args:
             mcp_client: MCP calculator client (required for math validation)
             db: Database instance (optional, for persistence)
+            on_step: Callback(step_number, step_name) called at the start of each step
         """
+        self._on_step = on_step
         print("Initializing Advisor Pipeline...")
         
         # Initialize database
@@ -103,32 +110,44 @@ class AdvisorPipeline:
             print("✓ Paper saved to database\n")
         
         # Step 1: Read paper and identify logical steps
+        if self._on_step:
+            self._on_step(1, "Reading paper")
         print("STEP 1: Reading paper and identifying logical steps...")
         paper_structure = self._run_step_1(paper_text, title)
         print(f"✓ Identified {len(paper_structure.logical_steps)} logical steps\n")
         
         # Step 2: Find evidence for each step
+        if self._on_step:
+            self._on_step(2, "Finding evidence")
         print("STEP 2: Finding evidence for each logical step...")
         step_evidence = self._run_step_2(paper_structure, paper_text)
         total_evidence = sum(len(se.evidence_list) for se in step_evidence)
         print(f"✓ Found {total_evidence} pieces of evidence across all steps\n")
         
         # Step 3: Evaluate figure-based evidence
+        if self._on_step:
+            self._on_step(3, "Evaluating figures")
         print("STEP 3: Evaluating figure-based evidence...")
         figure_evaluations = self._run_step_3(step_evidence, figures or {}, paper_structure)
         print(f"✓ Evaluated {len(figure_evaluations)} figures\n")
         
         # Step 4: Evaluate mathematical evidence
+        if self._on_step:
+            self._on_step(4, "Validating math")
         print("STEP 4: Validating mathematical evidence...")
         math_evaluations = self._run_step_4(step_evidence, paper_text, paper_structure)
         print(f"✓ Validated {len(math_evaluations)} mathematical claims\n")
         
         # Step 5: Check citations
+        if self._on_step:
+            self._on_step(5, "Checking citations")
         print("STEP 5: Verifying citations...")
         citation_checks = self._run_step_5(step_evidence, paper_text, bibliography or {}, paper_structure)
         print(f"✓ Checked {len(citation_checks)} citations\n")
         
         # Step 6: Compile results
+        if self._on_step:
+            self._on_step(6, "Compiling results")
         print("STEP 6: Compiling final assessment...")
         validation_result = self._run_step_6(
             paper_id,

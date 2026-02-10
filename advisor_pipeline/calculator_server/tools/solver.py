@@ -4,8 +4,8 @@ Symbolic equation solver.
 Uses SymPy to rearrange equations and solve for any variable.
 """
 
-from tools.db_config import MongoDBConnection, DB_NAME, FORMULAS_COLLECTION
-from tools.repository import FormulaRepository
+from .db_config import MongoDBConnection, DB_NAME, FORMULAS_COLLECTION
+from .repository import FormulaRepository
 import sympy as sp
 from typing import Dict, Any, Optional
 

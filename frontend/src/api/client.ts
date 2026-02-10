@@ -1,5 +1,11 @@
 import axios, { AxiosInstance, AxiosError } from "axios";
-import { AuthTokens, User } from "../types";
+import {
+  AuthTokens,
+  User,
+  PipelineJob,
+  ValidateRequest,
+  ValidationResult,
+} from "../types";
 
 let currentAccessToken: string | null = null;
 let isRefreshing = false;
@@ -171,6 +177,23 @@ export const workspacesAPI = {
 // Users endpoints
 export const usersAPI = {
   search: (query: string) => api.get("/users/search", { params: { q: query } }),
+};
+
+// Pipeline endpoints
+export const pipelineAPI = {
+  validate: (request: ValidateRequest) =>
+    api.post<PipelineJob>("/pipeline/validate", request),
+
+  status: (jobId: string) =>
+    api.get<PipelineJob>(`/pipeline/status/${jobId}`),
+
+  results: (jobId: string) =>
+    api.get<ValidationResult>(`/pipeline/results/${jobId}`),
+
+  history: (paperId: string) =>
+    api.get<ValidationResult[]>(`/pipeline/history/${paperId}`),
+
+  jobs: () => api.get<PipelineJob[]>("/pipeline/jobs"),
 };
 
 export default api;

@@ -11,6 +11,7 @@ import {
 import {
   Add as PlusIcon,
   ChevronLeft as ChevronLeftIcon,
+  Science as ValidateIcon,
 } from "@mui/icons-material";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
@@ -424,6 +425,35 @@ export const Sidebar = ({ onCollapse, isCollapsed = false }: SidebarProps) => {
             )}
           </List>
         </Box>
+
+        <Divider />
+
+        {/* Validate Section */}
+        {!isCollapsed && (
+          <Box
+            onClick={() => navigate("/app/validate")}
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: 1,
+              px: 1.5,
+              py: 1,
+              cursor: "pointer",
+              "&:hover": {
+                backgroundColor: theme.palette.action.hover,
+              },
+              transition: "background-color 0.2s ease",
+            }}
+          >
+            <ValidateIcon color="primary" sx={{ fontSize: "1rem" }} />
+            <Typography
+              variant="body2"
+              sx={{ fontWeight: 600, color: "text.primary" }}
+            >
+              Validate Paper
+            </Typography>
+          </Box>
+        )}
 
         <Divider />
 

@@ -2,8 +2,8 @@ from typing import Any, Dict, List
 from langchain.tools import Tool
 from langchain.prompts import ChatPromptTemplate
 
-from agents.base_agent import BaseAgent
-from models.schemas import PaperStructure, Evidence, StepEvidence
+from advisor_pipeline.agents.base_agent import BaseAgent
+from advisor_pipeline.models.schemas import PaperStructure, Evidence, StepEvidence
 
 
 class EvidenceFinderAgent(BaseAgent):

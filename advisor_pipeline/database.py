@@ -2,8 +2,8 @@ from pymongo import MongoClient
 from typing import Optional, Dict, List
 from datetime import datetime
 
-from config.settings import settings
-from models.schemas import PaperDocument, ValidationDocument, ValidationResult
+from advisor_pipeline.config.settings import settings
+from advisor_pipeline.models.schemas import PaperDocument, ValidationDocument, ValidationResult
 
 
 class Database:

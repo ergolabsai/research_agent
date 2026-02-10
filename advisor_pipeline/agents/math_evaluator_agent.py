@@ -3,8 +3,8 @@ from langchain.tools import Tool
 from langchain.prompts import ChatPromptTemplate
 import json
 
-from agents.base_agent import BaseAgent
-from models.schemas import Evidence, MathEvaluation
+from advisor_pipeline.agents.base_agent import BaseAgent
+from advisor_pipeline.models.schemas import Evidence, MathEvaluation
 
 
 class MathEvaluatorAgent(BaseAgent):

@@ -9,10 +9,7 @@ This module exposes just THREE tools that can handle all formula calculations:
 
 import json
 from mcp.types import Tool, TextContent
-if __name__ == '__main__':
-    from solver import FormulaCalculator
-else:
-    from .solver import FormulaCalculator
+from .solver import FormulaCalculator
 
 def success_response(result: dict) -> list[TextContent]:
     """Wrap a result dict in a TextContent response."""

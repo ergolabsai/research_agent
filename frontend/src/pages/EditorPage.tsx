@@ -1,4 +1,4 @@
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import {
   Box,
   TextField,
@@ -19,6 +19,7 @@ import {
 
 export const EditorPage = () => {
   const { id } = useParams();
+  const navigate = useNavigate();
   const theme = useTheme();
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
@@ -58,7 +59,9 @@ export const EditorPage = () => {
   }, [content, title, isLoaded]);
 
   const handleMath = () => {};
-  const handleLogic = () => {};
+  const handleLogic = () => {
+    navigate("/app/validate");
+  };
   const handleFormatter = () => {};
   const handleLibrarian = () => {};
   const handlePlots = () => {};

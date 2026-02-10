@@ -5,7 +5,7 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime
 from pymongo.collection import Collection
 from pymongo import ASCENDING, TEXT
-from tools.models import Formula
+from .models import Formula
 
 
 class FormulaRepository:

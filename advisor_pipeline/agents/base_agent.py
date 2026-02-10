@@ -8,7 +8,7 @@ from langchain_anthropic import ChatAnthropic
 from langchain.prompts import ChatPromptTemplate
 from langchain.tools import BaseTool
 
-from config.settings import settings
+from advisor_pipeline.config.settings import settings
 
 T = TypeVar('T', bound=BaseModel)
 

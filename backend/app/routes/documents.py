@@ -108,9 +108,6 @@ def update_document(
     user_id: int = Depends(get_current_user_id),
 ):
     """Update a document. Only the owner can edit, but workspace_id can be updated if user has workspace access."""
-    print(  # Debug print
-        f"Updating document {document_id} by user {user_id} with data {doc_update}"
-        )
     document = session.get(Document, document_id)
     if not document:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
@@ -152,9 +149,6 @@ def update_document(
         document.title = doc_update.title
     if doc_update.content is not None:
         document.content = doc_update.content
-    print(  # Debug print
-        f"Document after update: title={document.title}, content={document.content}, workspace_id={document.workspace_id}"
-        )
     session.add(document)
     session.commit()
     session.refresh(document)

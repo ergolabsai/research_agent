@@ -3,9 +3,11 @@ from pathlib import Path
 from langchain.tools import Tool
 from langchain.prompts import ChatPromptTemplate
 import base64
+from anthropic import Anthropic
 
-from agents.base_agent import BaseAgent
-from models.schemas import Evidence, FigureEvaluation, FigureInfo, ClaimValidity
+from advisor_pipeline.agents.base_agent import BaseAgent
+from advisor_pipeline.config.settings import settings
+from advisor_pipeline.models.schemas import Evidence, FigureEvaluation, FigureInfo, ClaimValidity
 
 
 class FigureEvaluatorAgent(BaseAgent):
@@ -111,12 +113,18 @@ Be precise with numbers and units. Be skeptical - verify claims against actual d
             if not figure_path:
                 print(f"Warning: Figure {figure_name} not found in provided figures")
                 continue
-            
+
             # Get the claim this figure is supposed to support
             claim = claims.get(evidence.supports_step, "Unknown claim")
-            
-            # Use agent to analyze the figure
-            agent_input = f"""Analyze this figure:
+
+            # If figure file exists on disk, use vision-based evaluation
+            if figure_path and Path(figure_path).exists():
+                print(f"Using vision analysis for {evidence.location}")
+                evaluation = self.evaluate_with_vision(figure_path, claim, evidence.supports_step)
+            else:
+                # Fallback: text-only evaluation when no figure file is available
+                # Use agent to analyze the figure
+                agent_input = f"""Analyze this figure:
 
 Figure: {evidence.location}
 Path: {figure_path}
@@ -124,12 +132,10 @@ Purpose: {evidence.description}
 Supporting claim: {claim}
 
 Load the figure and extract metadata."""
-            
-            agent_result = self.agent_executor.invoke({"input": agent_input})
-            
-            # For now, we'll use Instructor without vision (placeholder for future OCR)
-            # In production, you'd send the actual image to Claude with vision
-            prompt = f"""Evaluate this figure-based evidence:
+
+                agent_result = self.agent_executor.invoke({"input": agent_input})
+
+                prompt = f"""Evaluate this figure-based evidence:
 
 Figure: {evidence.location}
 What it claims to show: {evidence.description}
@@ -138,7 +144,7 @@ Supporting step {evidence.supports_step}: {claim}
 Agent analysis:
 {agent_result.get('output', '')}
 
-NOTE: In this version, we don't have the actual figure image yet. 
+NOTE: In this version, we don't have the actual figure image yet.
 Base your evaluation on:
 1. What the paper CLAIMS the figure shows (from description)
 2. Whether those claims are specific and verifiable
@@ -146,26 +152,86 @@ Base your evaluation on:
 
 Extract any numerical values mentioned, note confirmations and contradictions.
 """
-            
-            evaluation = self.get_structured_output(
-                prompt=prompt,
-                response_model=FigureEvaluation,
-                context={
-                    "figure_name": evidence.location,
-                    "supports_step": evidence.supports_step
-                }
-            )
-            
+
+                evaluation = self.get_structured_output(
+                    prompt=prompt,
+                    response_model=FigureEvaluation,
+                    context={
+                        "figure_name": evidence.location,
+                        "supports_step": evidence.supports_step
+                    }
+                )
+
             evaluations.append(evaluation)
         
         return evaluations
     
-    def evaluate_with_vision(self, figure_path: str, claim: str) -> FigureEvaluation:
-        """
-        Future method: Evaluate figure using Claude's vision capabilities.
-        
-        This is a placeholder for when you integrate actual image analysis.
-        """
-        # TODO: Implement vision-based figure analysis
-        # Will use Anthropic's vision API to analyze actual figure images
-        pass
+    def evaluate_with_vision(self, figure_path: str, claim: str, step_number: int) -> FigureEvaluation:
+        """Evaluate figure using Claude's vision capabilities."""
+        path = Path(figure_path)
+        if not path.exists():
+            return FigureEvaluation(
+                figure_name=path.name,
+                supports_step=step_number,
+                extracted_data=[],
+                validity=ClaimValidity(confirmations=[], contradictions=["Figure file not found"]),
+                notes=f"Could not find figure at {figure_path}",
+            )
+
+        with open(path, "rb") as f:
+            image_data = base64.b64encode(f.read()).decode("utf-8")
+
+        # Determine media type
+        suffix = path.suffix.lower()
+        media_types = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif", ".webp": "image/webp"}
+        media_type = media_types.get(suffix, "image/png")
+
+        client = Anthropic(api_key=settings.anthropic_api_key)
+        response = client.messages.create(
+            model=settings.model_name,
+            max_tokens=2000,
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image",
+                            "source": {"type": "base64", "media_type": media_type, "data": image_data},
+                        },
+                        {
+                            "type": "text",
+                            "text": f"""Analyze this scientific figure. The paper claims it supports: "{claim}"
+
+Please:
+1. Describe what the figure actually shows (data, axes, trends)
+2. Extract any specific numerical values with units
+3. List confirmations: ways the figure supports the claim
+4. List contradictions: ways the figure does NOT support the claim or shows something different
+5. Note anything unusual or concerning about the figure
+
+Be precise with numbers and units. Be skeptical.""",
+                        },
+                    ],
+                }
+            ],
+        )
+
+        # Parse the vision response into structured output
+        vision_text = response.content[0].text
+
+        evaluation = self.get_structured_output(
+            prompt=f"""Based on this vision analysis of a figure, create a structured evaluation:
+
+Vision analysis:
+{vision_text}
+
+The figure was claimed to support: "{claim}"
+Figure name: {path.name}
+Step number: {step_number}
+
+Extract numerical data, confirmations, and contradictions from the analysis.""",
+            response_model=FigureEvaluation,
+            context={"figure_name": path.name, "supports_step": step_number},
+        )
+
+        return evaluation

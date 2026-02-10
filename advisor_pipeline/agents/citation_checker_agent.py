@@ -2,9 +2,10 @@ from typing import Any, Dict, List
 from langchain.tools import Tool
 from langchain.prompts import ChatPromptTemplate
 import re
+import httpx
 
-from agents.base_agent import BaseAgent
-from models.schemas import Evidence, CitationCheck
+from advisor_pipeline.agents.base_agent import BaseAgent
+from advisor_pipeline.models.schemas import Evidence, CitationCheck
 
 
 class CitationCheckerAgent(BaseAgent):
@@ -49,28 +50,135 @@ Be thorough - misrepresenting citations is a serious issue in scientific publish
             return "No DOI found in citation"
         
         def search_paper_database(query: str) -> str:
-            """
-            Search for a paper (placeholder for actual API integration).
-            
-            In production, this would call APIs like:
-            - Semantic Scholar API
-            - CrossRef API
-            - arXiv API
-            - PubMed API
-            """
-            # TODO: Integrate with actual paper databases
-            return f"Placeholder: Would search for '{query}' in paper databases"
+            """Search for a paper using the Semantic Scholar API."""
+            try:
+                response = httpx.get(
+                    "https://api.semanticscholar.org/graph/v1/paper/search",
+                    params={
+                        "query": query,
+                        "limit": 5,
+                        "fields": "title,authors,year,abstract,externalIds",
+                    },
+                    timeout=10.0,
+                )
+                response.raise_for_status()
+                data = response.json()
+
+                results = data.get("data", [])
+                if not results:
+                    return f"No results found for query: '{query}'"
+
+                lines = [f"Found {len(results)} result(s) for '{query}':\n"]
+                for i, paper in enumerate(results, 1):
+                    title = paper.get("title", "Unknown title")
+                    year = paper.get("year", "Unknown year")
+                    paper_id = paper.get("paperId", "N/A")
+                    authors_list = paper.get("authors", [])
+                    author_names = ", ".join(
+                        a.get("name", "Unknown") for a in authors_list[:3]
+                    )
+                    if len(authors_list) > 3:
+                        author_names += " et al."
+                    external_ids = paper.get("externalIds", {}) or {}
+                    doi = external_ids.get("DOI", "N/A")
+
+                    lines.append(
+                        f"{i}. \"{title}\"\n"
+                        f"   Authors: {author_names}\n"
+                        f"   Year: {year}\n"
+                        f"   DOI: {doi}\n"
+                        f"   Semantic Scholar ID: {paper_id}\n"
+                    )
+                return "\n".join(lines)
+            except httpx.HTTPStatusError as e:
+                return f"HTTP error searching for '{query}': {e.response.status_code} {e.response.reason_phrase}"
+            except httpx.RequestError as e:
+                return f"Request error searching for '{query}': {str(e)}"
+            except Exception as e:
+                return f"Unexpected error searching for '{query}': {str(e)}"
         
         def check_accessibility(doi_or_url: str) -> str:
-            """Check if a paper is publicly accessible."""
-            # TODO: Actually check if paper is accessible
-            # For now, just return a placeholder
-            return f"Placeholder: Would check accessibility of {doi_or_url}"
+            """Check if a paper is publicly accessible via the Semantic Scholar API."""
+            try:
+                identifier = doi_or_url.strip()
+                if identifier.startswith("10."):
+                    api_url = f"https://api.semanticscholar.org/graph/v1/paper/DOI:{identifier}"
+                else:
+                    api_url = f"https://api.semanticscholar.org/graph/v1/paper/{identifier}"
+
+                response = httpx.get(
+                    api_url,
+                    params={"fields": "isOpenAccess,openAccessPdf,url"},
+                    timeout=10.0,
+                )
+                response.raise_for_status()
+                data = response.json()
+
+                is_open_access = data.get("isOpenAccess", False)
+                open_access_pdf = data.get("openAccessPdf")
+                paper_url = data.get("url", "N/A")
+
+                lines = [f"Accessibility check for '{doi_or_url}':"]
+                lines.append(f"  Semantic Scholar URL: {paper_url}")
+                lines.append(f"  Open Access: {'Yes' if is_open_access else 'No'}")
+                if open_access_pdf and open_access_pdf.get("url"):
+                    lines.append(f"  Open Access PDF: {open_access_pdf['url']}")
+                else:
+                    lines.append("  Open Access PDF: Not available")
+
+                return "\n".join(lines)
+            except httpx.HTTPStatusError as e:
+                if e.response.status_code == 404:
+                    return f"Paper not found in Semantic Scholar for identifier: '{doi_or_url}'"
+                return f"HTTP error checking accessibility for '{doi_or_url}': {e.response.status_code} {e.response.reason_phrase}"
+            except httpx.RequestError as e:
+                return f"Request error checking accessibility for '{doi_or_url}': {str(e)}"
+            except Exception as e:
+                return f"Unexpected error checking accessibility for '{doi_or_url}': {str(e)}"
         
         def get_paper_abstract(doi_or_url: str) -> str:
-            """Retrieve abstract of a cited paper."""
-            # TODO: Integrate with paper APIs to get abstracts
-            return f"Placeholder: Would retrieve abstract for {doi_or_url}"
+            """Retrieve abstract of a cited paper via the Semantic Scholar API."""
+            try:
+                identifier = doi_or_url.strip()
+                if identifier.startswith("10."):
+                    api_url = f"https://api.semanticscholar.org/graph/v1/paper/DOI:{identifier}"
+                else:
+                    api_url = f"https://api.semanticscholar.org/graph/v1/paper/{identifier}"
+
+                response = httpx.get(
+                    api_url,
+                    params={"fields": "abstract,title,authors,year"},
+                    timeout=10.0,
+                )
+                response.raise_for_status()
+                data = response.json()
+
+                title = data.get("title", "Unknown title")
+                year = data.get("year", "Unknown year")
+                abstract = data.get("abstract")
+                authors_list = data.get("authors", [])
+                author_names = ", ".join(
+                    a.get("name", "Unknown") for a in authors_list[:5]
+                )
+                if len(authors_list) > 5:
+                    author_names += " et al."
+
+                lines = [
+                    f"Title: {title}",
+                    f"Authors: {author_names}",
+                    f"Year: {year}",
+                    "",
+                    f"Abstract: {abstract if abstract else 'No abstract available.'}",
+                ]
+                return "\n".join(lines)
+            except httpx.HTTPStatusError as e:
+                if e.response.status_code == 404:
+                    return f"Paper not found in Semantic Scholar for identifier: '{doi_or_url}'"
+                return f"HTTP error retrieving abstract for '{doi_or_url}': {e.response.status_code} {e.response.reason_phrase}"
+            except httpx.RequestError as e:
+                return f"Request error retrieving abstract for '{doi_or_url}': {str(e)}"
+            except Exception as e:
+                return f"Unexpected error retrieving abstract for '{doi_or_url}': {str(e)}"
         
         return [
             Tool(

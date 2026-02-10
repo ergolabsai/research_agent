@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlmodel import SQLModel, create_engine
 from app.security import engine
-from app.routes import auth, documents, workspaces, users
+from app.routes import auth, documents, workspaces, users, pipeline
 
 # Create tables
 SQLModel.metadata.create_all(engine)
@@ -24,6 +24,7 @@ app.include_router(auth.router)
 app.include_router(documents.router)
 app.include_router(workspaces.router)
 app.include_router(users.router)
+app.include_router(pipeline.router)
 
 
 @app.get("/")

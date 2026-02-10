@@ -1,8 +1,8 @@
 from typing import Any, Dict, List
 from langchain.prompts import ChatPromptTemplate
 
-from agents.base_agent import BaseAgent
-from models.schemas import (
+from advisor_pipeline.agents.base_agent import BaseAgent
+from advisor_pipeline.models.schemas import (
     PaperStructure,
     StepEvidence,
     FigureEvaluation,

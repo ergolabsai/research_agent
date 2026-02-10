@@ -45,3 +45,59 @@ export interface AuthTokens {
   refresh_token: string;
   token_type: string;
 }
+
+// Pipeline types
+export interface PipelineJob {
+  job_id: string;
+  paper_id: string;
+  title: string;
+  status: "pending" | "running" | "completed" | "failed";
+  current_step: number;
+  total_steps: number;
+  step_name: string;
+  error?: string;
+}
+
+export interface ValidateRequest {
+  paper_text: string;
+  title: string;
+  paper_id?: string;
+  authors?: string[];
+  abstract?: string;
+}
+
+export interface StepValidation {
+  evidence_count: number;
+  figure_validations: Array<{
+    figure_name: string;
+    supports_step: number;
+    validity: { confirmations: string[]; contradictions: string[] };
+  }>;
+  math_validations: Array<{
+    equation_reference: string;
+    calculation_valid: boolean;
+    details: string;
+  }>;
+  citation_validations: Array<{
+    citation: string;
+    accessible: boolean;
+    supports_claim: boolean | null;
+    notes: string;
+  }>;
+}
+
+export interface ValidationResult {
+  paper_id: string;
+  confidence_score: number;
+  overall_assessment: { review: string };
+  paper_structure: {
+    title: string;
+    main_claim: string;
+    logical_steps: Array<{
+      step_number: number;
+      description: string;
+      section: string;
+    }>;
+  };
+  step_validations: Record<string, StepValidation>;
+}

@@ -1,44 +1,36 @@
 # ======================
-# Backend (Python)
+# Python
 # ======================
-
-# Python bytecode and cache
 __pycache__/
 *.py[cod]
 *.so
-
-# Virtual environments
-backend/.venv/
-
-# Environment variables
-backend/.env
-backend/.env.*
-!backend/.env.example
-
-# Databases & data files
-backend/*.db
-backend/data/
-
+.venv/
+*.egg-info/
 
 # ======================
-# Frontend (Node / JS)
+# Environment & Secrets
 # ======================
+.env
+.env.*
+!.env.example
 
-# Dependencies & build output
+# ======================
+# Databases & Data
+# ======================
+*.db
+data/
+
+# ======================
+# Frontend
+# ======================
 frontend/node_modules/
 frontend/dist/
-
-# Environment variables
-frontend/.env.*
-!frontend/.env.example
-
-# Logs
 frontend/npm-debug.log*
 frontend/yarn-debug.log*
 frontend/yarn-error.log*
-
+node_modules/
 
 # ======================
-# OS junk (global)
+# OS
 # ======================
 .DS_Store

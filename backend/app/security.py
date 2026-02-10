@@ -7,21 +7,17 @@ from fastapi import HTTPException, status, Header
 import bcrypt
 import os
 from app.time import APP_TIMEZONE, now
-import dotenv
-
-dotenv.load_dotenv()
+from advisor_pipeline.config.settings import settings
 
 # Security configuration
-SECRET_KEY = os.getenv("SECRET_KEY", "your-secret-key-change-in-production")
+SECRET_KEY = settings.secret_key
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 15
 REFRESH_TOKEN_EXPIRE_DAYS = 7
 
 if not os.path.exists("data"):
-    print("Creating data directory...")
     os.makedirs("data")
-sqlite_url = os.getenv("DATABASE_URL", "sqlite:///./data/app.db")
-engine = create_engine(sqlite_url, connect_args={"check_same_thread": False})
+engine = create_engine(settings.database_url, connect_args={"check_same_thread": False})
 
 
 def get_password_hash(password: str) -> str:
@@ -71,8 +67,7 @@ def verify_token(token: str) -> Optional[int]:
             return None
         user_id = int(sub)
         return user_id
-    except JWTError as e:
-        print("JWT Error:", e)
+    except JWTError:
         return None
     except (ValueError, TypeError):
         return None
