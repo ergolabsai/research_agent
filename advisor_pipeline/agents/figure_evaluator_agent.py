@@ -1,7 +1,6 @@
 from typing import Any, Dict, List
 from pathlib import Path
 from langchain_core.tools import Tool
-from langchain_core.prompts import ChatPromptTemplate
 import base64
 from anthropic import Anthropic
 
@@ -13,31 +12,27 @@ from advisor_pipeline.models.schemas import Evidence, FigureEvaluation, FigureIn
 class FigureEvaluatorAgent(BaseAgent):
     """
     Agent responsible for evaluating figure-based evidence.
-    
+
     Input: List of figure evidence and figure file paths
     Output: List of FigureEvaluation
     """
-    
+
     def __init__(self):
         super().__init__(
             name="FigureEvaluator",
             description="Evaluates whether figures actually support the claims made about them"
         )
         self.tools = self.get_tools()
-        
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", """You are a scientific figure analyst. For each figure:
+
+        system_prompt = """You are a scientific figure analyst. For each figure:
 1. Examine what data is actually shown
 2. Extract numerical values and their units
 3. Compare what the figure shows to what the paper claims it shows
 4. Identify confirmations (where figure supports claim) and contradictions (where it doesn't)
 
-Be precise with numbers and units. Be skeptical - verify claims against actual data."""),
-            ("user", "{input}"),
-            ("placeholder", "{agent_scratchpad}")
-        ])
-        
-        self.initialize_agent(prompt)
+Be precise with numbers and units. Be skeptical - verify claims against actual data."""
+
+        self.initialize_agent(system_prompt)
     
     def get_tools(self):
         """Define tools for figure analysis."""
@@ -133,7 +128,7 @@ Supporting claim: {claim}
 
 Load the figure and extract metadata."""
 
-                agent_result = self.agent_executor.invoke({"input": agent_input})
+                agent_result = self.invoke_agent(agent_input)
 
                 prompt = f"""Evaluate this figure-based evidence:
 
@@ -142,7 +137,7 @@ What it claims to show: {evidence.description}
 Supporting step {evidence.supports_step}: {claim}
 
 Agent analysis:
-{agent_result.get('output', '')}
+{agent_result}
 
 NOTE: In this version, we don't have the actual figure image yet.
 Base your evaluation on:

@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 from datetime import datetime
 
 
@@ -141,7 +141,7 @@ class ValidationResult(BaseModel):
     paper_id: str = Field(description="Unique identifier for the paper")
     timestamp: datetime = Field(default_factory=datetime.now)
     paper_structure: PaperStructure
-    step_validations: Dict[int, Dict[str, any]] = Field(
+    step_validations: Dict[int, Dict[str, Any]] = Field(
         description="For each logical step, validation results by evidence type"
     )
     overall_assessment: OverAllReview

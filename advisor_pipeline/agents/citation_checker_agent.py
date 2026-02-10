@@ -1,6 +1,5 @@
 from typing import Any, Dict, List
 from langchain_core.tools import Tool
-from langchain_core.prompts import ChatPromptTemplate
 import re
 import httpx
 
@@ -11,31 +10,27 @@ from advisor_pipeline.models.schemas import Evidence, CitationCheck
 class CitationCheckerAgent(BaseAgent):
     """
     Agent responsible for verifying citations actually support the claims.
-    
+
     Input: List of citation evidence
     Output: List of CitationCheck
     """
-    
+
     def __init__(self):
         super().__init__(
             name="CitationChecker",
             description="Verifies that citations actually support the claims attributed to them"
         )
         self.tools = self.get_tools()
-        
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", """You are a citation verification specialist. For each citation:
+
+        system_prompt = """You are a citation verification specialist. For each citation:
 1. Try to locate the cited paper (DOI, arXiv, etc.)
 2. If accessible, read the abstract and relevant sections
 3. Verify whether it actually supports the claim being made
 4. Note any discrepancies
 
-Be thorough - misrepresenting citations is a serious issue in scientific publishing."""),
-            ("user", "{input}"),
-            ("placeholder", "{agent_scratchpad}")
-        ])
-        
-        self.initialize_agent(prompt)
+Be thorough - misrepresenting citations is a serious issue in scientific publishing."""
+
+        self.initialize_agent(system_prompt)
     
     def get_tools(self):
         """Define tools for citation checking."""
@@ -259,8 +254,8 @@ Tasks:
 4. If accessible, get the abstract
 """
             
-            agent_result = self.agent_executor.invoke({"input": agent_input})
-            
+            agent_result = self.invoke_agent(agent_input)
+
             # Use Instructor to structure the verification result
             prompt = f"""Create a citation verification report:
 
@@ -269,7 +264,7 @@ Full citation details: {full_citation}
 Supports step {evidence.supports_step}: {claim}
 
 Agent's investigation:
-{agent_result.get('output', '')}
+{agent_result}
 
 Determine:
 1. Whether the citation is accessible

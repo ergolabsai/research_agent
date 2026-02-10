@@ -1,6 +1,5 @@
 from typing import Any, Dict, List
 from langchain_core.tools import Tool
-from langchain_core.prompts import ChatPromptTemplate
 
 from advisor_pipeline.agents.base_agent import BaseAgent
 from advisor_pipeline.models.schemas import PaperStructure, Evidence, StepEvidence
@@ -9,31 +8,27 @@ from advisor_pipeline.models.schemas import PaperStructure, Evidence, StepEviden
 class EvidenceFinderAgent(BaseAgent):
     """
     Agent responsible for finding evidence supporting each logical step.
-    
+
     Input: PaperStructure and full paper text
     Output: List of StepEvidence (one per logical step)
     """
-    
+
     def __init__(self):
         super().__init__(
             name="EvidenceFinder",
             description="Finds and catalogs evidence supporting each logical step"
         )
         self.tools = self.get_tools()
-        
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", """You are a scientific evidence analyst. For each logical step in a paper:
+
+        system_prompt = """You are a scientific evidence analyst. For each logical step in a paper:
 1. Find all evidence cited to support that step
 2. Classify evidence as: figure, math/equation, citation, or textual argument
 3. Note the exact location (section, page, figure number, equation number)
 4. Describe what the evidence shows
 
-Be thorough - one step may have multiple pieces of evidence."""),
-            ("user", "{input}"),
-            ("placeholder", "{agent_scratchpad}")
-        ])
-        
-        self.initialize_agent(prompt)
+Be thorough - one step may have multiple pieces of evidence."""
+
+        self.initialize_agent(system_prompt)
     
     def get_tools(self):
         """Define tools for evidence searching."""
@@ -117,15 +112,15 @@ Paper excerpt from {step.section}:
 {self._extract_section(paper_text, step.section)}
 """
             
-            agent_result = self.agent_executor.invoke({"input": agent_input})
-            
+            agent_result = self.invoke_agent(agent_input)
+
             # Use Instructor to structure the evidence
             prompt = f"""Extract all evidence supporting this step:
 
 Step {step.step_number}: {step.description}
 
 Agent found:
-{agent_result.get('output', '')}
+{agent_result}
 
 Full context:
 {paper_text}

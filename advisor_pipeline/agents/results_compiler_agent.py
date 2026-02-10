@@ -1,5 +1,4 @@
 from typing import Any, Dict, List
-from langchain_core.prompts import ChatPromptTemplate
 
 from advisor_pipeline.agents.base_agent import BaseAgent
 from advisor_pipeline.models.schemas import (

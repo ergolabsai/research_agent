@@ -1,6 +1,5 @@
 from typing import Any, Dict, List
 from langchain_core.tools import Tool
-from langchain_core.prompts import ChatPromptTemplate
 import json
 
 from advisor_pipeline.agents.base_agent import BaseAgent
@@ -11,36 +10,32 @@ class MathEvaluatorAgent(BaseAgent):
     """
     Agent responsible for validating mathematical evidence.
     Uses MCP calculator server to verify calculations.
-    
+
     Input: List of math evidence
     Output: List of MathEvaluation
     """
-    
+
     def __init__(self, mcp_client=None):
         super().__init__(
             name="MathEvaluator",
             description="Validates mathematical derivations and calculations"
         )
-        
+
         # Store MCP client for calculator access
         self.mcp_client = mcp_client
-        
+
         self.tools = self.get_tools()
-        
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", """You are a mathematical verification specialist. For each equation or calculation:
+
+        system_prompt = """You are a mathematical verification specialist. For each equation or calculation:
 1. Identify what formula or physical law is being applied
 2. Extract the input values and their units
 3. Determine what the expected output should be
 4. Use the MCP calculator to verify the math
 5. Check unit consistency
 
-Be rigorous - even small errors matter in scientific papers."""),
-            ("user", "{input}"),
-            ("placeholder", "{agent_scratchpad}")
-        ])
-        
-        self.initialize_agent(prompt)
+Be rigorous - even small errors matter in scientific papers."""
+
+        self.initialize_agent(system_prompt)
     
     def get_tools(self):
         """Define tools for mathematical validation."""
@@ -198,8 +193,8 @@ Tasks:
 4. Use the calculator to verify the math
 """
             
-            agent_result = self.agent_executor.invoke({"input": agent_input})
-            
+            agent_result = self.invoke_agent(agent_input)
+
             # Use Instructor to structure the validation result
             prompt = f"""Create a mathematical validation report:
 
@@ -208,7 +203,7 @@ Context: {evidence.description}
 Supports step {evidence.supports_step}: {claim}
 
 Agent verification:
-{agent_result.get('output', '')}
+{agent_result}
 
 Based on the agent's work with the MCP calculator, determine:
 1. Whether the calculation is valid

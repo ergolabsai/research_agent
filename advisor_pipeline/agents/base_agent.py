@@ -1,30 +1,38 @@
 from abc import ABC, abstractmethod
-from typing import Any, Dict, Type, TypeVar
+from typing import Any, Dict, Type, TypeVar, Annotated
 from pydantic import BaseModel
 import instructor
 from anthropic import Anthropic
-from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain_anthropic import ChatAnthropic
-from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.tools import BaseTool
+from langchain_core.messages import BaseMessage, HumanMessage
+from langgraph.graph import StateGraph, START, END
+from langgraph.graph.message import add_messages
+from langgraph.prebuilt import ToolNode, tools_condition
+from typing_extensions import TypedDict
 
 from advisor_pipeline.config.settings import settings
 
 T = TypeVar('T', bound=BaseModel)
 
 
+class AgentState(TypedDict):
+    """State for LangGraph agent."""
+    messages: Annotated[list[BaseMessage], add_messages]
+
+
 class BaseAgent(ABC):
     """Base class for all specialized agents in the pipeline."""
-    
+
     def __init__(self, name: str, description: str):
         self.name = name
         self.description = description
-        
+
         # Initialize Anthropic client with Instructor for structured outputs
         self.client = instructor.from_anthropic(
             Anthropic(api_key=settings.anthropic_api_key)
         )
-        
+
         # Initialize LangChain LLM for agent orchestration
         self.llm = ChatAnthropic(
             model=settings.model_name,
@@ -32,27 +40,77 @@ class BaseAgent(ABC):
             max_tokens=settings.max_tokens,
             api_key=settings.anthropic_api_key
         )
-        
+
         # Tools will be defined by child classes
         self.tools: list[BaseTool] = []
-        
-        # Agent executor will be initialized after tools are set
-        self.agent_executor: AgentExecutor | None = None
-    
-    def initialize_agent(self, prompt: ChatPromptTemplate):
-        """Initialize the LangChain agent with tools and prompt."""
+
+        # Agent graph will be initialized after tools are set
+        self.agent_graph = None
+
+    def initialize_agent(self, system_prompt: str):
+        """Initialize the LangGraph agent with tools and system prompt."""
         if not self.tools:
             raise ValueError(f"No tools defined for agent {self.name}")
-        
-        agent = create_tool_calling_agent(self.llm, self.tools, prompt)
-        self.agent_executor = AgentExecutor(
-            agent=agent,
-            tools=self.tools,
-            verbose=True,
-            handle_parsing_errors=True,
-            max_iterations=10
+
+        # Bind tools to the LLM
+        llm_with_tools = self.llm.bind_tools(self.tools)
+
+        # Store system prompt
+        self.system_prompt = system_prompt
+
+        # Define the agent node
+        def call_model(state: AgentState):
+            messages = state["messages"]
+            # Prepend system message if not already there
+            if not messages or not hasattr(messages[0], "content") or "system" not in str(type(messages[0])):
+                messages = [{"role": "system", "content": self.system_prompt}] + messages
+            response = llm_with_tools.invoke(messages)
+            return {"messages": [response]}
+
+        # Build the graph
+        workflow = StateGraph(AgentState)
+
+        # Add nodes
+        workflow.add_node("agent", call_model)
+        workflow.add_node("tools", ToolNode(self.tools))
+
+        # Add edges
+        workflow.add_edge(START, "agent")
+        workflow.add_conditional_edges(
+            "agent",
+            tools_condition,
         )
-    
+        workflow.add_edge("tools", "agent")
+
+        # Compile the graph
+        self.agent_graph = workflow.compile()
+
+    def invoke_agent(self, input_text: str) -> str:
+        """
+        Invoke the LangGraph agent with input text.
+
+        Args:
+            input_text: The input to send to the agent
+
+        Returns:
+            The agent's final response as a string
+        """
+        if not self.agent_graph:
+            raise ValueError(f"Agent graph not initialized for {self.name}")
+
+        result = self.agent_graph.invoke(
+            {"messages": [HumanMessage(content=input_text)]},
+            {"recursion_limit": 10}
+        )
+
+        # Extract the final message
+        if result and "messages" in result:
+            final_message = result["messages"][-1]
+            if hasattr(final_message, "content"):
+                return final_message.content
+            return str(final_message)
+        return ""
+
     def get_structured_output(
         self,
         prompt: str,
