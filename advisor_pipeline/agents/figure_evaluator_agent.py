@@ -1,7 +1,7 @@
 from typing import Any, Dict, List
 from pathlib import Path
-from langchain.tools import Tool
-from langchain.prompts import ChatPromptTemplate
+from langchain_core.tools import Tool
+from langchain_core.prompts import ChatPromptTemplate
 import base64
 from anthropic import Anthropic
 

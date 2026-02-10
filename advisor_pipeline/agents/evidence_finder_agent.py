@@ -1,6 +1,6 @@
 from typing import Any, Dict, List
-from langchain.tools import Tool
-from langchain.prompts import ChatPromptTemplate
+from langchain_core.tools import Tool
+from langchain_core.prompts import ChatPromptTemplate
 
 from advisor_pipeline.agents.base_agent import BaseAgent
 from advisor_pipeline.models.schemas import PaperStructure, Evidence, StepEvidence

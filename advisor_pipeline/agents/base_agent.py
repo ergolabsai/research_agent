@@ -5,8 +5,8 @@ import instructor
 from anthropic import Anthropic
 from langchain.agents import AgentExecutor, create_tool_calling_agent
 from langchain_anthropic import ChatAnthropic
-from langchain.prompts import ChatPromptTemplate
-from langchain.tools import BaseTool
+from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.tools import BaseTool
 
 from advisor_pipeline.config.settings import settings
 

@@ -1,6 +1,6 @@
 from typing import Any, Dict, List
-from langchain.tools import Tool
-from langchain.prompts import ChatPromptTemplate
+from langchain_core.tools import Tool
+from langchain_core.prompts import ChatPromptTemplate
 import re
 import httpx
 

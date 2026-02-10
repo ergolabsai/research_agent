@@ -5,8 +5,48 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="6cc51746-4537-4c5e-965f-ef86103f3ff2" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.archive/.gitignore" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.archive/Next_steps.txt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.archive/README.md" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.archive/agent_files/__init__.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.archive/agent_files/create_plots.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.archive/agent_files/ideas.txt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.archive/agent_files/inputs.txt" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.archive/agent_files/key" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.archive/agent_files/multi_step_paper_review.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.archive/agent_files/output_classes.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.archive/agent_files/test.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.archive/agent_server.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.archive/create_figure.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.archive/create_plasma_figure.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.archive/create_thomson_profile.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.archive/create_zap_diagram.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.archive/eslint.config.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.archive/index.html" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.archive/package-lock.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.archive/package.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.archive/public/vite.svg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.archive/server-commonjs.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.archive/server.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.archive/src/App.css" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.archive/src/App.tsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.archive/src/Settings.tsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.archive/src/assets/react.svg" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.archive/src/index.css" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.archive/src/main.tsx" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.archive/src/theme.ts" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.archive/tsconfig.json" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.archive/vite.config.js" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/advisor_pipeline/agent_server.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/advisor_pipeline/agents/base_agent.py" beforeDir="false" afterPath="$PROJECT_DIR$/advisor_pipeline/agents/base_agent.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/advisor_pipeline/agents/citation_checker_agent.py" beforeDir="false" afterPath="$PROJECT_DIR$/advisor_pipeline/agents/citation_checker_agent.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/advisor_pipeline/agents/evidence_finder_agent.py" beforeDir="false" afterPath="$PROJECT_DIR$/advisor_pipeline/agents/evidence_finder_agent.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/advisor_pipeline/agents/figure_evaluator_agent.py" beforeDir="false" afterPath="$PROJECT_DIR$/advisor_pipeline/agents/figure_evaluator_agent.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/advisor_pipeline/agents/math_evaluator_agent.py" beforeDir="false" afterPath="$PROJECT_DIR$/advisor_pipeline/agents/math_evaluator_agent.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/advisor_pipeline/agents/paper_reader_agent.py" beforeDir="false" afterPath="$PROJECT_DIR$/advisor_pipeline/agents/paper_reader_agent.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/advisor_pipeline/agents/results_compiler_agent.py" beforeDir="false" afterPath="$PROJECT_DIR$/advisor_pipeline/agents/results_compiler_agent.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pyproject.toml" beforeDir="false" afterPath="$PROJECT_DIR$/pyproject.toml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
