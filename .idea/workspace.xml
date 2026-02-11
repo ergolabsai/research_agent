@@ -6,16 +6,7 @@
   <component name="ChangeListManager">
     <list default="true" id="6cc51746-4537-4c5e-965f-ef86103f3ff2" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/advisor_pipeline/agents/base_agent.py" beforeDir="false" afterPath="$PROJECT_DIR$/advisor_pipeline/agents/base_agent.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/advisor_pipeline/agents/citation_checker_agent.py" beforeDir="false" afterPath="$PROJECT_DIR$/advisor_pipeline/agents/citation_checker_agent.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/advisor_pipeline/agents/evidence_finder_agent.py" beforeDir="false" afterPath="$PROJECT_DIR$/advisor_pipeline/agents/evidence_finder_agent.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/advisor_pipeline/agents/figure_evaluator_agent.py" beforeDir="false" afterPath="$PROJECT_DIR$/advisor_pipeline/agents/figure_evaluator_agent.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/advisor_pipeline/agents/math_evaluator_agent.py" beforeDir="false" afterPath="$PROJECT_DIR$/advisor_pipeline/agents/math_evaluator_agent.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/advisor_pipeline/agents/paper_reader_agent.py" beforeDir="false" afterPath="$PROJECT_DIR$/advisor_pipeline/agents/paper_reader_agent.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/advisor_pipeline/agents/results_compiler_agent.py" beforeDir="false" afterPath="$PROJECT_DIR$/advisor_pipeline/agents/results_compiler_agent.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/advisor_pipeline/models/schemas.py" beforeDir="false" afterPath="$PROJECT_DIR$/advisor_pipeline/models/schemas.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/backend/app/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/main.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pyproject.toml" beforeDir="false" afterPath="$PROJECT_DIR$/pyproject.toml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />

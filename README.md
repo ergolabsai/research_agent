@@ -113,7 +113,12 @@ cd ..
 
 ### 4. Start MongoDB
 
+skip this step if you already have mongo working on your computer
+
 ```bash
+# To check if you have MongoDB
+mongosh
+
 # If using Homebrew:
 brew services start mongodb-community
 
@@ -128,7 +133,7 @@ Open three terminals:
 ```bash
 # Terminal 1: Backend
 cd backend
-uvicorn app.main:app --reload --port 8080
+uvicorn app.main:app --reload --port 8000
 
 # Terminal 2: Frontend
 cd frontend
