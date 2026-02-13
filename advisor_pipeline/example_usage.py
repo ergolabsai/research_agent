@@ -16,28 +16,11 @@ from pipeline import AdvisorPipeline
 
 def example_basic_usage():
     """Basic example: Run pipeline on a paper without database."""
-    
-    # Sample paper (in practice, you'd load this from a file)
-    sample_paper = """
-    Title: Novel Approach to Quantum Error Correction
-    
-    Abstract: We present a new method for quantum error correction...
-    
-    Introduction:
-    Quantum computers are susceptible to errors from decoherence and noise.
-    Our approach uses a novel encoding scheme based on topological codes...
-    
-    Methods:
-    We implement a surface code with distance d=5 (Equation 1).
-    The error rate is given by: p_L = (p/p_th)^((d+1)/2)
-    
-    Results:
-    Figure 1 shows that our method achieves a 10^-6 error rate.
-    This is confirmed by simulations in Figure 2.
-    
-    Discussion:
-    As shown by Smith et al. (2023), topological codes are robust...
-    """
+
+    # Load paper from LaTeX file
+    paper_path = Path("/Users/chelsea/python_projects/project_files/shumlak2009_latex/main_text.tex")
+    with open(paper_path, 'r') as f:
+        sample_paper = f.read()
     
     # Initialize pipeline (no database, no MCP for this basic example)
     pipeline = AdvisorPipeline()
@@ -46,8 +29,9 @@ def example_basic_usage():
     result = pipeline.run(
         paper_id="example_001",
         paper_text=sample_paper,
-        title="Novel Approach to Quantum Error Correction",
-        authors=["Jane Doe", "John Smith"],
+        title="Equilibrium, flow shear and stability measurements in the Z-pinch",
+        authors=["U. Shumlak", "C.S. Adams", "J.M. Blakely", "B.-J. Chan", "R.P. Golingo", "S.D. Knecht", "B.A. Nelson",
+                 "R.J. Oberto", "M.R. Sybouts", "G.V. Vogman"],
         save_to_db=False  # Don't save since no database
     )
     

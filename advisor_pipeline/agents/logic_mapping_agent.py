@@ -5,9 +5,9 @@ from advisor_pipeline.agents.base_agent import BaseAgent
 from advisor_pipeline.models.schemas import PaperStructure, LogicalStep
 
 
-class PaperReaderAgent(BaseAgent):
+class LogicMappingAgent(BaseAgent):
     """
-    Agent responsible for reading the paper and identifying key logical steps.
+    Agent responsible for identifying key logical steps.
 
     Input: Full paper text
     Output: PaperStructure with ordered logical steps

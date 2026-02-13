@@ -35,10 +35,12 @@ class BaseAgent(ABC):
 
         # Initialize LangChain LLM for agent orchestration
         self.llm = ChatAnthropic(
-            model=settings.model_name,
+            model_name=settings.model_name,
             temperature=settings.temperature,
-            max_tokens=settings.max_tokens,
-            api_key=settings.anthropic_api_key
+            max_tokens_to_sample=settings.max_tokens,
+            api_key=settings.anthropic_api_key,
+            timeout=settings.timeout_seconds,
+            stop=None
         )
 
         # Tools will be defined by child classes
@@ -46,6 +48,8 @@ class BaseAgent(ABC):
 
         # Agent graph will be initialized after tools are set
         self.agent_graph = None
+
+        self.system_prompt = ""
 
     def initialize_agent(self, system_prompt: str):
         """Initialize the LangGraph agent with tools and system prompt."""
@@ -76,10 +80,7 @@ class BaseAgent(ABC):
 
         # Add edges
         workflow.add_edge(START, "agent")
-        workflow.add_conditional_edges(
-            "agent",
-            tools_condition,
-        )
+        workflow.add_conditional_edges("agent", tools_condition)
         workflow.add_edge("tools", "agent")
 
         # Compile the graph

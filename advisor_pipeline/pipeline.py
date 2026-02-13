@@ -2,7 +2,7 @@ from typing import Callable, Dict, Any, Optional
 from pathlib import Path
 import json
 
-from advisor_pipeline.agents.paper_reader_agent import PaperReaderAgent
+from advisor_pipeline.agents.logic_mapping_agent import LogicMappingAgent
 from advisor_pipeline.agents.evidence_finder_agent import EvidenceFinderAgent
 from advisor_pipeline.agents.figure_evaluator_agent import FigureEvaluatorAgent
 from advisor_pipeline.agents.math_evaluator_agent import MathEvaluatorAgent
@@ -23,7 +23,7 @@ class AdvisorPipeline:
     Main orchestrator for The Advisor validation pipeline.
     
     Runs all 6 steps in sequence:
-    1. Paper Reader - identify logical steps
+    1. Logic Mapper - identify logical steps
     2. Evidence Finder - find supporting evidence
     3. Figure Evaluator - validate figure evidence
     4. Math Evaluator - validate mathematical evidence
@@ -31,12 +31,7 @@ class AdvisorPipeline:
     6. Results Compiler - synthesize final assessment
     """
     
-    def __init__(
-        self,
-        mcp_client=None,
-        db: Database = None,
-        on_step: Callable[[int, str], None] | None = None,
-    ):
+    def __init__(self, mcp_client=None, db: Database = None):
         """
         Initialize the pipeline with all agents.
 
@@ -45,7 +40,6 @@ class AdvisorPipeline:
             db: Database instance (optional, for persistence)
             on_step: Callback(step_number, step_name) called at the start of each step
         """
-        self._on_step = on_step
         print("Initializing Advisor Pipeline...")
         
         # Initialize database
@@ -55,7 +49,7 @@ class AdvisorPipeline:
         
         # Initialize all agents
         print("Loading agents...")
-        self.paper_reader = PaperReaderAgent()
+        self.logic_mapper = LogicMappingAgent()
         self.evidence_finder = EvidenceFinderAgent()
         self.figure_evaluator = FigureEvaluatorAgent()
         self.math_evaluator = MathEvaluatorAgent(mcp_client=mcp_client)
@@ -64,17 +58,8 @@ class AdvisorPipeline:
         
         print("✓ Pipeline initialized successfully")
     
-    def run(
-        self,
-        paper_id: str,
-        paper_text: str,
-        title: str,
-        figures: Dict[str, str] = None,
-        authors: list[str] = None,
-        abstract: str = "",
-        bibliography: Dict[str, str] = None,
-        save_to_db: bool = True
-    ) -> ValidationResult:
+    def run(self, paper_id: str, paper_text: str, title: str, figures: Dict[str, str] = None, authors: list[str] = None,
+            abstract: str = "", bibliography: Dict[str, str] = None, save_to_db: bool = True) -> ValidationResult:
         """
         Run the complete validation pipeline on a paper.
         
@@ -110,15 +95,11 @@ class AdvisorPipeline:
             print("✓ Paper saved to database\n")
         
         # Step 1: Read paper and identify logical steps
-        if self._on_step:
-            self._on_step(1, "Reading paper")
         print("STEP 1: Reading paper and identifying logical steps...")
         paper_structure = self._run_step_1(paper_text, title)
         print(f"✓ Identified {len(paper_structure.logical_steps)} logical steps\n")
         
         # Step 2: Find evidence for each step
-        if self._on_step:
-            self._on_step(2, "Finding evidence")
         print("STEP 2: Finding evidence for each logical step...")
         step_evidence = self._run_step_2(paper_structure, paper_text)
         total_evidence = sum(len(se.evidence_list) for se in step_evidence)
@@ -172,7 +153,7 @@ class AdvisorPipeline:
     
     def _run_step_1(self, paper_text: str, title: str) -> PaperStructure:
         """Step 1: Read paper and identify logical steps."""
-        return self.paper_reader.run({
+        return self.logic_mapper.run({
             "paper_text": paper_text,
             "title": title
         })
