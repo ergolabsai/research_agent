@@ -53,14 +53,11 @@ class BaseAgent(ABC):
 
     def initialize_agent(self, system_prompt: str):
         """Initialize the LangGraph agent with tools and system prompt."""
-        if not self.tools:
-            raise ValueError(f"No tools defined for agent {self.name}")
-
-        # Bind tools to the LLM
-        llm_with_tools = self.llm.bind_tools(self.tools)
-
         # Store system prompt
         self.system_prompt = system_prompt
+
+        # Bind tools to LLM if available
+        bound_llm = self.llm.bind_tools(self.tools) if self.tools else self.llm
 
         # Define the agent node
         def call_model(state: AgentState):
@@ -68,20 +65,23 @@ class BaseAgent(ABC):
             # Prepend system message if not already there
             if not messages or not hasattr(messages[0], "content") or "system" not in str(type(messages[0])):
                 messages = [{"role": "system", "content": self.system_prompt}] + messages
-            response = llm_with_tools.invoke(messages)
+            response = bound_llm.invoke(messages)
             return {"messages": [response]}
 
         # Build the graph
         workflow = StateGraph(AgentState)
-
-        # Add nodes
         workflow.add_node("agent", call_model)
-        workflow.add_node("tools", ToolNode(self.tools))
 
-        # Add edges
-        workflow.add_edge(START, "agent")
-        workflow.add_conditional_edges("agent", tools_condition)
-        workflow.add_edge("tools", "agent")
+        if self.tools:
+            # Agent with tools: agent <-> tools loop
+            workflow.add_node("tools", ToolNode(self.tools))
+            workflow.add_edge(START, "agent")
+            workflow.add_conditional_edges("agent", tools_condition)
+            workflow.add_edge("tools", "agent")
+        else:
+            # Agent without tools: single pass
+            workflow.add_edge(START, "agent")
+            workflow.add_edge("agent", END)
 
         # Compile the graph
         self.agent_graph = workflow.compile()

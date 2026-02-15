@@ -97,9 +97,11 @@ class Evidence(BaseModel):
     supports_step: int = Field(description="Which logical step this supports")
 
 
+class EvidenceList(BaseModel):
+    evidence: List[Evidence]
+
 class StepEvidence(BaseModel):
     """Output from Step 2: Evidence identification for each step."""
-    step_number: int
     evidence_list: List[Evidence] = Field(default_factory=list)
 
 

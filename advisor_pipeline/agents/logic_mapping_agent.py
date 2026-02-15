@@ -32,34 +32,7 @@ Be precise and capture the logical flow of the argument, not just a summary."""
         self.initialize_agent(system_prompt)
     
     def get_tools(self):
-        """Define tools for paper analysis."""
-        
-        def extract_sections(text: str) -> str:
-            """Extract section headers and their locations from paper text."""
-            # Simple heuristic: look for common section patterns
-            import re
-            sections = re.findall(r'^(#+\s+.*|\d+\.?\s+[A-Z][^\n]+)$', text, re.MULTILINE)
-            return "\n".join(sections[:20])  # Return first 20 sections
-        
-        def extract_main_equations(text: str) -> str:
-            """Extract numbered equations from the paper."""
-            import re
-            # Look for equation markers like (1), Eq. 1, etc.
-            equations = re.findall(r'(?:Eq\.|Equation)\s*\(?(\d+)\)?|\\begin{equation}.*?\\end{equation}', text, re.DOTALL)
-            return f"Found {len(equations)} numbered equations"
-        
-        return [
-            Tool(
-                name="extract_sections",
-                func=extract_sections,
-                description="Extract section headers to understand paper structure"
-            ),
-            Tool(
-                name="extract_main_equations", 
-                func=extract_main_equations,
-                description="Identify numbered equations in the paper"
-            )
-        ]
+        return []
     
     def run(self, input_data: Dict[str, Any]) -> PaperStructure:
         """

@@ -158,11 +158,7 @@ class AdvisorPipeline:
             "title": title
         })
     
-    def _run_step_2(
-        self,
-        paper_structure: PaperStructure,
-        paper_text: str
-    ) -> list[StepEvidence]:
+    def _run_step_2(self, paper_structure: PaperStructure, paper_text: str) -> list[StepEvidence]:
         """Step 2: Find evidence for each step."""
         return self.evidence_finder.run({
             "paper_structure": paper_structure,
