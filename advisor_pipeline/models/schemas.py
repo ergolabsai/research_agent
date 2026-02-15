@@ -2,8 +2,7 @@ from pydantic import BaseModel, Field
 from typing import Any, Dict, List, Optional
 from datetime import datetime
 
-
-# ===== Original Output Classes =====
+#### Context Agent
 class ContextList(BaseModel):
     context: List[str] = Field(
         description="context for future API calls",
@@ -12,6 +11,39 @@ class ContextList(BaseModel):
 
 class ContextString(BaseModel):
     context: str = Field(description="context for future API calls")
+
+
+#### Logic Maping Agent
+class LogicalStep(BaseModel):
+    """A single logical step in the paper's argument."""
+    step_number: int = Field(description="Order of this step in the logical chain")
+    description: str = Field(description="What this step claims or establishes")
+    depends_on: List[int] = Field(
+        description="Which previous steps this depends on",
+        default_factory=list
+    )
+    section: str = Field(description="Which section of the paper this appears in")
+
+
+class PaperStructure(BaseModel):
+    """Output from Step 1: Paper reading and logical step identification."""
+    title: str = Field(description="Paper title")
+    main_claim: str = Field(description="The paper's primary claim or thesis")
+    logical_steps: List[LogicalStep] = Field(description="Ordered list of logical steps")
+
+
+#### Evidence Finder Agent
+class Evidence(BaseModel):
+    """Generic evidence supporting a logical step."""
+    evidence_type: str = Field(description="Type: 'figure', 'math', 'citation', or 'text'")
+    description: str = Field(description="What this evidence shows")
+    location: str = Field(description="Where in the paper (section, page, figure number, etc.)")
+    supports_step: int = Field(description="Which logical step this supports")
+
+
+class StepEvidence(BaseModel):
+    """Output from Step 2: Evidence identification for each step."""
+    evidence_list: List[Evidence] = Field(description="list of evidence to support a logical step", default_factory=list)
 
 
 class FigureDescription(BaseModel):
@@ -41,21 +73,6 @@ class FigureInfo(BaseModel):
     units: str = Field(description="The units for the value")
 
 
-class SupportingClaim(BaseModel):
-    """A supporting claim with evidence from a figure."""
-    description: str = Field(description="3-4 sentence description of the claim")
-    figures: list[FigureInfo] = Field(description="The figure(s) supporting this claim")
-
-
-class ResearchAnalysis(BaseModel):
-    """Main research analysis structure with question, answer, and supporting claims."""
-    question: str = Field(description="The main question in 2-3 sentences")
-    answer: str = Field(description="The author's answer")
-    supporting_claims: Dict[str, SupportingClaim] = Field(
-        description="Dictionary of supporting claims where keys are importance scores (e.g., '1', '2', 'n' where 'n' is the number of supporting claims)"
-    )
-
-
 class ClaimValidity(BaseModel):
     confirmations: list[str] = Field(
         description="A list of confirmations that support the the validity of the supporting statement."
@@ -67,42 +84,6 @@ class ClaimValidity(BaseModel):
 
 class OverAllReview(BaseModel):
     review: str = Field(description="Review of the paper")
-
-
-# ===== New Pipeline Models =====
-
-class LogicalStep(BaseModel):
-    """A single logical step in the paper's argument."""
-    step_number: int = Field(description="Order of this step in the logical chain")
-    description: str = Field(description="What this step claims or establishes")
-    depends_on: List[int] = Field(
-        description="Which previous steps this depends on",
-        default_factory=list
-    )
-    section: str = Field(description="Which section of the paper this appears in")
-
-
-class PaperStructure(BaseModel):
-    """Output from Step 1: Paper reading and logical step identification."""
-    title: str = Field(description="Paper title")
-    main_claim: str = Field(description="The paper's primary claim or thesis")
-    logical_steps: List[LogicalStep] = Field(description="Ordered list of logical steps")
-    
-
-class Evidence(BaseModel):
-    """Generic evidence supporting a logical step."""
-    evidence_type: str = Field(description="Type: 'figure', 'math', 'citation', or 'text'")
-    description: str = Field(description="What this evidence shows")
-    location: str = Field(description="Where in the paper (section, page, figure number, etc.)")
-    supports_step: int = Field(description="Which logical step this supports")
-
-
-class EvidenceList(BaseModel):
-    evidence: List[Evidence]
-
-class StepEvidence(BaseModel):
-    """Output from Step 2: Evidence identification for each step."""
-    evidence_list: List[Evidence] = Field(default_factory=list)
 
 
 class FigureEvaluation(BaseModel):

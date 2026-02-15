@@ -1,5 +1,4 @@
 from typing import Any, Dict
-from langchain_core.tools import Tool
 
 from advisor_pipeline.agents.base_agent import BaseAgent
 from advisor_pipeline.models.schemas import PaperStructure, LogicalStep
@@ -18,18 +17,8 @@ class LogicMappingAgent(BaseAgent):
             name="PaperReader",
             description="Reads scientific papers and extracts the logical argument structure"
         )
-        self.tools = self.get_tools()
 
-        # Initialize the agent with its system prompt
-        system_prompt = """You are a scientific paper analyst. Your job is to:
-1. Identify the paper's main claim or thesis
-2. Break down the argument into discrete logical steps
-3. Identify dependencies between steps (which steps build on which)
-4. Note which section each step appears in
-
-Be precise and capture the logical flow of the argument, not just a summary."""
-
-        self.initialize_agent(system_prompt)
+        self.initialize_agent()
     
     def get_tools(self):
         return []
@@ -61,25 +50,24 @@ Identify the main sections and structure."""
         agent_result = self.invoke_agent(agent_input)
 
         # Now use Instructor for structured output
-        prompt = f"""Analyze this scientific paper and extract its logical structure.
+        instructor_prompt = f"""A previous agent was asked to find the structure of a research paper.
+You're job is to now properly format its response.  
 
-Title: {title}
+Your response should be in the form:
 
-Paper text:
+    title: str = Field(description="Paper title")
+    main_claim: str = Field(description="The paper's primary claim or thesis")
+    logical_steps: List[LogicalStep] = Field(description="Ordered list of logical steps")
+
+Here is the paper:
 {paper_text}
 
-Based on the paper, identify:
-1. The main claim or thesis
-2. Each logical step in the argument (typically 5-15 steps)
-3. Dependencies between steps
-4. Which section each step appears in
-
-Agent's initial analysis:
+Here is the agent's initial analysis:
 {agent_result}
 """
 
         structure = self.get_structured_output(
-            prompt=prompt,
+            prompt=instructor_prompt,
             response_model=PaperStructure
         )
 

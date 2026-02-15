@@ -1,4 +1,3 @@
-import re
 from typing import Any, Dict, List
 
 from advisor_pipeline.agents.base_agent import BaseAgent
@@ -19,6 +18,8 @@ class EvidenceFinderAgent(BaseAgent):
             description="Finds and catalogs evidence supporting each logical step"
         )
 
+        self.initialize_agent()
+
     def get_tools(self):
         return []
 
@@ -35,30 +36,17 @@ class EvidenceFinderAgent(BaseAgent):
         paper_structure: PaperStructure = input_data.get("paper_structure")
         paper_text: str = input_data.get("paper_text")
 
-        if not paper_structure:
-            raise ValueError("paper_structure is required")
-        if not paper_text:
-            raise ValueError("paper_text is required")
-
-        # Run regex searches once on the full paper
-        figures_found = self._search_for_figures(paper_text)
-        equations_found = self._search_for_equations(paper_text)
-        citations_found = self._search_for_citations(paper_text)
-
         all_step_evidence = []
+
+        paper_structure.logical_steps = sorted(paper_structure.logical_steps, key=lambda s: s.step_number)
 
         for step in paper_structure.logical_steps:
             print(f"Finding evidence for step {step.step_number}: {step.description[:100]}...")
 
-            prompt = f"""You are a scientific evidence analyst. Extract all evidence supporting this step:
+            agent_input = f"""You are a scientific evidence analyst. Extract all evidence supporting this step:
 
 Step {step.step_number}: {step.description}
 Section: {step.section}
-
-References found in the paper:
-- {figures_found}
-- {equations_found}
-- {citations_found}
 
 Paper text:
 {paper_text}
@@ -71,12 +59,32 @@ List ALL evidence for this step, including:
 
 Be thorough - one step may have multiple pieces of evidence."""
 
+            agent_result = self.invoke_agent(agent_input)
+
+            # Now use Instructor for structured output
+            instructor_prompt = f"""A previous agent was asked to find evidence that supports a claim in a research paper.
+            You're job is to now properly format its response.  
+
+            Your response should be in the form:
+
+                evidence_type: str = Field(description="Type: 'figure', 'math', 'citation', or 'text'")
+                description: str = Field(description="What this evidence shows")
+                location: str = Field(description="Where in the paper (section, page, figure number, etc.)")
+                supports_step: int = Field(description="Which logical step this supports")
+
+            Here is the paper:
+            {paper_text}
+
+            Here is the agent's initial analysis:
+            {agent_result}
+            """
+
             step_evidence = self.get_structured_output(
-                prompt=prompt,
+                prompt=instructor_prompt,
                 response_model=StepEvidence
             )
 
-            all_step_evidence = all_step_evidence + [step_evidence]
+            all_step_evidence = all_step_evidence + [(step, step_evidence)]
 
         return all_step_evidence
 

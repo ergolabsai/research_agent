@@ -49,12 +49,21 @@ class BaseAgent(ABC):
         # Agent graph will be initialized after tools are set
         self.agent_graph = None
 
-        self.system_prompt = ""
+        self.system_prompt = """You are a scientist reviewing a new paper.  Your job is to:
+1. Identify the paper's main claim or thesis
+2. Break down the argument into discrete logical steps
+3. Identify dependencies between steps (which steps build on which)
+4. Note which section each step appears in
 
-    def initialize_agent(self, system_prompt: str):
+Be precise and capture the logical flow of the argument, not just a summary.
+
+You're job is also to remain highly skeptical of the author's conclusions.  
+You are looking for mistakes in logic and you should not assume their results are conclusive."""
+
+    def initialize_agent(self):
         """Initialize the LangGraph agent with tools and system prompt."""
-        # Store system prompt
-        self.system_prompt = system_prompt
+
+        self.tools = self.get_tools()
 
         # Bind tools to LLM if available
         bound_llm = self.llm.bind_tools(self.tools) if self.tools else self.llm

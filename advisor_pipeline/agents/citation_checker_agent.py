@@ -30,7 +30,7 @@ class CitationCheckerAgent(BaseAgent):
 
 Be thorough - misrepresenting citations is a serious issue in scientific publishing."""
 
-        self.initialize_agent(system_prompt)
+        self.initialize_agent()
     
     def get_tools(self):
         """Define tools for citation checking."""

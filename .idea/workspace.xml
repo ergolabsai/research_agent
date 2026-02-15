@@ -5,10 +5,14 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="6cc51746-4537-4c5e-965f-ef86103f3ff2" name="Changes" comment="">
+      <change afterPath="$PROJECT_DIR$/todo.txt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/advisor_pipeline/agents/base_agent.py" beforeDir="false" afterPath="$PROJECT_DIR$/advisor_pipeline/agents/base_agent.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/advisor_pipeline/agents/citation_checker_agent.py" beforeDir="false" afterPath="$PROJECT_DIR$/advisor_pipeline/agents/citation_checker_agent.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/advisor_pipeline/agents/evidence_finder_agent.py" beforeDir="false" afterPath="$PROJECT_DIR$/advisor_pipeline/agents/evidence_finder_agent.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/advisor_pipeline/agents/figure_evaluator_agent.py" beforeDir="false" afterPath="$PROJECT_DIR$/advisor_pipeline/agents/figure_evaluator_agent.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/advisor_pipeline/agents/logic_mapping_agent.py" beforeDir="false" afterPath="$PROJECT_DIR$/advisor_pipeline/agents/logic_mapping_agent.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/advisor_pipeline/agents/math_evaluator_agent.py" beforeDir="false" afterPath="$PROJECT_DIR$/advisor_pipeline/agents/math_evaluator_agent.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/advisor_pipeline/models/schemas.py" beforeDir="false" afterPath="$PROJECT_DIR$/advisor_pipeline/models/schemas.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/advisor_pipeline/pipeline.py" beforeDir="false" afterPath="$PROJECT_DIR$/advisor_pipeline/pipeline.py" afterDir="false" />
     </list>
@@ -60,7 +64,7 @@
     "node.js.selected.package.eslint": "(autodetect)",
     "node.js.selected.package.tslint": "(autodetect)",
     "nodejs_package_manager_path": "npm",
-    "settings.editor.selected.configurable": "reference.settings.ide.settings.notifications",
+    "settings.editor.selected.configurable": "reference.settingsdialog.project.grazie",
     "vue.rearranger.settings.migration": "true"
   }
 }]]></component>
@@ -242,19 +246,9 @@
           <option name="timeStamp" value="6" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/advisor_pipeline/pipeline.py</url>
-          <line>105</line>
-          <option name="timeStamp" value="12" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/advisor_pipeline/agents/evidence_finder_agent.py</url>
-          <line>64</line>
-          <option name="timeStamp" value="17" />
-        </line-breakpoint>
-        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/advisor_pipeline/agents/base_agent.py</url>
-          <line>101</line>
-          <option name="timeStamp" value="18" />
+          <line>42</line>
+          <option name="timeStamp" value="19" />
         </line-breakpoint>
       </breakpoints>
       <default-breakpoints>

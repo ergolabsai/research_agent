@@ -106,25 +106,23 @@ class AdvisorPipeline:
         print(f"✓ Found {total_evidence} pieces of evidence across all steps\n")
         
         # Step 3: Evaluate figure-based evidence
-        if self._on_step:
-            self._on_step(3, "Evaluating figures")
         print("STEP 3: Evaluating figure-based evidence...")
         figure_evaluations = self._run_step_3(step_evidence, figures or {}, paper_structure)
         print(f"✓ Evaluated {len(figure_evaluations)} figures\n")
         
-        # Step 4: Evaluate mathematical evidence
-        if self._on_step:
-            self._on_step(4, "Validating math")
-        print("STEP 4: Validating mathematical evidence...")
-        math_evaluations = self._run_step_4(step_evidence, paper_text, paper_structure)
-        print(f"✓ Validated {len(math_evaluations)} mathematical claims\n")
-        
-        # Step 5: Check citations
-        if self._on_step:
-            self._on_step(5, "Checking citations")
-        print("STEP 5: Verifying citations...")
-        citation_checks = self._run_step_5(step_evidence, paper_text, bibliography or {}, paper_structure)
-        print(f"✓ Checked {len(citation_checks)} citations\n")
+        # # Step 4: Evaluate mathematical evidence
+        # if self._on_step:
+        #     self._on_step(4, "Validating math")
+        # print("STEP 4: Validating mathematical evidence...")
+        # math_evaluations = self._run_step_4(step_evidence, paper_text, paper_structure)
+        # print(f"✓ Validated {len(math_evaluations)} mathematical claims\n")
+        #
+        # # Step 5: Check citations
+        # if self._on_step:
+        #     self._on_step(5, "Checking citations")
+        # print("STEP 5: Verifying citations...")
+        # citation_checks = self._run_step_5(step_evidence, paper_text, bibliography or {}, paper_structure)
+        # print(f"✓ Checked {len(citation_checks)} citations\n")
         
         # Step 6: Compile results
         if self._on_step:
@@ -135,8 +133,8 @@ class AdvisorPipeline:
             paper_structure,
             step_evidence,
             figure_evaluations,
-            math_evaluations,
-            citation_checks
+            # math_evaluations,
+            # citation_checks
         )
         print(f"✓ Final confidence score: {validation_result.confidence_score:.2%}\n")
         

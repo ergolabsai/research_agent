@@ -32,7 +32,7 @@ class FigureEvaluatorAgent(BaseAgent):
 
 Be precise with numbers and units. Be skeptical - verify claims against actual data."""
 
-        self.initialize_agent(system_prompt)
+        self.initialize_agent()
     
     def get_tools(self):
         """Define tools for figure analysis."""

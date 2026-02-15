@@ -35,7 +35,7 @@ class MathEvaluatorAgent(BaseAgent):
 
 Be rigorous - even small errors matter in scientific papers."""
 
-        self.initialize_agent(system_prompt)
+        self.initialize_agent()
     
     def get_tools(self):
         """Define tools for mathematical validation."""
