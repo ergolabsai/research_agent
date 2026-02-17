@@ -5,6 +5,7 @@ from advisor_pipeline.models.schemas import (
     PaperStructure,
     StepEvidence,
     FigureEvaluation,
+    FigureClaimAssessment,
     MathEvaluation,
     CitationCheck,
     ValidationResult,
@@ -148,11 +149,12 @@ Write a comprehensive review that:
                 "citation_validations": []
             }
         
-        # Add figure evaluations
+        # Add figure evaluations (each figure may have multiple claim assessments for different steps)
         for fig_eval in figure_evals:
-            step_num = fig_eval.supports_step
-            if step_num in step_validations:
-                step_validations[step_num]["figure_validations"].append(fig_eval)
+            for assessment in fig_eval.claim_assessments:
+                step_num = assessment.supports_step
+                if step_num in step_validations:
+                    step_validations[step_num]["figure_validations"].append(fig_eval)
         
         # Add math evaluations
         for math_eval in math_evals:
@@ -192,13 +194,18 @@ Write a comprehensive review that:
         """Format figure evaluation results."""
         if not figure_evals:
             return "No figure evaluations performed"
-        
+
         lines = []
         for fig in figure_evals:
-            conf_count = len(fig.validity.confirmations)
-            cont_count = len(fig.validity.contradictions)
-            lines.append(f"- {fig.figure_name}: {conf_count} confirmations, {cont_count} contradictions")
-        
+            lines.append(f"\n- {fig.figure_name}:")
+            lines.append(f"  Actual: {fig.actual_description[:150]}...")
+            lines.append(f"  Expected: {fig.expected_description[:150]}...")
+            lines.append(f"  Similarities: {len(fig.comparison.similarities)}, Differences: {len(fig.comparison.differences)}")
+            for assessment in fig.claim_assessments:
+                conf_count = len(assessment.validity.confirmations)
+                cont_count = len(assessment.validity.contradictions)
+                lines.append(f"  Step {assessment.supports_step}: {conf_count} confirmations, {cont_count} contradictions")
+
         return "\n".join(lines)
     
     def _format_math_results(self, math_evals: List[MathEvaluation]) -> str:
@@ -254,10 +261,16 @@ Write a comprehensive review that:
             math_score = sum(1 for m in math_evals if m.calculation_valid) / len(math_evals)
             scores.append(math_score)
         
-        # Figure validation score
+        # Figure validation score (across all claim assessments)
         if figure_evals:
-            total_confirmations = sum(len(f.validity.confirmations) for f in figure_evals)
-            total_contradictions = sum(len(f.validity.contradictions) for f in figure_evals)
+            total_confirmations = sum(
+                len(a.validity.confirmations)
+                for f in figure_evals for a in f.claim_assessments
+            )
+            total_contradictions = sum(
+                len(a.validity.contradictions)
+                for f in figure_evals for a in f.claim_assessments
+            )
             if total_confirmations + total_contradictions > 0:
                 fig_score = total_confirmations / (total_confirmations + total_contradictions)
                 scores.append(fig_score)

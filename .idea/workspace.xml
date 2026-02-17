@@ -6,11 +6,11 @@
   <component name="ChangeListManager">
     <list default="true" id="6cc51746-4537-4c5e-965f-ef86103f3ff2" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/advisor_pipeline/agents/evidence_finder_agent.py" beforeDir="false" afterPath="$PROJECT_DIR$/advisor_pipeline/agents/evidence_finder_agent.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/advisor_pipeline/agents/logic_mapping_agent.py" beforeDir="false" afterPath="$PROJECT_DIR$/advisor_pipeline/agents/logic_mapping_agent.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/advisor_pipeline/example_usage.py" beforeDir="false" afterPath="$PROJECT_DIR$/advisor_pipeline/example_usage.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/advisor_pipeline/agents/figure_evaluator_agent.py" beforeDir="false" afterPath="$PROJECT_DIR$/advisor_pipeline/agents/figure_evaluator_agent.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/advisor_pipeline/agents/results_compiler_agent.py" beforeDir="false" afterPath="$PROJECT_DIR$/advisor_pipeline/agents/results_compiler_agent.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/advisor_pipeline/models/schemas.py" beforeDir="false" afterPath="$PROJECT_DIR$/advisor_pipeline/models/schemas.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/advisor_pipeline/pipeline.py" beforeDir="false" afterPath="$PROJECT_DIR$/advisor_pipeline/pipeline.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/todo.txt" beforeDir="false" afterPath="$PROJECT_DIR$/todo.txt" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -242,9 +242,14 @@
           <option name="timeStamp" value="6" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/advisor_pipeline/pipeline.py</url>
-          <line>146</line>
-          <option name="timeStamp" value="21" />
+          <url>file://$PROJECT_DIR$/advisor_pipeline/agents/figure_evaluator_agent.py</url>
+          <line>62</line>
+          <option name="timeStamp" value="27" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
+          <url>file://$PROJECT_DIR$/advisor_pipeline/agents/figure_evaluator_agent.py</url>
+          <line>58</line>
+          <option name="timeStamp" value="30" />
         </line-breakpoint>
       </breakpoints>
       <default-breakpoints>

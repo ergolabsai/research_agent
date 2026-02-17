@@ -144,7 +144,7 @@ class AdvisorPipeline:
 
         # Step 3: Evaluate figure-based evidence
         print("STEP 3: Evaluating figure-based evidence...")
-        figure_evaluations = self._run_step_3(step_evidence, figures or {}, paper_structure)
+        figure_evaluations = self._run_step_3(step_evidence, paper_structure, figures, paper_text)
         print(f"✓ Evaluated {len(figure_evaluations)} figures\n")
         
         # # Step 4: Evaluate mathematical evidence
@@ -186,7 +186,7 @@ class AdvisorPipeline:
         
         return validation_result
     
-    def _run_step_1(self, paper_folder: Path) -> tuple[PaperStructure, str, Dict[str, str]]:
+    def _run_step_1(self, paper_folder: Path) -> tuple[PaperStructure, str, Dict[str, Dict[str, str]]]:
         """Step 1: Read paper text and figures, then identify logical steps.
 
         Args:
@@ -208,7 +208,7 @@ class AdvisorPipeline:
             for img_path in image_folder.iterdir():
                 if img_path.is_file():
                     img_data, media_type = encode_image(img_path)
-                    figures[img_path.name] = img_data
+                    figures[img_path.name] = {'data': img_data, 'media_type': media_type}
 
         paper_structure = self.logic_mapper.run({
             "paper_text": paper_text
@@ -227,25 +227,31 @@ class AdvisorPipeline:
     def _run_step_3(
         self,
         step_evidence: list[StepEvidence],
-        figures: Dict[str, str],
-        paper_structure: PaperStructure
+        paper_structure: PaperStructure,
+        figures: Dict[str, Dict[str, str]],
+        paper_text: str
     ) -> list:
         """Step 3: Evaluate figure evidence."""
-        # Collect all evidence
-        all_evidence = []
+        # Collect all figure evidence and map figure names to their associated claims
+        figure_claims = {}
         for se in step_evidence:
-            all_evidence.extend(se.evidence_list)
-        
-        # Create claims dict
-        claims = {
-            step.step_number: step.description
-            for step in paper_structure.logical_steps
-        }
-        
+            for ev in se.evidence_list:
+                if ev.evidence_type == "figure":
+                    if ev.location not in figure_claims:
+                        figure_claims[ev.location] = []
+                    figure_claims[ev.location].append({
+                        "supports_step": ev.supports_step,
+                        "claim": next(
+                            (step.description for step in paper_structure.logical_steps
+                             if step.step_number == ev.supports_step),
+                            "Unknown claim"
+                        )
+                    })
+
         return self.figure_evaluator.run({
-            "evidence_list": all_evidence,
             "figures": figures,
-            "claims": claims
+            "figure_claims": figure_claims,
+            "paper_text": paper_text
         })
     
     def _run_step_4(

@@ -1,1 +1,2 @@
-Next I need to import in the figures and make sure that the figures are referenced correctly in the evidence finder agent.
+Check that the figure names are correct after the figure_evaluator
+Get the figure evaluator working

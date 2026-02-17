@@ -1,19 +1,29 @@
 from typing import Any, Dict, List
-from pathlib import Path
-from langchain_core.tools import Tool
-import base64
 from anthropic import Anthropic
 
 from advisor_pipeline.agents.base_agent import BaseAgent
 from advisor_pipeline.config.settings import settings
-from advisor_pipeline.models.schemas import Evidence, FigureEvaluation, FigureInfo, ClaimValidity
+from advisor_pipeline.models.schemas import (
+    FigureEvaluation,
+    FigureClaimAssessment,
+    FigureDescription,
+    ExpectedFigureDescription,
+    Comparison,
+    ClaimValidity,
+)
 
 
 class FigureEvaluatorAgent(BaseAgent):
     """
     Agent responsible for evaluating figure-based evidence.
 
-    Input: List of figure evidence and figure file paths
+    For each figure:
+    1. Describe what the figure actually shows (vision)
+    2. Describe what the figure should show based on the paper text alone
+    3. Compare similarities and differences
+    4. Assess each associated claim based on the comparison
+
+    Input: Pre-loaded figures (base64), figure-to-claims mapping, and paper text
     Output: List of FigureEvaluation
     """
 
@@ -22,165 +32,84 @@ class FigureEvaluatorAgent(BaseAgent):
             name="FigureEvaluator",
             description="Evaluates whether figures actually support the claims made about them"
         )
-        self.tools = self.get_tools()
-
-        system_prompt = """You are a scientific figure analyst. For each figure:
-1. Examine what data is actually shown
-2. Extract numerical values and their units
-3. Compare what the figure shows to what the paper claims it shows
-4. Identify confirmations (where figure supports claim) and contradictions (where it doesn't)
-
-Be precise with numbers and units. Be skeptical - verify claims against actual data."""
 
         self.initialize_agent()
-    
+
     def get_tools(self):
-        """Define tools for figure analysis."""
-        
-        def load_figure(figure_path: str) -> str:
-            """Load a figure file and return its base64 encoding."""
-            try:
-                path = Path(figure_path)
-                if not path.exists():
-                    return f"Error: Figure not found at {figure_path}"
-                
-                with open(path, 'rb') as f:
-                    image_data = base64.b64encode(f.read()).decode('utf-8')
-                    return f"Successfully loaded figure: {path.name} ({len(image_data)} bytes)"
-            except Exception as e:
-                return f"Error loading figure: {str(e)}"
-        
-        def extract_figure_metadata(figure_path: str) -> str:
-            """Extract metadata from figure file."""
-            try:
-                from PIL import Image
-                img = Image.open(figure_path)
-                return f"Figure size: {img.size}, Format: {img.format}, Mode: {img.mode}"
-            except Exception as e:
-                return f"Could not extract metadata: {str(e)}"
-        
-        return [
-            Tool(
-                name="load_figure",
-                func=load_figure,
-                description="Load a figure file for analysis"
-            ),
-            Tool(
-                name="extract_figure_metadata",
-                func=extract_figure_metadata,
-                description="Get metadata about a figure file"
-            )
-        ]
-    
+        return []
+
     def run(self, input_data: Dict[str, Any]) -> List[FigureEvaluation]:
         """
-        Evaluate all figure-based evidence.
-        
+        Evaluate all figures.
+
         Args:
             input_data: Must contain:
-                - 'evidence_list': List[Evidence] filtered to figure evidence
-                - 'figures': Dict mapping figure names to file paths
-                - 'claims': Dict mapping step numbers to their claims
-                
+                - 'figures': Dict mapping figure names to {'data': base64_str, 'media_type': str}
+                - 'figure_claims': Dict mapping figure names to list of {'supports_step': int, 'claim': str}
+                - 'paper_text': Full paper text
+
         Returns:
             List of FigureEvaluation objects
         """
-        evidence_list: List[Evidence] = input_data.get("evidence_list", [])
-        figures: Dict[str, str] = input_data.get("figures", {})
-        claims: Dict[int, str] = input_data.get("claims", {})
-        
-        # Filter to only figure evidence
-        figure_evidence = [e for e in evidence_list if e.evidence_type == "figure"]
-        
-        if not figure_evidence:
-            print("No figure evidence to evaluate")
+        figures: Dict[str, Dict[str, str]] = input_data.get("figures", {})
+        figure_claims: Dict[str, List[Dict]] = input_data.get("figure_claims", {})
+        paper_text: str = input_data.get("paper_text", "")
+
+        if not figures:
+            print("No figures to evaluate")
             return []
-        
+
         evaluations = []
-        
-        for evidence in figure_evidence:
-            print(f"Evaluating figure evidence: {evidence.location}")
-            
-            # Extract figure name from location (e.g., "Figure 3" -> "figure_3")
-            figure_name = evidence.location.lower().replace(" ", "_").replace(".", "")
-            figure_path = figures.get(figure_name)
-            
-            if not figure_path:
-                print(f"Warning: Figure {figure_name} not found in provided figures")
-                continue
 
-            # Get the claim this figure is supposed to support
-            claim = claims.get(evidence.supports_step, "Unknown claim")
+        for figure_name, figure_data in figures.items():
+            print(f"Evaluating figure: {figure_name}")
 
-            # If figure file exists on disk, use vision-based evaluation
-            if figure_path and Path(figure_path).exists():
-                print(f"Using vision analysis for {evidence.location}")
-                evaluation = self.evaluate_with_vision(figure_path, claim, evidence.supports_step)
-            else:
-                # Fallback: text-only evaluation when no figure file is available
-                # Use agent to analyze the figure
-                agent_input = f"""Analyze this figure:
-
-Figure: {evidence.location}
-Path: {figure_path}
-Purpose: {evidence.description}
-Supporting claim: {claim}
-
-Load the figure and extract metadata."""
-
-                agent_result = self.invoke_agent(agent_input)
-
-                prompt = f"""Evaluate this figure-based evidence:
-
-Figure: {evidence.location}
-What it claims to show: {evidence.description}
-Supporting step {evidence.supports_step}: {claim}
-
-Agent analysis:
-{agent_result}
-
-NOTE: In this version, we don't have the actual figure image yet.
-Base your evaluation on:
-1. What the paper CLAIMS the figure shows (from description)
-2. Whether those claims are specific and verifiable
-3. What you would expect to see if you had the figure
-
-Extract any numerical values mentioned, note confirmations and contradictions.
-"""
-
-                evaluation = self.get_structured_output(
-                    prompt=prompt,
-                    response_model=FigureEvaluation,
-                    context={
-                        "figure_name": evidence.location,
-                        "supports_step": evidence.supports_step
-                    }
-                )
-
-            evaluations.append(evaluation)
-        
-        return evaluations
-    
-    def evaluate_with_vision(self, figure_path: str, claim: str, step_number: int) -> FigureEvaluation:
-        """Evaluate figure using Claude's vision capabilities."""
-        path = Path(figure_path)
-        if not path.exists():
-            return FigureEvaluation(
-                figure_name=path.name,
-                supports_step=step_number,
-                extracted_data=[],
-                validity=ClaimValidity(confirmations=[], contradictions=["Figure file not found"]),
-                notes=f"Could not find figure at {figure_path}",
+            # Step A: Describe what the figure actually shows using vision
+            actual_description = self._describe_figure(
+                figure_data['media_type'],
+                figure_data['data'],
+                figure_name
             )
+            print(f"  Actual description complete")
 
-        with open(path, "rb") as f:
-            image_data = base64.b64encode(f.read()).decode("utf-8")
+            # Step B: Describe what the figure should look like based on text only
+            expected_description = self._describe_expected(figure_name, paper_text)
+            print(f"  Expected description complete")
 
-        # Determine media type
-        suffix = path.suffix.lower()
-        media_types = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif", ".webp": "image/webp"}
-        media_type = media_types.get(suffix, "image/png")
+            # Step C: Compare similarities and differences
+            comparison = self._compare_descriptions(
+                figure_name, actual_description, expected_description
+            )
+            print(f"  Comparison complete: {len(comparison.similarities)} similarities, {len(comparison.differences)} differences")
 
+            # Step D: Assess each claim associated with this figure
+            claims = figure_claims.get(figure_name, [])
+            claim_assessments = []
+            for claim_info in claims:
+                assessment = self._assess_claim(
+                    figure_name,
+                    actual_description,
+                    expected_description,
+                    comparison,
+                    claim_info['claim'],
+                    claim_info['supports_step']
+                )
+                claim_assessments.append(assessment)
+            print(f"  Assessed {len(claim_assessments)} claims")
+
+            evaluation = FigureEvaluation(
+                figure_name=figure_name,
+                actual_description=actual_description,
+                expected_description=expected_description,
+                comparison=comparison,
+                claim_assessments=claim_assessments
+            )
+            evaluations.append(evaluation)
+
+        return evaluations
+
+    def _describe_figure(self, media_type: str, image_data: str, figure_name: str) -> str:
+        """Use Claude's vision to describe what the figure actually shows."""
         client = Anthropic(api_key=settings.anthropic_api_key)
         response = client.messages.create(
             model=settings.model_name,
@@ -195,38 +124,90 @@ Extract any numerical values mentioned, note confirmations and contradictions.
                         },
                         {
                             "type": "text",
-                            "text": f"""Analyze this scientific figure. The paper claims it supports: "{claim}"
+                            "text": f"""Describe this scientific figure ({figure_name}) in detail.
 
-Please:
-1. Describe what the figure actually shows (data, axes, trends)
-2. Extract any specific numerical values with units
-3. List confirmations: ways the figure supports the claim
-4. List contradictions: ways the figure does NOT support the claim or shows something different
-5. Note anything unusual or concerning about the figure
+Include:
+1. The type of figure (plot, diagram, photograph, schematic, etc.)
+2. Axes labels and ranges (if applicable)
+3. Data trends, patterns, and key features
+4. Any specific numerical values visible
+5. Legends, annotations, or labels
 
-Be precise with numbers and units. Be skeptical.""",
+Be precise and objective. Only describe what you can actually see.""",
                         },
                     ],
                 }
             ],
         )
 
-        # Parse the vision response into structured output
-        vision_text = response.content[0].text
+        result = self.get_structured_output(
+            prompt=f"""Format this vision analysis into a concise figure description:
 
-        evaluation = self.get_structured_output(
-            prompt=f"""Based on this vision analysis of a figure, create a structured evaluation:
+{response.content[0].text}""",
+            response_model=FigureDescription
+        )
+        return result.description
 
-Vision analysis:
-{vision_text}
+    def _describe_expected(self, figure_name: str, paper_text: str) -> str:
+        """Based on the paper text alone, describe what this figure should show."""
+        result = self.get_structured_output(
+            prompt=f"""Based ONLY on the paper text below, describe what the figure "{figure_name}" should show.
+Do NOT guess or infer beyond what the text explicitly states about this figure.
+Include any specific values, trends, or features the text mentions about this figure.
 
-The figure was claimed to support: "{claim}"
-Figure name: {path.name}
-Step number: {step_number}
+Paper text:
+{paper_text}""",
+            response_model=ExpectedFigureDescription
+        )
+        return result.description
 
-Extract numerical data, confirmations, and contradictions from the analysis.""",
-            response_model=FigureEvaluation,
-            context={"figure_name": path.name, "supports_step": step_number},
+    def _compare_descriptions(
+        self, figure_name: str, actual: str, expected: str
+    ) -> Comparison:
+        """Compare the actual and expected descriptions to find similarities and differences."""
+        return self.get_structured_output(
+            prompt=f"""Compare these two descriptions of figure "{figure_name}".
+
+ACTUAL (from looking at the figure):
+{actual}
+
+EXPECTED (from the paper text):
+{expected}
+
+List the similarities (things that match between actual and expected) and
+differences (things that don't match, are missing, or are unexpected).
+Be specific and reference concrete details from both descriptions.""",
+            response_model=Comparison
         )
 
-        return evaluation
+    def _assess_claim(
+        self,
+        figure_name: str,
+        actual: str,
+        expected: str,
+        comparison: Comparison,
+        claim: str,
+        supports_step: int
+    ) -> FigureClaimAssessment:
+        """Assess whether a specific claim is supported based on the figure comparison."""
+        return self.get_structured_output(
+            prompt=f"""Assess whether the following claim is supported by figure "{figure_name}",
+given the comparison between what the figure actually shows and what was expected.
+
+Claim (step {supports_step}): {claim}
+
+Actual figure description: {actual}
+Expected figure description: {expected}
+
+Similarities found:
+{chr(10).join(f"- {s}" for s in comparison.similarities)}
+
+Differences found:
+{chr(10).join(f"- {d}" for d in comparison.differences)}
+
+Based on the comparison above, list:
+- Confirmations: specific ways the figure supports this claim
+- Contradictions: specific ways the figure undermines or fails to support this claim""",
+            response_model=FigureClaimAssessment,
+            context={"supports_step": supports_step, "claim": claim}
+        )

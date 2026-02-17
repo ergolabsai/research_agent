@@ -86,16 +86,23 @@ class OverAllReview(BaseModel):
     review: str = Field(description="Review of the paper")
 
 
+class FigureClaimAssessment(BaseModel):
+    """Assessment of a single claim against a figure's comparison results."""
+    supports_step: int = Field(description="Which logical step this claim belongs to")
+    claim: str = Field(description="The claim being assessed")
+    validity: ClaimValidity = Field(description="Confirmations and contradictions for this claim based on figure comparison")
+
+
 class FigureEvaluation(BaseModel):
     """Output from Step 3: Figure-based evidence evaluation."""
     figure_name: str = Field(description="Name/number of the figure")
-    supports_step: int = Field(description="Which logical step this figure supports")
-    extracted_data: List[FigureInfo] = Field(
-        description="Numerical data extracted from figure",
+    actual_description: str = Field(description="Description of what the figure actually shows (from vision)")
+    expected_description: str = Field(description="Description of what the figure should show based on the paper text alone")
+    comparison: Comparison = Field(description="Similarities and differences between actual and expected descriptions")
+    claim_assessments: List[FigureClaimAssessment] = Field(
+        description="Assessment of each claim associated with this figure",
         default_factory=list
     )
-    validity: ClaimValidity = Field(description="Whether the figure supports the claim")
-    notes: str = Field(description="Additional observations about the figure", default="")
 
 
 class MathEvaluation(BaseModel):
