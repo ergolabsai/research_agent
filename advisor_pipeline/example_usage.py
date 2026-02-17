@@ -8,7 +8,6 @@ This script demonstrates how to:
 3. Retrieve and display results
 """
 
-import os
 from pathlib import Path
 from database import Database
 from pipeline import AdvisorPipeline
@@ -16,11 +15,6 @@ from pipeline import AdvisorPipeline
 
 def example_basic_usage():
     """Basic example: Run pipeline on a paper without database."""
-
-    # Load paper from LaTeX file
-    paper_path = Path("/Users/chelsea/python_projects/project_files/shumlak2009_latex/main_text.tex")
-    with open(paper_path, 'r') as f:
-        sample_paper = f.read()
     
     # Initialize pipeline (no database, no MCP for this basic example)
     pipeline = AdvisorPipeline()
@@ -28,10 +22,7 @@ def example_basic_usage():
     # Run validation
     result = pipeline.run(
         paper_id="example_001",
-        paper_text=sample_paper,
-        title="Equilibrium, flow shear and stability measurements in the Z-pinch",
-        authors=["U. Shumlak", "C.S. Adams", "J.M. Blakely", "B.-J. Chan", "R.P. Golingo", "S.D. Knecht", "B.A. Nelson",
-                 "R.J. Oberto", "M.R. Sybouts", "G.V. Vogman"],
+        paper_folder=Path('/Users/chelsea/python_projects/project_files/shumlak2009_latex'),
         save_to_db=False  # Don't save since no database
     )
     

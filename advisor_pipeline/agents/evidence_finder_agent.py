@@ -35,8 +35,11 @@ class EvidenceFinderAgent(BaseAgent):
         """
         paper_structure: PaperStructure = input_data.get("paper_structure")
         paper_text: str = input_data.get("paper_text")
+        figure_names: list = input_data.get("figure_names", [])
 
         all_step_evidence = []
+
+        figure_names_str = ", ".join(figure_names) if figure_names else "None provided"
 
         paper_structure.logical_steps = sorted(paper_structure.logical_steps, key=lambda s: s.step_number)
 
@@ -51,8 +54,10 @@ Section: {step.section}
 Paper text:
 {paper_text}
 
+Available figure files: {figure_names_str}
+
 List ALL evidence for this step, including:
-- Figures (with figure numbers)
+- Figures (with figure numbers). When referencing a figure, use the exact filename from the available figure files list above.
 - Math/equations (with equation numbers)
 - Citations (with citation info)
 - Important textual arguments
@@ -63,14 +68,16 @@ Be thorough - one step may have multiple pieces of evidence."""
 
             # Now use Instructor for structured output
             instructor_prompt = f"""A previous agent was asked to find evidence that supports a claim in a research paper.
-            You're job is to now properly format its response.  
+            You're job is to now properly format its response.
 
             Your response should be in the form:
 
                 evidence_type: str = Field(description="Type: 'figure', 'math', 'citation', or 'text'")
-                description: str = Field(description="What this evidence shows")
-                location: str = Field(description="Where in the paper (section, page, figure number, etc.)")
+                description: str = Field(description="What this evidence shows.")
+                location: str = Field(description="Where in the paper (section, page, figure name, etc.)   If the evidence_type is 'figure', this MUST be the exact filename from the available figure files list.")
                 supports_step: int = Field(description="Which logical step this supports")
+
+            Available figure names: {figure_names_str}
 
             Here is the paper:
             {paper_text}
@@ -84,7 +91,10 @@ Be thorough - one step may have multiple pieces of evidence."""
                 response_model=StepEvidence
             )
 
-            all_step_evidence = all_step_evidence + [(step, step_evidence)]
+            all_step_evidence = all_step_evidence + [step_evidence]
+
+            if step.step_number > 2:
+                break
 
         return all_step_evidence
 

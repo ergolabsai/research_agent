@@ -34,13 +34,12 @@ class LogicMappingAgent(BaseAgent):
             PaperStructure with identified logical steps
         """
         paper_text = input_data.get("paper_text", "")
-        title = input_data.get("title", "Unknown")
 
         if not paper_text:
             raise ValueError("paper_text is required")
 
         # Use the agent to do initial analysis
-        agent_input = f"""Analyze this paper titled "{title}".
+        agent_input = f"""Analyze the following paper".
 
 Paper text:
 {paper_text[:10000]}

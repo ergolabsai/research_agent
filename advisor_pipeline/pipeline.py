@@ -1,6 +1,9 @@
 from typing import Callable, Dict, Any, Optional
 from pathlib import Path
 import json
+from PIL import Image
+import io
+import base64
 
 from advisor_pipeline.agents.logic_mapping_agent import LogicMappingAgent
 from advisor_pipeline.agents.evidence_finder_agent import EvidenceFinderAgent
@@ -16,6 +19,43 @@ from advisor_pipeline.models.schemas import (
     StepEvidence
 )
 from advisor_pipeline.database import Database
+
+
+def encode_image(image_path: Path, max_size=800) -> tuple[str, str]:
+    # Resize if image is larger than max_size
+
+    # Open the image
+    img = Image.open(image_path)
+
+    if max(img.size) > max_size:
+        # Calculate new size maintaining aspect ratio
+        ratio = max_size / max(img.size)
+        new_size = tuple(int(dim * ratio) for dim in img.size)
+        img = img.resize(new_size, Image.Resampling.LANCZOS)
+
+    # Determine format and media type from extension
+    if image_path.name.endswith('.png'):
+        img_format = "PNG"
+        media_type = "image/png"
+    elif image_path.name.endswith('.jpg') or image_path.name.endswith('.jpeg'):
+        img_format = "JPEG"
+        media_type = "image/jpeg"
+    elif image_path.name.endswith('.gif'):
+        img_format = "GIF"
+        media_type = "image/gif"
+    elif image_path.name.endswith('.webp'):
+        img_format = "WEBP"
+        media_type = "image/webp"
+    else:
+        img_format = "JPEG"
+        media_type = "image/jpeg"
+
+    # Convert to bytes
+    buffer = io.BytesIO()
+    img.save(buffer, format=img_format)
+    image_data = base64.standard_b64encode(buffer.getvalue()).decode("utf-8")
+
+    return image_data, media_type
 
 
 class AdvisorPipeline:
@@ -58,53 +98,50 @@ class AdvisorPipeline:
         
         print("✓ Pipeline initialized successfully")
     
-    def run(self, paper_id: str, paper_text: str, title: str, figures: Dict[str, str] = None, authors: list[str] = None,
-            abstract: str = "", bibliography: Dict[str, str] = None, save_to_db: bool = True) -> ValidationResult:
+    def run(self, paper_id: str, paper_folder: Path, save_to_db: bool = True,
+            bibliography: Dict[str, str] = None) -> ValidationResult:
         """
         Run the complete validation pipeline on a paper.
-        
+
         Args:
             paper_id: Unique identifier for the paper
-            paper_text: Full text of the paper
-            title: Paper title
-            figures: Dict mapping figure names to file paths
-            authors: List of author names
-            abstract: Paper abstract
-            bibliography: Dict of citation references
+            paper_folder: Path to the folder containing the paper's LaTeX and images
             save_to_db: Whether to save to database
-            
+            bibliography: Dict of citation references
+
         Returns:
             ValidationResult with complete assessment
         """
         print(f"\n{'='*60}")
-        print(f"Running validation pipeline for: {title}")
+        print(f"Running validation pipeline")
         print(f"Paper ID: {paper_id}")
         print(f"{'='*60}\n")
-        
+
+        # Step 1: Read paper and identify logical steps
+        print("STEP 1: Reading paper and identifying logical steps...")
+        paper_structure, paper_text, figures = self._run_step_1(paper_folder)
+        print(f"✓ Identified {len(paper_structure.logical_steps)} logical steps\n")
+
         # Save paper to database if requested
         if save_to_db and self.db:
             paper_doc = PaperDocument(
                 paper_id=paper_id,
-                title=title,
-                authors=authors or [],
-                abstract=abstract,
+                title=paper_structure.main_claim,
+                authors=[],
+                abstract="",
                 full_text=paper_text,
                 figures=figures or {}
             )
             self.db.save_paper(paper_doc)
             print("✓ Paper saved to database\n")
-        
-        # Step 1: Read paper and identify logical steps
-        print("STEP 1: Reading paper and identifying logical steps...")
-        paper_structure = self._run_step_1(paper_text, title)
-        print(f"✓ Identified {len(paper_structure.logical_steps)} logical steps\n")
-        
+
         # Step 2: Find evidence for each step
         print("STEP 2: Finding evidence for each logical step...")
-        step_evidence = self._run_step_2(paper_structure, paper_text)
+        figure_names = list(figures.keys()) if figures else []
+        step_evidence = self._run_step_2(paper_structure, paper_text, figure_names)
         total_evidence = sum(len(se.evidence_list) for se in step_evidence)
         print(f"✓ Found {total_evidence} pieces of evidence across all steps\n")
-        
+
         # Step 3: Evaluate figure-based evidence
         print("STEP 3: Evaluating figure-based evidence...")
         figure_evaluations = self._run_step_3(step_evidence, figures or {}, paper_structure)
@@ -149,18 +186,42 @@ class AdvisorPipeline:
         
         return validation_result
     
-    def _run_step_1(self, paper_text: str, title: str) -> PaperStructure:
-        """Step 1: Read paper and identify logical steps."""
-        return self.logic_mapper.run({
-            "paper_text": paper_text,
-            "title": title
+    def _run_step_1(self, paper_folder: Path) -> tuple[PaperStructure, str, Dict[str, str]]:
+        """Step 1: Read paper text and figures, then identify logical steps.
+
+        Args:
+            paper_folder: Path to the folder containing main_text.tex and images/
+
+        Returns:
+            Tuple of (paper_structure, paper_text, figures) where figures maps
+            filenames to base64-encoded image data.
+        """
+        # Load paper from LaTeX file
+        paper_path = paper_folder / "main_text.tex"
+        with open(paper_path, 'r') as f:
+            paper_text = f.read()
+
+        # Load figures from images/ subfolder
+        figures = {}
+        image_folder = paper_folder / 'images'
+        if image_folder.exists():
+            for img_path in image_folder.iterdir():
+                if img_path.is_file():
+                    img_data, media_type = encode_image(img_path)
+                    figures[img_path.name] = img_data
+
+        paper_structure = self.logic_mapper.run({
+            "paper_text": paper_text
         })
+
+        return paper_structure, paper_text, figures
     
-    def _run_step_2(self, paper_structure: PaperStructure, paper_text: str) -> list[StepEvidence]:
+    def _run_step_2(self, paper_structure: PaperStructure, paper_text: str, figure_names: list[str]) -> list[StepEvidence]:
         """Step 2: Find evidence for each step."""
         return self.evidence_finder.run({
             "paper_structure": paper_structure,
-            "paper_text": paper_text
+            "paper_text": paper_text,
+            "figure_names": figure_names
         })
     
     def _run_step_3(
@@ -267,3 +328,4 @@ class AdvisorPipeline:
         """Cleanup on deletion."""
         if self.db:
             self.db.disconnect()
+

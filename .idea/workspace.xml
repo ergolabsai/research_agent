@@ -5,14 +5,10 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="6cc51746-4537-4c5e-965f-ef86103f3ff2" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/todo.txt" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/advisor_pipeline/agents/base_agent.py" beforeDir="false" afterPath="$PROJECT_DIR$/advisor_pipeline/agents/base_agent.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/advisor_pipeline/agents/citation_checker_agent.py" beforeDir="false" afterPath="$PROJECT_DIR$/advisor_pipeline/agents/citation_checker_agent.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/advisor_pipeline/agents/evidence_finder_agent.py" beforeDir="false" afterPath="$PROJECT_DIR$/advisor_pipeline/agents/evidence_finder_agent.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/advisor_pipeline/agents/figure_evaluator_agent.py" beforeDir="false" afterPath="$PROJECT_DIR$/advisor_pipeline/agents/figure_evaluator_agent.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/advisor_pipeline/agents/logic_mapping_agent.py" beforeDir="false" afterPath="$PROJECT_DIR$/advisor_pipeline/agents/logic_mapping_agent.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/advisor_pipeline/agents/math_evaluator_agent.py" beforeDir="false" afterPath="$PROJECT_DIR$/advisor_pipeline/agents/math_evaluator_agent.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/advisor_pipeline/example_usage.py" beforeDir="false" afterPath="$PROJECT_DIR$/advisor_pipeline/example_usage.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/advisor_pipeline/models/schemas.py" beforeDir="false" afterPath="$PROJECT_DIR$/advisor_pipeline/models/schemas.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/advisor_pipeline/pipeline.py" beforeDir="false" afterPath="$PROJECT_DIR$/advisor_pipeline/pipeline.py" afterDir="false" />
     </list>
@@ -48,7 +44,7 @@
   "keyToString": {
     "ModuleVcsDetector.initialDetectionPerformed": "true",
     "Python.critique_figure.executor": "Run",
-    "Python.example_usage.executor": "Run",
+    "Python.example_usage.executor": "Debug",
     "Python.multi_step_paper_review.executor": "Debug",
     "Python.multistep_paper_review.executor": "Run",
     "Python.paper_review.executor": "Run",
@@ -107,7 +103,7 @@
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <option name="SCRIPT_NAME" value="$PROJECT_DIR$/advisor_pipeline/example_usage.py" />
       <option name="PARAMETERS" value="" />
-      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="SHOW_COMMAND_LINE" value="true" />
       <option name="EMULATE_TERMINAL" value="false" />
       <option name="MODULE_MODE" value="false" />
       <option name="REDIRECT_INPUT" value="false" />
@@ -246,9 +242,9 @@
           <option name="timeStamp" value="6" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
-          <url>file://$PROJECT_DIR$/advisor_pipeline/agents/evidence_finder_agent.py</url>
-          <line>42</line>
-          <option name="timeStamp" value="19" />
+          <url>file://$PROJECT_DIR$/advisor_pipeline/pipeline.py</url>
+          <line>146</line>
+          <option name="timeStamp" value="21" />
         </line-breakpoint>
       </breakpoints>
       <default-breakpoints>

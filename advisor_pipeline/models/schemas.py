@@ -37,7 +37,7 @@ class Evidence(BaseModel):
     """Generic evidence supporting a logical step."""
     evidence_type: str = Field(description="Type: 'figure', 'math', 'citation', or 'text'")
     description: str = Field(description="What this evidence shows")
-    location: str = Field(description="Where in the paper (section, page, figure number, etc.)")
+    location: str = Field(description="Where in the paper (section, page, figure number, etc.)   If the evidence_type is 'figure', this MUST be the exact filename from the available figure files list.")
     supports_step: int = Field(description="Which logical step this supports")
 
 
