@@ -28,8 +28,6 @@ class FigureEvaluatorAgent(BaseAgent):
             description="Evaluates whether figures actually support the claims made about them"
         )
 
-        self.initialize_agent()
-
     def get_tools(self):
         return []
 
@@ -122,7 +120,7 @@ Be precise and objective. Only describe what you can actually see.""",
 
     def _describe_expected(self, figure_name: str, paper_text: str) -> str:
         """Based on the paper text alone, describe what this figure should show."""
-        return self.invoke_agent(
+        return self.invoke_llm(
             f"""Based ONLY on the paper text below, describe what the figure "{figure_name}" should show.
 Do NOT guess or infer beyond what the text explicitly states about this figure.
 Include any specific values, trends, or features the text mentions about this figure.

@@ -18,8 +18,6 @@ class EvidenceFinderAgent(BaseAgent):
             description="Finds and catalogs evidence supporting each logical step"
         )
 
-        self.initialize_agent()
-
     def get_tools(self):
         return []
 

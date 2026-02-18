@@ -1,9 +1,11 @@
-from typing import Callable, Dict, Any, Optional
+from typing import Dict, Any, Optional
 from pathlib import Path
-import json
 from PIL import Image
 import io
 import base64
+
+from langgraph.graph import StateGraph, START, END
+from typing_extensions import TypedDict
 
 from advisor_pipeline.agents.logic_mapping_agent import LogicMappingAgent
 from advisor_pipeline.agents.evidence_finder_agent import EvidenceFinderAgent
@@ -16,7 +18,10 @@ from advisor_pipeline.models.schemas import (
     PaperDocument,
     ValidationResult,
     PaperStructure,
-    StepEvidence
+    StepEvidence,
+    FigureEvaluation,
+    MathEvaluation,
+    CitationCheck,
 )
 from advisor_pipeline.database import Database
 
@@ -58,19 +63,53 @@ def encode_image(image_path: Path, max_size=800) -> tuple[str, str]:
     return image_data, media_type
 
 
+# ---------------------------------------------------------------------------
+# Pipeline state — every node reads from / writes to this TypedDict
+# ---------------------------------------------------------------------------
+
+class PipelineState(TypedDict, total=False):
+    # Inputs (set before the graph runs)
+    paper_id: str
+    paper_folder: Path
+    save_to_db: bool
+    bibliography: Dict[str, str]
+
+    # Populated by load_paper
+    paper_text: str
+    figures: Dict[str, Dict[str, str]]
+
+    # Populated by map_logic
+    paper_structure: PaperStructure
+
+    # Populated by find_evidence
+    step_evidence: list[StepEvidence]
+
+    # Populated by evaluate_figures
+    figure_evaluations: list[FigureEvaluation]
+
+    # Steps 4 & 5 are currently disabled. When re-enabled they would
+    # run in parallel with evaluate_figures, before compile_results.
+    # math_evaluations: list[MathEvaluation]
+    # citation_checks: list[CitationCheck]
+
+    # Populated by compile_results
+    validation_result: ValidationResult
+
+
 class AdvisorPipeline:
     """
     Main orchestrator for The Advisor validation pipeline.
-    
-    Runs all 6 steps in sequence:
-    1. Logic Mapper - identify logical steps
-    2. Evidence Finder - find supporting evidence
-    3. Figure Evaluator - validate figure evidence
-    4. Math Evaluator - validate mathematical evidence
-    5. Citation Checker - verify citations
-    6. Results Compiler - synthesize final assessment
+
+    Uses a LangGraph StateGraph to run the pipeline:
+
+        START -> load_paper -> map_logic -> find_evidence
+              -> evaluate_figures -> compile_results -> END
+
+    Steps 4 (math) and 5 (citations) are currently disabled.  When
+    re-enabled they would slot in as parallel nodes alongside
+    evaluate_figures, before compile_results.
     """
-    
+
     def __init__(self, mcp_client=None, db: Database = None):
         """
         Initialize the pipeline with all agents.
@@ -78,15 +117,14 @@ class AdvisorPipeline:
         Args:
             mcp_client: MCP calculator client (required for math validation)
             db: Database instance (optional, for persistence)
-            on_step: Callback(step_number, step_name) called at the start of each step
         """
         print("Initializing Advisor Pipeline...")
-        
+
         # Initialize database
         self.db = db
         if self.db:
             self.db.connect()
-        
+
         # Initialize all agents
         print("Loading agents...")
         self.logic_mapper = LogicMappingAgent()
@@ -95,9 +133,149 @@ class AdvisorPipeline:
         self.math_evaluator = MathEvaluatorAgent(mcp_client=mcp_client)
         self.citation_checker = CitationCheckerAgent()
         self.results_compiler = ResultsCompilerAgent()
-        
-        print("✓ Pipeline initialized successfully")
-    
+
+        # Build the pipeline graph
+        self._graph = self._build_graph()
+
+        print("Pipeline initialized successfully")
+
+    # ------------------------------------------------------------------
+    # Graph construction
+    # ------------------------------------------------------------------
+
+    def _build_graph(self) -> Any:
+        """Build and compile the LangGraph pipeline."""
+        workflow = StateGraph(PipelineState)
+
+        workflow.add_node("load_paper", self._node_load_paper)
+        workflow.add_node("map_logic", self._node_map_logic)
+        workflow.add_node("find_evidence", self._node_find_evidence)
+        workflow.add_node("evaluate_figures", self._node_evaluate_figures)
+        workflow.add_node("compile_results", self._node_compile_results)
+
+        workflow.add_edge(START, "load_paper")
+        workflow.add_edge("load_paper", "map_logic")
+        workflow.add_edge("map_logic", "find_evidence")
+        workflow.add_edge("find_evidence", "evaluate_figures")
+        workflow.add_edge("evaluate_figures", "compile_results")
+        workflow.add_edge("compile_results", END)
+
+        return workflow.compile()
+
+    # ------------------------------------------------------------------
+    # Node functions — each reads from state and returns updates
+    # ------------------------------------------------------------------
+
+    def _node_load_paper(self, state: PipelineState) -> dict:
+        """Load paper text and figures from disk."""
+        print("STEP 1a: Loading paper from disk...")
+        paper_folder = Path(state["paper_folder"])
+
+        paper_path = paper_folder / "main_text.tex"
+        with open(paper_path, 'r') as f:
+            paper_text = f.read()
+
+        figures: Dict[str, Dict[str, str]] = {}
+        image_folder = paper_folder / 'images'
+        if image_folder.exists():
+            for img_path in image_folder.iterdir():
+                if img_path.is_file():
+                    img_data, media_type = encode_image(img_path)
+                    figures[img_path.name] = {'data': img_data, 'media_type': media_type}
+
+        return {"paper_text": paper_text, "figures": figures}
+
+    def _node_map_logic(self, state: PipelineState) -> dict:
+        """Identify the logical structure of the paper."""
+        print("STEP 1b: Identifying logical steps...")
+        paper_structure = self.logic_mapper.run({
+            "paper_text": state["paper_text"]
+        })
+        print(f"  Identified {len(paper_structure.logical_steps)} logical steps")
+
+        # Optionally save to database
+        if state.get("save_to_db") and self.db:
+            paper_doc = PaperDocument(
+                paper_id=state["paper_id"],
+                title=paper_structure.main_claim,
+                authors=[],
+                abstract="",
+                full_text=state["paper_text"],
+                figures=state.get("figures") or {}
+            )
+            self.db.save_paper(paper_doc)
+            print("  Paper saved to database")
+
+        return {"paper_structure": paper_structure}
+
+    def _node_find_evidence(self, state: PipelineState) -> dict:
+        """Find evidence supporting each logical step."""
+        print("STEP 2: Finding evidence for each logical step...")
+        figure_names = list(state.get("figures", {}).keys())
+        step_evidence = self.evidence_finder.run({
+            "paper_structure": state["paper_structure"],
+            "paper_text": state["paper_text"],
+            "figure_names": figure_names
+        })
+        total_evidence = sum(len(se.evidence_list) for se in step_evidence)
+        print(f"  Found {total_evidence} pieces of evidence across all steps")
+        return {"step_evidence": step_evidence}
+
+    def _node_evaluate_figures(self, state: PipelineState) -> dict:
+        """Evaluate figure-based evidence."""
+        print("STEP 3: Evaluating figure-based evidence...")
+        paper_structure: PaperStructure = state["paper_structure"]
+        figures = state.get("figures", {})
+        step_evidence = state["step_evidence"]
+
+        # Build figure-to-claims mapping
+        figure_claims: Dict[str, list] = {}
+        for se in step_evidence:
+            for ev in se.evidence_list:
+                if ev.evidence_type == "figure":
+                    if ev.location not in figure_claims:
+                        figure_claims[ev.location] = []
+                    figure_claims[ev.location].append({
+                        "supports_step": ev.supports_step,
+                        "claim": next(
+                            (step.description for step in paper_structure.logical_steps
+                             if step.step_number == ev.supports_step),
+                            "Unknown claim"
+                        )
+                    })
+
+        figure_evaluations = self.figure_evaluator.run({
+            "figures": figures,
+            "figure_claims": figure_claims,
+            "paper_text": state["paper_text"]
+        })
+        print(f"  Evaluated {len(figure_evaluations)} figures")
+        return {"figure_evaluations": figure_evaluations}
+
+    def _node_compile_results(self, state: PipelineState) -> dict:
+        """Compile all evaluation results into a final assessment."""
+        print("STEP 4: Compiling final assessment...")
+        validation_result = self.results_compiler.run({
+            "paper_id": state["paper_id"],
+            "paper_structure": state["paper_structure"],
+            "step_evidence": state["step_evidence"],
+            "figure_evaluations": state.get("figure_evaluations", []),
+            "math_evaluations": state.get("math_evaluations", []),
+            "citation_checks": state.get("citation_checks", []),
+        })
+        print(f"  Final confidence score: {validation_result.confidence_score:.2%}")
+
+        # Save validation to database
+        if state.get("save_to_db") and self.db:
+            self.db.save_validation(validation_result, state["paper_id"])
+            print("  Validation saved to database")
+
+        return {"validation_result": validation_result}
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+
     def run(self, paper_id: str, paper_folder: Path, save_to_db: bool = True,
             bibliography: Dict[str, str] = None) -> ValidationResult:
         """
@@ -117,221 +295,29 @@ class AdvisorPipeline:
         print(f"Paper ID: {paper_id}")
         print(f"{'='*60}\n")
 
-        # Step 1: Read paper and identify logical steps
-        print("STEP 1: Reading paper and identifying logical steps...")
-        paper_structure, paper_text, figures = self._run_step_1(paper_folder)
-        print(f"✓ Identified {len(paper_structure.logical_steps)} logical steps\n")
+        initial_state: PipelineState = {
+            "paper_id": paper_id,
+            "paper_folder": paper_folder,
+            "save_to_db": save_to_db,
+            "bibliography": bibliography or {},
+        }
 
-        # Save paper to database if requested
-        if save_to_db and self.db:
-            paper_doc = PaperDocument(
-                paper_id=paper_id,
-                title=paper_structure.main_claim,
-                authors=[],
-                abstract="",
-                full_text=paper_text,
-                figures=figures or {}
-            )
-            self.db.save_paper(paper_doc)
-            print("✓ Paper saved to database\n")
+        final_state = self._graph.invoke(initial_state)
 
-        # Step 2: Find evidence for each step
-        print("STEP 2: Finding evidence for each logical step...")
-        figure_names = list(figures.keys()) if figures else []
-        step_evidence = self._run_step_2(paper_structure, paper_text, figure_names)
-        total_evidence = sum(len(se.evidence_list) for se in step_evidence)
-        print(f"✓ Found {total_evidence} pieces of evidence across all steps\n")
-
-        # Step 3: Evaluate figure-based evidence
-        print("STEP 3: Evaluating figure-based evidence...")
-        figure_evaluations = self._run_step_3(step_evidence, paper_structure, figures, paper_text)
-        print(f"✓ Evaluated {len(figure_evaluations)} figures\n")
-        
-        # # Step 4: Evaluate mathematical evidence
-        # if self._on_step:
-        #     self._on_step(4, "Validating math")
-        # print("STEP 4: Validating mathematical evidence...")
-        # math_evaluations = self._run_step_4(step_evidence, paper_text, paper_structure)
-        # print(f"✓ Validated {len(math_evaluations)} mathematical claims\n")
-        #
-        # # Step 5: Check citations
-        # if self._on_step:
-        #     self._on_step(5, "Checking citations")
-        # print("STEP 5: Verifying citations...")
-        # citation_checks = self._run_step_5(step_evidence, paper_text, bibliography or {}, paper_structure)
-        # print(f"✓ Checked {len(citation_checks)} citations\n")
-        
-        # Step 6: Compile results
-        if self._on_step:
-            self._on_step(6, "Compiling results")
-        print("STEP 6: Compiling final assessment...")
-        validation_result = self._run_step_6(
-            paper_id,
-            paper_structure,
-            step_evidence,
-            figure_evaluations,
-            # math_evaluations,
-            # citation_checks
-        )
-        print(f"✓ Final confidence score: {validation_result.confidence_score:.2%}\n")
-        
-        # Save validation to database
-        if save_to_db and self.db:
-            self.db.save_validation(validation_result, paper_id)
-            print("✓ Validation saved to database\n")
-        
-        print(f"{'='*60}")
+        print(f"\n{'='*60}")
         print("Pipeline complete!")
         print(f"{'='*60}\n")
-        
-        return validation_result
-    
-    def _run_step_1(self, paper_folder: Path) -> tuple[PaperStructure, str, Dict[str, Dict[str, str]]]:
-        """Step 1: Read paper text and figures, then identify logical steps.
 
-        Args:
-            paper_folder: Path to the folder containing main_text.tex and images/
+        return final_state["validation_result"]
 
-        Returns:
-            Tuple of (paper_structure, paper_text, figures) where figures maps
-            filenames to base64-encoded image data.
-        """
-        # Load paper from LaTeX file
-        paper_path = paper_folder / "main_text.tex"
-        with open(paper_path, 'r') as f:
-            paper_text = f.read()
-
-        # Load figures from images/ subfolder
-        figures = {}
-        image_folder = paper_folder / 'images'
-        if image_folder.exists():
-            for img_path in image_folder.iterdir():
-                if img_path.is_file():
-                    img_data, media_type = encode_image(img_path)
-                    figures[img_path.name] = {'data': img_data, 'media_type': media_type}
-
-        paper_structure = self.logic_mapper.run({
-            "paper_text": paper_text
-        })
-
-        return paper_structure, paper_text, figures
-    
-    def _run_step_2(self, paper_structure: PaperStructure, paper_text: str, figure_names: list[str]) -> list[StepEvidence]:
-        """Step 2: Find evidence for each step."""
-        return self.evidence_finder.run({
-            "paper_structure": paper_structure,
-            "paper_text": paper_text,
-            "figure_names": figure_names
-        })
-    
-    def _run_step_3(
-        self,
-        step_evidence: list[StepEvidence],
-        paper_structure: PaperStructure,
-        figures: Dict[str, Dict[str, str]],
-        paper_text: str
-    ) -> list:
-        """Step 3: Evaluate figure evidence."""
-        # Collect all figure evidence and map figure names to their associated claims
-        figure_claims = {}
-        for se in step_evidence:
-            for ev in se.evidence_list:
-                if ev.evidence_type == "figure":
-                    if ev.location not in figure_claims:
-                        figure_claims[ev.location] = []
-                    figure_claims[ev.location].append({
-                        "supports_step": ev.supports_step,
-                        "claim": next(
-                            (step.description for step in paper_structure.logical_steps
-                             if step.step_number == ev.supports_step),
-                            "Unknown claim"
-                        )
-                    })
-
-        return self.figure_evaluator.run({
-            "figures": figures,
-            "figure_claims": figure_claims,
-            "paper_text": paper_text
-        })
-    
-    def _run_step_4(
-        self,
-        step_evidence: list[StepEvidence],
-        paper_text: str,
-        paper_structure: PaperStructure
-    ) -> list:
-        """Step 4: Validate mathematical evidence."""
-        # Collect all evidence
-        all_evidence = []
-        for se in step_evidence:
-            all_evidence.extend(se.evidence_list)
-        
-        # Create claims dict
-        claims = {
-            step.step_number: step.description
-            for step in paper_structure.logical_steps
-        }
-        
-        return self.math_evaluator.run({
-            "evidence_list": all_evidence,
-            "paper_text": paper_text,
-            "claims": claims
-        })
-    
-    def _run_step_5(
-        self,
-        step_evidence: list[StepEvidence],
-        paper_text: str,
-        bibliography: Dict[str, str],
-        paper_structure: PaperStructure
-    ) -> list:
-        """Step 5: Check citations."""
-        # Collect all evidence
-        all_evidence = []
-        for se in step_evidence:
-            all_evidence.extend(se.evidence_list)
-        
-        # Create claims dict
-        claims = {
-            step.step_number: step.description
-            for step in paper_structure.logical_steps
-        }
-        
-        return self.citation_checker.run({
-            "evidence_list": all_evidence,
-            "paper_text": paper_text,
-            "bibliography": bibliography,
-            "claims": claims
-        })
-    
-    def _run_step_6(
-        self,
-        paper_id: str,
-        paper_structure: PaperStructure,
-        step_evidence: list[StepEvidence],
-        figure_evaluations: list,
-        math_evaluations: list,
-        citation_checks: list
-    ) -> ValidationResult:
-        """Step 6: Compile results."""
-        return self.results_compiler.run({
-            "paper_id": paper_id,
-            "paper_structure": paper_structure,
-            "step_evidence": step_evidence,
-            "figure_evaluations": figure_evaluations,
-            "math_evaluations": math_evaluations,
-            "citation_checks": citation_checks
-        })
-    
     def load_from_database(self, paper_id: str) -> Optional[ValidationResult]:
         """Load the latest validation for a paper from database."""
         if not self.db:
             raise ValueError("Database not initialized")
-        
+
         return self.db.get_latest_validation(paper_id)
-    
+
     def __del__(self):
         """Cleanup on deletion."""
         if self.db:
             self.db.disconnect()
-

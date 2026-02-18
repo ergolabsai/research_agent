@@ -46,7 +46,7 @@ class BaseAgent(ABC):
         # Tools will be defined by child classes
         self.tools: list[BaseTool] = []
 
-        # Agent graph will be initialized after tools are set
+        # Agent graph will be initialized after tools are set (only for agents with tools)
         self.agent_graph = None
 
         self.system_prompt = """You are a scientist reviewing a new paper.  Your job is to:
@@ -57,47 +57,68 @@ class BaseAgent(ABC):
 
 Be precise and capture the logical flow of the argument, not just a summary.
 
-You're job is also to remain highly skeptical of the author's conclusions.  
+You're job is also to remain highly skeptical of the author's conclusions.
 You are looking for mistakes in logic and you should not assume their results are conclusive."""
 
     def initialize_agent(self):
-        """Initialize the LangGraph agent with tools and system prompt."""
+        """Initialize the LangGraph agent with tools.
 
+        Only builds a graph when the agent has tools (for the agent<->tools loop).
+        Toolless agents should use invoke_llm() instead.
+        """
         self.tools = self.get_tools()
 
-        # Bind tools to LLM if available
-        bound_llm = self.llm.bind_tools(self.tools) if self.tools else self.llm
+        if not self.tools:
+            # No tools — no graph needed. Use invoke_llm() for direct calls.
+            return
+
+        # Bind tools to LLM
+        bound_llm = self.llm.bind_tools(self.tools)
 
         # Define the agent node
         def call_model(state: AgentState):
             messages = state["messages"]
-            # Prepend system message if not already there
             if not messages or not hasattr(messages[0], "content") or "system" not in str(type(messages[0])):
                 messages = [{"role": "system", "content": self.system_prompt}] + messages
             response = bound_llm.invoke(messages)
             return {"messages": [response]}
 
-        # Build the graph
+        # Build the graph with agent <-> tools loop
         workflow = StateGraph(AgentState)
         workflow.add_node("agent", call_model)
+        workflow.add_node("tools", ToolNode(self.tools))
+        workflow.add_edge(START, "agent")
+        workflow.add_conditional_edges("agent", tools_condition)
+        workflow.add_edge("tools", "agent")
 
-        if self.tools:
-            # Agent with tools: agent <-> tools loop
-            workflow.add_node("tools", ToolNode(self.tools))
-            workflow.add_edge(START, "agent")
-            workflow.add_conditional_edges("agent", tools_condition)
-            workflow.add_edge("tools", "agent")
-        else:
-            # Agent without tools: single pass
-            workflow.add_edge(START, "agent")
-            workflow.add_edge("agent", END)
-
-        # Compile the graph
         self.agent_graph = workflow.compile()
 
-    def invoke_agent(self, input_text: str) -> str:
+    def invoke_llm(self, input_text: str) -> str:
+        """Call the LLM directly without LangGraph overhead.
+
+        Use this for agents that have no tools. The system prompt is
+        prepended automatically.
+
+        Args:
+            input_text: The input to send to the LLM
+
+        Returns:
+            The LLM's response as a string
         """
-        Invoke the LangGraph agent with input text.
+        messages = [
+            {"role": "system", "content": self.system_prompt},
+            HumanMessage(content=input_text),
+        ]
+        response = self.llm.invoke(messages)
+        if hasattr(response, "content"):
+            return response.content
+        return str(response)
+
+    def invoke_agent(self, input_text: str) -> str:
+        """Invoke the LangGraph agent with tools.
+
+        Only works for agents that have tools and have called initialize_agent().
+        Toolless agents should use invoke_llm() instead.
 
         Args:
             input_text: The input to send to the agent

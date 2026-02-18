@@ -17,8 +17,6 @@ class LogicMappingAgent(BaseAgent):
             name="PaperReader",
             description="Reads scientific papers and extracts the logical argument structure"
         )
-
-        self.initialize_agent()
     
     def get_tools(self):
         return []
