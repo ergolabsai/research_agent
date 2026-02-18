@@ -6,11 +6,11 @@
   <component name="ChangeListManager">
     <list default="true" id="6cc51746-4537-4c5e-965f-ef86103f3ff2" name="Changes" comment="">
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/advisor_pipeline/agents/base_agent.py" beforeDir="false" afterPath="$PROJECT_DIR$/advisor_pipeline/agents/base_agent.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/advisor_pipeline/agents/evidence_finder_agent.py" beforeDir="false" afterPath="$PROJECT_DIR$/advisor_pipeline/agents/evidence_finder_agent.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/advisor_pipeline/agents/figure_evaluator_agent.py" beforeDir="false" afterPath="$PROJECT_DIR$/advisor_pipeline/agents/figure_evaluator_agent.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/advisor_pipeline/agents/results_compiler_agent.py" beforeDir="false" afterPath="$PROJECT_DIR$/advisor_pipeline/agents/results_compiler_agent.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/advisor_pipeline/agents/logic_mapping_agent.py" beforeDir="false" afterPath="$PROJECT_DIR$/advisor_pipeline/agents/logic_mapping_agent.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/advisor_pipeline/models/schemas.py" beforeDir="false" afterPath="$PROJECT_DIR$/advisor_pipeline/models/schemas.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/advisor_pipeline/pipeline.py" beforeDir="false" afterPath="$PROJECT_DIR$/advisor_pipeline/pipeline.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/todo.txt" beforeDir="false" afterPath="$PROJECT_DIR$/todo.txt" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -44,7 +44,7 @@
   "keyToString": {
     "ModuleVcsDetector.initialDetectionPerformed": "true",
     "Python.critique_figure.executor": "Run",
-    "Python.example_usage.executor": "Debug",
+    "Python.example_usage.executor": "Run",
     "Python.multi_step_paper_review.executor": "Debug",
     "Python.multistep_paper_review.executor": "Run",
     "Python.paper_review.executor": "Run",
@@ -93,9 +93,6 @@
       <option name="ENV_FILES" value="" />
       <option name="INTERPRETER_OPTIONS" value="" />
       <option name="PARENT_ENVS" value="true" />
-      <envs>
-        <env name="PYTHONUNBUFFERED" value="1" />
-      </envs>
       <option name="SDK_HOME" value="" />
       <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/advisor_pipeline" />
       <option name="IS_MODULE_SDK" value="true" />
@@ -243,12 +240,12 @@
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/advisor_pipeline/agents/figure_evaluator_agent.py</url>
-          <line>62</line>
+          <line>57</line>
           <option name="timeStamp" value="27" />
         </line-breakpoint>
         <line-breakpoint enabled="true" suspend="THREAD" type="python-line">
           <url>file://$PROJECT_DIR$/advisor_pipeline/agents/figure_evaluator_agent.py</url>
-          <line>58</line>
+          <line>53</line>
           <option name="timeStamp" value="30" />
         </line-breakpoint>
       </breakpoints>

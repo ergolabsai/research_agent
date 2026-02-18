@@ -46,14 +46,7 @@ class StepEvidence(BaseModel):
     evidence_list: List[Evidence] = Field(description="list of evidence to support a logical step", default_factory=list)
 
 
-class FigureDescription(BaseModel):
-    description: str = Field(description="description of the image")
-
-
-class ExpectedFigureDescription(BaseModel):
-    description: str = Field(description="expected figure description")
-
-
+#### Figure Evaluator Agent
 class Comparison(BaseModel):
     """Comparison results with differences and similarities."""
     differences: List[str] = Field(

@@ -1,15 +1,10 @@
 from typing import Any, Dict, List
-from anthropic import Anthropic
 
 from advisor_pipeline.agents.base_agent import BaseAgent
-from advisor_pipeline.config.settings import settings
 from advisor_pipeline.models.schemas import (
     FigureEvaluation,
     FigureClaimAssessment,
-    FigureDescription,
-    ExpectedFigureDescription,
     Comparison,
-    ClaimValidity,
 )
 
 
@@ -68,7 +63,6 @@ class FigureEvaluatorAgent(BaseAgent):
             actual_description = self._describe_figure(
                 figure_data['media_type'],
                 figure_data['data'],
-                figure_name
             )
             print(f"  Actual description complete")
 
@@ -78,7 +72,7 @@ class FigureEvaluatorAgent(BaseAgent):
 
             # Step C: Compare similarities and differences
             comparison = self._compare_descriptions(
-                figure_name, actual_description, expected_description
+                actual_description, expected_description
             )
             print(f"  Comparison complete: {len(comparison.similarities)} similarities, {len(comparison.differences)} differences")
 
@@ -92,7 +86,8 @@ class FigureEvaluatorAgent(BaseAgent):
                     expected_description,
                     comparison,
                     claim_info['claim'],
-                    claim_info['supports_step']
+                    claim_info['supports_step'],
+                    paper_text
                 )
                 claim_assessments.append(assessment)
             print(f"  Assessed {len(claim_assessments)} claims")
@@ -108,23 +103,10 @@ class FigureEvaluatorAgent(BaseAgent):
 
         return evaluations
 
-    def _describe_figure(self, media_type: str, image_data: str, figure_name: str) -> str:
+    def _describe_figure(self, media_type: str, image_data: str) -> str:
         """Use Claude's vision to describe what the figure actually shows."""
-        client = Anthropic(api_key=settings.anthropic_api_key)
-        response = client.messages.create(
-            model=settings.model_name,
-            max_tokens=2000,
-            messages=[
-                {
-                    "role": "user",
-                    "content": [
-                        {
-                            "type": "image",
-                            "source": {"type": "base64", "media_type": media_type, "data": image_data},
-                        },
-                        {
-                            "type": "text",
-                            "text": f"""Describe this scientific figure ({figure_name}) in detail.
+        return self.invoke_agent_with_vision(
+            input_text="""Describe this scientific figure in detail in such a way that you think someone could reproduce it from your description.
 
 Include:
 1. The type of figure (plot, diagram, photograph, schematic, etc.)
@@ -134,39 +116,27 @@ Include:
 5. Legends, annotations, or labels
 
 Be precise and objective. Only describe what you can actually see.""",
-                        },
-                    ],
-                }
-            ],
+            media_type=media_type,
+            image_data=image_data,
         )
-
-        result = self.get_structured_output(
-            prompt=f"""Format this vision analysis into a concise figure description:
-
-{response.content[0].text}""",
-            response_model=FigureDescription
-        )
-        return result.description
 
     def _describe_expected(self, figure_name: str, paper_text: str) -> str:
         """Based on the paper text alone, describe what this figure should show."""
-        result = self.get_structured_output(
-            prompt=f"""Based ONLY on the paper text below, describe what the figure "{figure_name}" should show.
+        return self.invoke_agent(
+            f"""Based ONLY on the paper text below, describe what the figure "{figure_name}" should show.
 Do NOT guess or infer beyond what the text explicitly states about this figure.
 Include any specific values, trends, or features the text mentions about this figure.
 
 Paper text:
-{paper_text}""",
-            response_model=ExpectedFigureDescription
+{paper_text}"""
         )
-        return result.description
 
     def _compare_descriptions(
-        self, figure_name: str, actual: str, expected: str
+        self, actual: str, expected: str
     ) -> Comparison:
         """Compare the actual and expected descriptions to find similarities and differences."""
         return self.get_structured_output(
-            prompt=f"""Compare these two descriptions of figure "{figure_name}".
+            prompt=f"""Compare these two descriptions of a figure.
 
 ACTUAL (from looking at the figure):
 {actual}
@@ -187,7 +157,8 @@ Be specific and reference concrete details from both descriptions.""",
         expected: str,
         comparison: Comparison,
         claim: str,
-        supports_step: int
+        supports_step: int,
+        paper_text: str
     ) -> FigureClaimAssessment:
         """Assess whether a specific claim is supported based on the figure comparison."""
         return self.get_structured_output(
@@ -205,7 +176,10 @@ Similarities found:
 Differences found:
 {chr(10).join(f"- {d}" for d in comparison.differences)}
 
-Based on the comparison above, list:
+Full paper text:
+{paper_text}
+
+Based on the comparison above and the full paper text, list:
 - Confirmations: specific ways the figure supports this claim
 - Contradictions: specific ways the figure undermines or fails to support this claim""",
             response_model=FigureClaimAssessment,

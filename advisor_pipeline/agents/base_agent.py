@@ -121,6 +121,41 @@ You are looking for mistakes in logic and you should not assume their results ar
             return str(final_message)
         return ""
 
+    def invoke_agent_with_vision(self, input_text: str, media_type: str, image_data: str) -> str:
+        """
+        Send an image plus text prompt to Claude's vision API, then pass
+        the result through the LangGraph agent for formatting.
+
+        Args:
+            input_text: The text prompt to accompany the image
+            media_type: MIME type of the image (e.g. 'image/png')
+            image_data: Base64-encoded image data
+
+        Returns:
+            The agent's formatted response as a string
+        """
+        client = Anthropic(api_key=settings.anthropic_api_key)
+        response = client.messages.create(
+            model=settings.model_name,
+            max_tokens=2000,
+            messages=[
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image",
+                            "source": {"type": "base64", "media_type": media_type, "data": image_data},
+                        },
+                        {
+                            "type": "text",
+                            "text": input_text,
+                        },
+                    ],
+                }
+            ],
+        )
+        return response.content[0].text
+
     def get_structured_output(
         self,
         prompt: str,
