@@ -55,7 +55,6 @@ class Paper(LanceModel):
     report_no: Optional[str]
     categories: str
     license: Optional[str]
-    # We remove the Vector type hint from here to stop PyArrow from choking
     abstract: str 
     update_date: str
 
@@ -64,18 +63,17 @@ def migrate(skip=0, limit=10000):
     db = lancedb.connect("backend/data/arxiv_lancedb")
     VALID_FIELDS = set(Paper.model_fields.keys())
     table_name = "papers"
-    
+    # Check if table already exists from a previous run
+    if table_name in db.list_tables().tables:
+        table = db.open_table(table_name)
+    else:
+        table = None
     print(f"Starting migration: skipping first {skip} papers, processing {limit}...")
 
     with open("backend/data/arxiv.json", "rb") as f:
         parser = ijson.items(f, '', multiple_values=True)
         batch = []
-        table = None
         count_this_session = 0
-        
-        # Check if table already exists from a previous run
-        if table_name in db.list_tables():
-            table = db.open_table(table_name)
         
         for idx, paper in enumerate(parser):
             # Skip logic based on your function argument
@@ -86,7 +84,7 @@ def migrate(skip=0, limit=10000):
             batch.append(record)
             
             if len(batch) >= 1000:
-                # Build rich context for embedding
+                # Build rich context for embedding ((TODO: add number of citations, publication date, authors?? maybe mcp blocks those?))
                 texts = [
                     f"Title: {item['title']}\nCategories: {item['categories']}\nAbstract: {item['abstract']}" 
                     for item in batch
@@ -96,8 +94,8 @@ def migrate(skip=0, limit=10000):
                     r["vector"] = vectors[i]
                 
                 if table is None:
-                    # Create for the very first run
-                    table = db.create_table(table_name, data=batch, mode="overwrite")
+                    print("Creating new table. Deleting existing data if any...")
+                    table = db.create_table(table_name, data=batch, mode="create")
                 else:
                     # Append for all subsequent runs
                     table.add(batch)
@@ -118,7 +116,8 @@ def migrate(skip=0, limit=10000):
                 r["vector"] = vectors[i]
             
             if table is None:
-                table = db.create_table(table_name, data=batch, mode="overwrite")
+                print("Creating new table. Deleting existing data if any...")
+                table = db.create_table(table_name, data=batch, mode="create")
             else:
                 table.add(batch)
 
@@ -136,5 +135,5 @@ if __name__ == "__main__":
         print("Creating data directory...")
         os.makedirs("backend/data")
 
-    # Session 1: migrate(skip=0, limit=110000)
-    migrate(skip=110000, limit=10000)
+    # Session 1: migrate(skip=0, limit=2951000)
+    migrate(skip=2951540, limit=1000) 
