@@ -1,4 +1,8 @@
+# backend/requirements.txt
+
+# API
 anthropic
+bcrypt>=4.0.1
 fastapi
 instructor
 lancedb
@@ -6,14 +10,23 @@ langchain_anthropic
 langchain_core
 langgraph
 mcp
+minio
 pandas
 pydantic
 pydantic-settings
-python-jose[cryptography]
-bcrypt>=4.0.1
-python-multipart
-python-dotenv
 pymongo
+python-dotenv
+python-jose[cryptography]
+python-multipart
 sqlmodel
 tzdata
 uvicorn
+
+# ML / Processing
+ijson
+numpy
+tantivy
+torch
+torchvision
+torchaudio
+transformers
