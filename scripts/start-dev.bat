@@ -1,13 +1,11 @@
 @echo off
 echo Starting backend...
 
-cd /d "%~dp0..\backend"
-
 REM Activate API environment
-call .venv\api\Scripts\activate.bat
+call backend\.venv\api\Scripts\activate.bat
 
 REM Start backend
-start cmd /k ""%CD%\.venv\api\Scripts\python.exe" -m uvicorn app.main:app --reload --port 8000"
+start cmd /k "python -m uvicorn app.main:app --reload --port 8000 --app-dir backend"
 
 timeout /t 2
 
