@@ -1,5 +1,11 @@
+anthropic
 fastapi
+instructor
 lancedb
+langchain_anthropic
+langchain_core
+langgraph
+mcp
 pandas
 pydantic
 pydantic-settings
@@ -7,6 +13,7 @@ python-jose[cryptography]
 bcrypt>=4.0.1
 python-multipart
 python-dotenv
+pymongo
 sqlmodel
 tzdata
 uvicorn
