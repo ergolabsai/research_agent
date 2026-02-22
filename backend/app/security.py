@@ -15,8 +15,6 @@ ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 15
 REFRESH_TOKEN_EXPIRE_DAYS = 7
 
-if not os.path.exists("data"):
-    os.makedirs("data")
 engine = create_engine(settings.database_url, connect_args={"check_same_thread": False})
 
 
