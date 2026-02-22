@@ -9,12 +9,15 @@ import {
 } from "@mui/material";
 import { useState, useEffect } from "react";
 import { documentsAPI } from "../api";
+import { Attachment } from "../types";
 import {
   Functions as MathIcon,
   Psychology as LogicIcon,
   LineStyle as FormatterIcon,
   LocalLibrary as LibrarianIcon,
   Insights as PlotsIcon,
+  AttachFile as AttachFileIcon,
+  Delete as DeleteIcon,
 } from "@mui/icons-material";
 
 export const EditorPage = () => {
@@ -25,6 +28,29 @@ export const EditorPage = () => {
   const [content, setContent] = useState("");
   const [hoveredIcon, setHoveredIcon] = useState<string | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [isLoadingAttachments, setIsLoadingAttachments] = useState(false);
+  const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
+
+  const formatFileSize = (sizeInBytes: number) => {
+    if (sizeInBytes < 1024) return `${sizeInBytes} B`;
+    if (sizeInBytes < 1024 * 1024)
+      return `${(sizeInBytes / 1024).toFixed(1)} KB`;
+    return `${(sizeInBytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
+  const loadAttachments = async (documentId: number) => {
+    setIsLoadingAttachments(true);
+    try {
+      const response = await documentsAPI.listAttachments(documentId);
+      setAttachments(response.data || []);
+    } catch (err) {
+      console.error("Failed to load attachments:", err);
+      setAttachments([]);
+    } finally {
+      setIsLoadingAttachments(false);
+    }
+  };
 
   useEffect(() => {
     const loadDocument = async () => {
@@ -41,6 +67,11 @@ export const EditorPage = () => {
     };
 
     loadDocument();
+  }, [id]);
+
+  useEffect(() => {
+    if (!id) return;
+    loadAttachments(Number(id));
   }, [id]);
 
   useEffect(() => {
@@ -65,6 +96,35 @@ export const EditorPage = () => {
   const handleFormatter = () => {};
   const handleLibrarian = () => {};
   const handlePlots = () => {};
+
+  const handleAttachmentUpload = async (
+    event: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const file = event.target.files?.[0];
+    if (!file || !id) return;
+
+    setIsUploadingAttachment(true);
+    try {
+      await documentsAPI.uploadAttachment(Number(id), file);
+      await loadAttachments(Number(id));
+    } catch (err) {
+      console.error("Failed to upload attachment:", err);
+    } finally {
+      setIsUploadingAttachment(false);
+      event.target.value = "";
+    }
+  };
+
+  const handleRemoveAttachment = async (attachmentId: number) => {
+    if (!id) return;
+
+    try {
+      await documentsAPI.deleteAttachment(Number(id), attachmentId);
+      await loadAttachments(Number(id));
+    } catch (err) {
+      console.error("Failed to delete attachment:", err);
+    }
+  };
 
   const buttons = [
     { id: "math", label: "Math", icon: MathIcon, handler: handleMath },
@@ -206,6 +266,75 @@ export const EditorPage = () => {
           onChange={(e) => setContent(e.target.value)}
           sx={{ mt: 0 }}
         />
+
+        <Box
+          sx={{ mt: 2, pt: 2, borderTop: "1px solid " + theme.palette.divider }}
+        >
+          <Stack
+            direction="row"
+            sx={{
+              alignItems: "center",
+              justifyContent: "space-between",
+              mb: 1,
+            }}
+          >
+            <Typography variant="subtitle2">Attachments</Typography>
+            <Button
+              variant="outlined"
+              size="small"
+              component="label"
+              startIcon={<AttachFileIcon />}
+              disabled={!id || isUploadingAttachment}
+            >
+              {isUploadingAttachment ? "Uploading..." : "Upload"}
+              <input hidden type="file" onChange={handleAttachmentUpload} />
+            </Button>
+          </Stack>
+
+          {isLoadingAttachments ? (
+            <Typography variant="body2" color="text.secondary">
+              Loading attachments...
+            </Typography>
+          ) : attachments.length === 0 ? (
+            <Typography variant="body2" color="text.secondary">
+              No attachments yet.
+            </Typography>
+          ) : (
+            <Stack spacing={1}>
+              {attachments.map((attachment) => (
+                <Box
+                  key={attachment.id}
+                  sx={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    border: "1px solid " + theme.palette.divider,
+                    borderRadius: "8px",
+                    px: 1.5,
+                    py: 1,
+                  }}
+                >
+                  <Box sx={{ minWidth: 0 }}>
+                    <Typography variant="body2" noWrap>
+                      {attachment.filename}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {formatFileSize(attachment.size)}
+                    </Typography>
+                  </Box>
+                  <Button
+                    size="small"
+                    color="error"
+                    startIcon={<DeleteIcon />}
+                    onClick={() => handleRemoveAttachment(attachment.id)}
+                  >
+                    Remove
+                  </Button>
+                </Box>
+              ))}
+            </Stack>
+          )}
+        </Box>
       </Box>
     </Box>
   );

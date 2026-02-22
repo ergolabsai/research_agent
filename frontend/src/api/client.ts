@@ -5,6 +5,7 @@ import {
   PipelineJob,
   ValidateRequest,
   ValidationResult,
+  Attachment,
 } from "../types";
 
 let currentAccessToken: string | null = null;
@@ -151,6 +152,20 @@ export const documentsAPI = {
 
   unshare: (id: number, userId: number) =>
     api.delete(`/documents/${id}/share/${userId}`),
+
+  listAttachments: (id: number) =>
+    api.get<Attachment[]>(`/documents/${id}/attachments`),
+
+  uploadAttachment: (id: number, file: File) => {
+    const formData = new FormData();
+    formData.append("file", file);
+    return api.post<Attachment>(`/documents/${id}/attachments`, formData, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
+  },
+
+  deleteAttachment: (documentId: number, attachmentId: number) =>
+    api.delete(`/documents/${documentId}/attachments/${attachmentId}`),
 };
 
 // Workspaces endpoints
@@ -184,8 +199,7 @@ export const pipelineAPI = {
   validate: (request: ValidateRequest) =>
     api.post<PipelineJob>("/pipeline/validate", request),
 
-  status: (jobId: string) =>
-    api.get<PipelineJob>(`/pipeline/status/${jobId}`),
+  status: (jobId: string) => api.get<PipelineJob>(`/pipeline/status/${jobId}`),
 
   results: (jobId: string) =>
     api.get<ValidationResult>(`/pipeline/results/${jobId}`),
