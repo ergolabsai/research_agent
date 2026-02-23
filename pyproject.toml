@@ -6,7 +6,7 @@ requires-python = ">=3.11"
 dependencies = [
     # LLM & AI
     "anthropic>=0.40.0",
-    "instructor>=1.0.0",
+    "tenacity>=8.0.0",
     "langchain>=0.3.0",
     "langchain-anthropic>=0.3.0",
     "langgraph>=0.2.0",

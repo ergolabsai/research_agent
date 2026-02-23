@@ -1,6 +1,6 @@
+from typing import Dict, List, Optional
+
 from pymongo import MongoClient
-from typing import Optional, Dict, List
-from datetime import datetime
 
 from advisor_pipeline.config.settings import settings
 from advisor_pipeline.models.schemas import PaperDocument, ValidationDocument, ValidationResult
@@ -44,7 +44,7 @@ class Database:
     def save_paper(self, paper: PaperDocument) -> str:
         """Save a paper document."""
         paper_dict = paper.model_dump()
-        result = self.papers_collection.update_one(
+        self.papers_collection.update_one(
             {"paper_id": paper.paper_id},
             {"$set": paper_dict},
             upsert=True

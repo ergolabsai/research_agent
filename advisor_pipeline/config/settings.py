@@ -1,7 +1,8 @@
 import os
-from pydantic_settings import BaseSettings
 from typing import Optional
+
 import dotenv
+from pydantic_settings import BaseSettings
 
 dotenv.load_dotenv()
 
@@ -24,6 +25,8 @@ class Settings(BaseSettings):
     # MCP Server
     mcp_server_url: Optional[str] = os.getenv("MCP_SERVER_URL", None)
     mcp_server_command: Optional[str] = os.getenv("MCP_SERVER_COMMAND", None)
+    advisor_mcp_command: Optional[str] = os.getenv("ADVISOR_MCP_COMMAND", None)
+    calculator_mcp_command: Optional[str] = os.getenv("CALCULATOR_MCP_COMMAND", None)
 
     # LLM Settings
     model_name: str = os.getenv("MODEL_NAME", "claude-sonnet-4-20250514")
