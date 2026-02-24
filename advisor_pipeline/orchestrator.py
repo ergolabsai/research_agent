@@ -16,15 +16,13 @@ from advisor_pipeline.database import Database
 from advisor_pipeline.llm import get_structured_output, invoke_text
 from advisor_pipeline.mcp_servers.advisor_server.prompts import (
     EVIDENCE_FINDER,
-    LIBRARIAN,
+    CONTEXT_MAKER,
     LOGIC_MAPPER,
     RESULTS_COMPILER,
     SYSTEM_PROMPT,
 )
-from advisor_pipeline.mcp_servers.advisor_server.tools import _encode_image as encode_image
 from advisor_pipeline.models.schemas import (
     CitationCheck,
-    ContextRequest,
     FigureEvaluation,
     MathEvaluation,
     OverAllReview,
@@ -41,31 +39,25 @@ from advisor_pipeline.models.schemas import (
 
 class AdvisorState(TypedDict, total=False):
     # Inputs
-    paper_id: str
-    paper_folder: Path
-    save_to_db: bool
-    bibliography: Dict[str, str]
-
-    # Populated by make_context
     paper_text: str
     figures: Dict[str, Dict[str, str]]
+    bibliography: Dict[str, str]
+    save_to_db: bool
+
+    # Populated by make_context
+    paper_context: str
 
     # Populated by map_logic
     paper_structure: PaperStructure
 
     # Populated by find_evidence
     step_evidence: list[StepEvidence]
+    evaluation_types_needed: list[str]
 
     # Evaluation results
     figure_evaluations: list[FigureEvaluation]
     math_evaluations: list[MathEvaluation]
     citation_checks: list[CitationCheck]
-
-    # Routing / context loop
-    needs_more_context: bool
-    context_requests: list[ContextRequest]
-    evaluation_types_needed: list[str]
-    context_loop_count: int
 
     # Final output
     validation_result: ValidationResult
@@ -77,36 +69,18 @@ class AdvisorState(TypedDict, total=False):
 
 
 def make_context_node(state: AdvisorState) -> dict:
-    """Load paper text and figures from disk (first call) or enrich context (subsequent)."""
-    context_loop = state.get("context_loop_count", 0)
-
-    if context_loop == 0:
-        # First pass — load from disk
-
-    # Subsequent passes — use librarian to enrich context
-    print(f"  Context enrichment pass {context_loop}...")
-    context_requests = state.get("context_requests", [])
-    if context_requests:
-        requests_text = "\n".join(
-            f"- {cr.question} (section: {cr.target_section}, reason: {cr.reason})"
-            for cr in context_requests
+    """make context to use going forward."""
+    print("STEP 1a: Make some context...")
+    context = invoke_text(
+        CONTEXT_MAKER.format(
+            paper_text=state["paper_text"],
         )
-        enrichment = invoke_text(
-            LIBRARIAN.format(
-                paper_text=state["paper_text"],
-                context_requests=requests_text,
-            )
-        )
-        # Append enrichment to paper text as additional context
-        paper_text = state["paper_text"] + f"\n\n--- Additional Context ---\n{enrichment}"
-    else:
-        paper_text = state["paper_text"]
+    )
+    # Append enrichment to paper text as additional context
+    paper_text = state["paper_text"] + f"\n\n--- Additional Context ---\n{context}"
 
     return {
         "paper_text": paper_text,
-        "context_loop_count": context_loop + 1,
-        "needs_more_context": False,
-        "context_requests": [],
     }
 
 
@@ -185,21 +159,15 @@ def find_evidence_node(state: AdvisorState) -> dict:
     eval_types = []
     if has_figures:
         eval_types.append("figures")
-    if has_math:
-        eval_types.append("math")
-    if has_citations:
-        eval_types.append("citations")
+    # if has_math:
+    #     eval_types.append("math")
+    # if has_citations:
+    #     eval_types.append("citations")
 
     return {
         "step_evidence": all_step_evidence,
         "evaluation_types_needed": eval_types,
-        "needs_more_context": False,
     }
-
-
-def route_evaluations_node(state: AdvisorState) -> dict:
-    """Pass-through node for conditional routing to evaluation branches."""
-    return {}
 
 
 def evaluate_figures_node(state: AdvisorState) -> dict:
@@ -221,14 +189,7 @@ def evaluate_figures_node(state: AdvisorState) -> dict:
                 figure_claims[ev.location].append(
                     {
                         "supports_step": ev.supports_step,
-                        "claim": next(
-                            (
-                                step.description
-                                for step in paper_structure.logical_steps
-                                if step.step_number == ev.supports_step
-                            ),
-                            "Unknown claim",
-                        ),
+                        "claim": paper_structure.logical_steps[ev.supports_step-1].description
                     }
                 )
 
@@ -499,15 +460,6 @@ def _calculate_confidence(
 # Conditional routing functions
 # ---------------------------------------------------------------------------
 
-MAX_CONTEXT_LOOPS = 2
-
-
-def should_loop_back(state: AdvisorState) -> str:
-    """After find_evidence, decide whether to loop back for more context."""
-    if state.get("needs_more_context") and state.get("context_loop_count", 0) <= MAX_CONTEXT_LOOPS:
-        return "make_context"
-    return "route_evaluations"
-
 
 def get_evaluation_branches(state: AdvisorState) -> list[str]:
     """Determine which evaluation branches to run based on evidence found."""
@@ -515,10 +467,10 @@ def get_evaluation_branches(state: AdvisorState) -> list[str]:
     branches = []
     if "figures" in eval_types:
         branches.append("evaluate_figures")
-    if "math" in eval_types:
-        branches.append("evaluate_math")
-    if "citations" in eval_types:
-        branches.append("check_citations")
+    # if "math" in eval_types:
+    #     branches.append("evaluate_math")
+    # if "citations" in eval_types:
+    #     branches.append("check_citations")
     if not branches:
         branches.append("compile_results")
     return branches
@@ -536,10 +488,9 @@ def _build_graph() -> StateGraph:
     workflow.add_node("make_context", make_context_node)
     workflow.add_node("map_logic", map_logic_node)
     workflow.add_node("find_evidence", find_evidence_node)
-    workflow.add_node("route_evaluations", route_evaluations_node)
     workflow.add_node("evaluate_figures", evaluate_figures_node)
-    workflow.add_node("evaluate_math", evaluate_math_node)
-    workflow.add_node("check_citations", check_citations_node)
+    # workflow.add_node("evaluate_math", evaluate_math_node)
+    # workflow.add_node("check_citations", check_citations_node)
     workflow.add_node("compile_results", compile_results_node)
 
     # Edges
@@ -547,29 +498,26 @@ def _build_graph() -> StateGraph:
     workflow.add_edge("make_context", "map_logic")
     workflow.add_edge("map_logic", "find_evidence")
 
-    # Conditional: after find_evidence, loop back or proceed
-    workflow.add_conditional_edges(
-        "find_evidence",
-        should_loop_back,
-        {"make_context": "make_context", "route_evaluations": "route_evaluations"},
-    )
 
+    #COMENTING OUT OTHER TYPES OF CHECKS FOR NOW
     # Conditional: route to evaluation branches
-    workflow.add_conditional_edges(
-        "route_evaluations",
-        get_evaluation_branches,
-        {
-            "evaluate_figures": "evaluate_figures",
-            "evaluate_math": "evaluate_math",
-            "check_citations": "check_citations",
-            "compile_results": "compile_results",
-        },
-    )
+    # workflow.add_conditional_edges(
+    #     "find_evidence",
+    #     get_evaluation_branches,
+    #     {
+    #         "evaluate_figures": "evaluate_figures",
+    #         "evaluate_math": "evaluate_math",
+    #         "check_citations": "check_citations",
+    #         "compile_results": "compile_results",
+    #     },
+    # )
+
+    workflow.add_edge("find_evidence", "evaluate_figures")
 
     # All evaluation branches converge on compile_results
     workflow.add_edge("evaluate_figures", "compile_results")
-    workflow.add_edge("evaluate_math", "compile_results")
-    workflow.add_edge("check_citations", "compile_results")
+    # workflow.add_edge("evaluate_math", "compile_results")
+    # workflow.add_edge("check_citations", "compile_results")
     workflow.add_edge("compile_results", END)
 
     return workflow
@@ -604,10 +552,10 @@ class AdvisorOrchestrator:
 
     def run(
         self,
-        paper_id: str,
-        paper_folder: Path,
+        paper_text: str = None,
+        figures: Dict[str, Dict[str, str]] = None,
+        paper_bib: Dict[str, str] | None = None,
         save_to_db: bool = True,
-        bibliography: Dict[str, str] | None = None,
     ) -> ValidationResult:
         """Run the complete validation pipeline on a paper.
 
@@ -622,16 +570,13 @@ class AdvisorOrchestrator:
         """
         print(f"\n{'=' * 60}")
         print("Running validation pipeline")
-        print(f"Paper ID: {paper_id}")
         print(f"{'=' * 60}\n")
 
         initial_state: AdvisorState = {
-            "paper_id": paper_id,
-            "paper_folder": paper_folder,
+            "paper_text": paper_text,
+            "figures": figures,
+            "bibliography": paper_bib or {},
             "save_to_db": save_to_db,
-            "bibliography": bibliography or {},
-            "context_loop_count": 0,
-            "needs_more_context": False,
             "figure_evaluations": [],
             "math_evaluations": [],
             "citation_checks": [],

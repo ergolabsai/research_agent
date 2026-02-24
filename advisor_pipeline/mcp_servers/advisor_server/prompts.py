@@ -17,6 +17,19 @@ You are looking for mistakes in logic and you should not assume their results ar
 
 
 # ---------------------------------------------------------------------------
+# Context Enrichment (new — librarian)
+# ---------------------------------------------------------------------------
+
+CONTEXT_MAKER = """You are a research librarian helping to gather context for paper evaluation.
+Generate context that will not bias you towards the authors conclusions by looking through papers that are related to this paper's topic.
+Avoid including papers that include the authors in this paper.
+
+Paper text:
+{paper_text}
+"""
+
+
+# ---------------------------------------------------------------------------
 # Logic Mapping (from logic_mapping_agent.py)
 # ---------------------------------------------------------------------------
 
@@ -220,22 +233,6 @@ Write a comprehensive review that:
 
 
 # ---------------------------------------------------------------------------
-# Context Enrichment (new — librarian)
-# ---------------------------------------------------------------------------
-
-LIBRARIAN = """You are a research librarian helping to gather context for paper evaluation.
-
-Paper text:
-{paper_text}
-
-Context requests:
-{context_requests}
-
-For each request, extract the relevant information from the paper text.
-Be thorough and precise — the evaluation agents depend on accurate context."""
-
-
-# ---------------------------------------------------------------------------
 # MCP Prompt registry (name -> template mapping)
 # ---------------------------------------------------------------------------
 
@@ -251,5 +248,5 @@ PROMPT_REGISTRY = {
     "citation_verifier": CITATION_VERIFIER,
     "citation_reporter": CITATION_REPORTER,
     "results_compiler": RESULTS_COMPILER,
-    "librarian": LIBRARIAN,
+    "librarian": CONTEXT_MAKER,
 }

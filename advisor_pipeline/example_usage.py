@@ -12,18 +12,25 @@ from pathlib import Path
 
 from advisor_pipeline.database import Database
 from advisor_pipeline.orchestrator import AdvisorOrchestrator
+from utils import load_paper
 
 
 def example_basic_usage():
     """Basic example: Run pipeline on a paper without database."""
+
+    loaded_paper = load_paper.load_paper_from_file(
+        paper_file=Path('/Users/chelsea/python_projects/project_files/shumlak2009_latex/main_text.tex'),
+        figure_folder=Path('/Users/chelsea/python_projects/project_files/shumlak2009_latex/images'),
+        bib_file=Path('/Users/chelsea/python_projects/project_files/shumlak2009_latex/bib.tex'))
 
     # Initialize orchestrator (no database for this basic example)
     orchestrator = AdvisorOrchestrator()
 
     # Run validation
     result = orchestrator.run(
-        paper_text=Path("/Users/chelsea/python_projects/project_files/shumlak2009_latex"),
-        paper_bib=
+        paper_text=loaded_paper["paper_text"],
+        figures=loaded_paper["figures"],
+        paper_bib=loaded_paper["bib_text"],
         save_to_db=False,
     )
 

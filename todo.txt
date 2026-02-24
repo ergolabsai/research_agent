@@ -1,2 +1,9 @@
-Check that the figure names are correct after the figure_evaluator
-Get the figure evaluator working
+Add back in needing more context, as necessary, when it makes sense
+Get the agent to look over everything for consistency - can it catch that the two figures should have the same shot numbers?
+- something like, based on the structure/attributes of this evidence, is there any evidence that suspect?
+- Or does it seem like the authors are selectively displaying certain data?
+- Would you have expected the evidence to be presented in a different way?
+Check that evidence is actually using the figure names.
+Graph database for persistence?
+Fix advisor type definitions
+consolidate get_evaluation_branches
