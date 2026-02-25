@@ -1,0 +1,36 @@
+from advisor_pipeline.models.paper_graph import load_graph
+
+G = load_graph("/Users/chelsea/python_projects/project_files/shumlak2009_latex/paper_graph.json")
+
+from pyvis.network import Network
+
+net = Network(directed=True)
+
+for node_id, data in G.nodes(data=True):
+    node_type = data.get("node_type", "")
+
+    if node_type == "figure":
+        title = (
+                f"Figure: {data.get('figure_name')}\n\n"
+                f"Actual: {data.get('actual_description')}\n\n"
+                f"Expected: {data.get('expected_description')}\n\n"
+                f"Similarities:\n" + "\n".join(f"  - {s}" for s in data.get("similarities", [])) +
+                f"\n\nDifferences:\n" + "\n".join(f"  - {d}" for d in data.get("differences", []))
+        )
+    elif node_type == "step":
+        title = f"Step {data.get('step_number')}: {data.get('description')}"
+    elif node_type == "evidence":
+        title = f"Evidence ({data.get('evidence_type')}): {data.get('description')}"
+    elif node_type == "math":
+        title = f"{data.get('equation_reference')}\nValid: {data.get('calculation_valid')}\n{data.get('details')}"
+    elif node_type == "citation":
+        title = f"{data.get('citation')}\nAccessible: {data.get('accessible')}\nSupports claim: {data.get('supports_claim')}"
+    else:
+        title = str(data)
+
+    net.add_node(node_id, label=node_id, title=title)
+
+for u, v, data in G.edges(data=True):
+    net.add_edge(u, v, title=data.get("edge_type", ""))
+
+net.write_html("/Users/chelsea/python_projects/project_files/shumlak2009_latex/paper_graph.html")

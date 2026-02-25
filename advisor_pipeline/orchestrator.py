@@ -7,8 +7,9 @@ Replaces the old linear pipeline.py with a flexible graph that supports:
 """
 
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Dict, Optional
 
+import networkx as nx
 from langgraph.graph import END, START, StateGraph
 from typing_extensions import TypedDict
 
@@ -20,6 +21,10 @@ from advisor_pipeline.mcp_servers.advisor_server.prompts import (
     LOGIC_MAPPER,
     RESULTS_COMPILER,
     SYSTEM_PROMPT,
+)
+from advisor_pipeline.models.paper_graph import (
+    build_paper_graph,
+    save_graph,
 )
 from advisor_pipeline.models.schemas import (
     CitationCheck,
@@ -43,6 +48,7 @@ class AdvisorState(TypedDict, total=False):
     figures: Dict[str, Dict[str, str]]
     bibliography: Dict[str, str]
     save_to_db: bool
+    output_folder: str  # folder path to save the final paper graph
 
     # Populated by make_context
     paper_context: str
@@ -53,6 +59,9 @@ class AdvisorState(TypedDict, total=False):
     # Populated by find_evidence
     step_evidence: list[StepEvidence]
     evaluation_types_needed: list[str]
+
+    # Paper graph (built after find_evidence, used by evaluation nodes)
+    paper_graph: nx.DiGraph
 
     # Evaluation results
     figure_evaluations: list[FigureEvaluation]
@@ -164,9 +173,18 @@ def find_evidence_node(state: AdvisorState) -> dict:
     # if has_citations:
     #     eval_types.append("citations")
 
+    # Build the paper graph from structure + evidence
+    paper_graph = build_paper_graph(
+        paper_structure=paper_structure,
+        step_evidence=all_step_evidence,
+        paper_id=state.get("paper_id", "unknown"),
+    )
+    print(f"  Built paper graph: {paper_graph.number_of_nodes()} nodes, {paper_graph.number_of_edges()} edges")
+
     return {
         "step_evidence": all_step_evidence,
         "evaluation_types_needed": eval_types,
+        "paper_graph": paper_graph,
     }
 
 
@@ -189,7 +207,7 @@ def evaluate_figures_node(state: AdvisorState) -> dict:
                 figure_claims[ev.location].append(
                     {
                         "supports_step": ev.supports_step,
-                        "claim": paper_structure.logical_steps[ev.supports_step-1].description
+                        "claim": paper_structure.logical_steps[ev.supports_step - 1].description,
                     }
                 )
 
@@ -267,6 +285,16 @@ def compile_results_node(state: AdvisorState) -> dict:
     math_evals: list[MathEvaluation] = state.get("math_evaluations", [])
     citation_checks: list[CitationCheck] = state.get("citation_checks", [])
 
+    # Build final graph with all evaluation results
+    G = build_paper_graph(
+        paper_structure=paper_structure,
+        step_evidence=step_evidence,
+        figure_evaluations=figure_evals,
+        math_evaluations=math_evals,
+        citation_checks=citation_checks,
+        paper_id=state.get("paper_id", "unknown"),
+    )
+
     # Organize validations by step
     step_validations = _organize_by_step(step_evidence, figure_evals, math_evals, citation_checks)
 
@@ -312,7 +340,14 @@ def compile_results_node(state: AdvisorState) -> dict:
         except Exception as e:
             print(f"  Warning: could not save validation to DB: {e}")
 
-    return {"validation_result": result}
+    # Save graph to output folder
+    output_folder = state.get("output_folder")
+    if output_folder:
+        graph_path = Path(output_folder) / "paper_graph.json"
+        save_graph(G, graph_path)
+        print(f"  Paper graph saved to {graph_path}")
+
+    return {"validation_result": result, "paper_graph": G}
 
 
 # ---------------------------------------------------------------------------
@@ -325,8 +360,8 @@ def _organize_by_step(
     figure_evals: list[FigureEvaluation],
     math_evals: list[MathEvaluation],
     citation_checks: list[CitationCheck],
-) -> Dict[int, Dict[str, Any]]:
-    step_validations: Dict[int, Dict[str, Any]] = {}
+) -> Dict[int, Dict]:
+    step_validations: Dict[int, Dict] = {}
 
     for step_ev in step_evidence:
         step_num = step_ev.step_number
@@ -556,14 +591,16 @@ class AdvisorOrchestrator:
         figures: Dict[str, Dict[str, str]] = None,
         paper_bib: Dict[str, str] | None = None,
         save_to_db: bool = True,
+        output_folder: str | Path | None = None,
     ) -> ValidationResult:
         """Run the complete validation pipeline on a paper.
 
         Args:
-            paper_id: Unique identifier for the paper.
-            paper_folder: Path to the folder containing main_text.tex and images/.
+            paper_text: Full text of the paper.
+            figures: Dict mapping figure names to image data.
+            paper_bib: Dict of citation references.
             save_to_db: Whether to save results to database.
-            bibliography: Dict of citation references.
+            output_folder: Folder path to save the final paper graph JSON.
 
         Returns:
             ValidationResult with complete assessment.
@@ -577,6 +614,7 @@ class AdvisorOrchestrator:
             "figures": figures,
             "bibliography": paper_bib or {},
             "save_to_db": save_to_db,
+            "output_folder": str(output_folder) if output_folder else "",
             "figure_evaluations": [],
             "math_evaluations": [],
             "citation_checks": [],

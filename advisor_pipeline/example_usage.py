@@ -18,20 +18,24 @@ from utils import load_paper
 def example_basic_usage():
     """Basic example: Run pipeline on a paper without database."""
 
+    paper_folder = Path('/Users/chelsea/python_projects/project_files/shumlak2009_latex')
+
     loaded_paper = load_paper.load_paper_from_file(
-        paper_file=Path('/Users/chelsea/python_projects/project_files/shumlak2009_latex/main_text.tex'),
-        figure_folder=Path('/Users/chelsea/python_projects/project_files/shumlak2009_latex/images'),
-        bib_file=Path('/Users/chelsea/python_projects/project_files/shumlak2009_latex/bib.tex'))
+        paper_file=paper_folder / 'main_text.tex',
+        figure_folder=paper_folder / 'images',
+        bib_file=paper_folder / 'bib.tex')
 
     # Initialize orchestrator (no database for this basic example)
     orchestrator = AdvisorOrchestrator()
 
     # Run validation
+
     result = orchestrator.run(
         paper_text=loaded_paper["paper_text"],
         figures=loaded_paper["figures"],
         paper_bib=loaded_paper["bib_text"],
         save_to_db=False,
+        output_folder=paper_folder,
     )
 
     # Display results

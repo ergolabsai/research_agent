@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     calculator_mcp_command: Optional[str] = os.getenv("CALCULATOR_MCP_COMMAND", None)
 
     # LLM Settings
-    model_name: str = os.getenv("MODEL_NAME", "claude-sonnet-4-20250514")
+    model_name: str = os.getenv("MODEL_NAME", "claude-haiku-4-5-20251001")
     temperature: float = float(os.getenv("TEMPERATURE", "0.1"))
     max_tokens: int = int(os.getenv("MAX_TOKENS", "4000"))
 

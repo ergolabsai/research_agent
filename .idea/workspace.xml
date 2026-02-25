@@ -5,13 +5,13 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="6cc51746-4537-4c5e-965f-ef86103f3ff2" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/advisor_pipeline/models/paper_graph.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/advisor_pipeline/utils/graph_visualizer.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/advisor_pipeline/config/settings.py" beforeDir="false" afterPath="$PROJECT_DIR$/advisor_pipeline/config/settings.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/advisor_pipeline/example_usage.py" beforeDir="false" afterPath="$PROJECT_DIR$/advisor_pipeline/example_usage.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/advisor_pipeline/mcp_servers/advisor_server/prompts.py" beforeDir="false" afterPath="$PROJECT_DIR$/advisor_pipeline/mcp_servers/advisor_server/prompts.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/advisor_pipeline/models/paper_graph.py" beforeDir="false" afterPath="$PROJECT_DIR$/advisor_pipeline/models/paper_graph.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/advisor_pipeline/orchestrator.py" beforeDir="false" afterPath="$PROJECT_DIR$/advisor_pipeline/orchestrator.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/advisor_pipeline/utils/load_paper.py" beforeDir="false" afterPath="$PROJECT_DIR$/advisor_pipeline/utils/load_paper.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/todo.txt" beforeDir="false" afterPath="$PROJECT_DIR$/todo.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/pyproject.toml" beforeDir="false" afterPath="$PROJECT_DIR$/pyproject.toml" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -46,6 +46,7 @@
     "ModuleVcsDetector.initialDetectionPerformed": "true",
     "Python.critique_figure.executor": "Run",
     "Python.example_usage.executor": "Run",
+    "Python.graph_visualizer.executor": "Run",
     "Python.multi_step_paper_review.executor": "Debug",
     "Python.multistep_paper_review.executor": "Run",
     "Python.paper_review.executor": "Run",
@@ -54,6 +55,8 @@
     "RunOnceActivity.ShowReadmeOnStart": "true",
     "RunOnceActivity.TerminalTabsStorage.copyFrom.TerminalArrangementManager.252": "true",
     "RunOnceActivity.git.unshallow": "true",
+    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
+    "ai.playground.ignore.import.keys.banner.in.settings": "true",
     "git-widget-placeholder": "backend__only",
     "last_opened_file_path": "/Users/chelsea/python_projects/research_agent",
     "node.js.detected.package.eslint": "true",
@@ -65,30 +68,12 @@
     "vue.rearranger.settings.migration": "true"
   }
 }]]></component>
-  <component name="RunManager" selected="Python.example_usage">
-    <configuration name="critique_figure" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
-      <module name="research_agent" />
-      <option name="ENV_FILES" value="" />
-      <option name="INTERPRETER_OPTIONS" value="" />
-      <option name="PARENT_ENVS" value="true" />
-      <envs>
-        <env name="PYTHONUNBUFFERED" value="1" />
-      </envs>
-      <option name="SDK_HOME" value="" />
-      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
-      <option name="IS_MODULE_SDK" value="true" />
-      <option name="ADD_CONTENT_ROOTS" value="true" />
-      <option name="ADD_SOURCE_ROOTS" value="true" />
-      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/critique_figure.py" />
-      <option name="PARAMETERS" value="" />
-      <option name="SHOW_COMMAND_LINE" value="true" />
-      <option name="EMULATE_TERMINAL" value="false" />
-      <option name="MODULE_MODE" value="false" />
-      <option name="REDIRECT_INPUT" value="false" />
-      <option name="INPUT_FILE" value="" />
-      <method v="2" />
-    </configuration>
+  <component name="RecentsManager">
+    <key name="MoveFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/advisor_pipeline/utils" />
+    </key>
+  </component>
+  <component name="RunManager" selected="Python.graph_visualizer">
     <configuration name="example_usage" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="research_agent" />
       <option name="ENV_FILES" value="" />
@@ -99,7 +84,30 @@
       <option name="IS_MODULE_SDK" value="true" />
       <option name="ADD_CONTENT_ROOTS" value="true" />
       <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="RUN_TOOL" value="" />
       <option name="SCRIPT_NAME" value="$PROJECT_DIR$/advisor_pipeline/example_usage.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="true" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration name="graph_visualizer" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+      <module name="research_agent" />
+      <option name="ENV_FILES" value="" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/advisor_pipeline/utils" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="RUN_TOOL" value="" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/advisor_pipeline/utils/graph_visualizer.py" />
       <option name="PARAMETERS" value="" />
       <option name="SHOW_COMMAND_LINE" value="true" />
       <option name="EMULATE_TERMINAL" value="false" />
@@ -122,6 +130,7 @@
       <option name="ADD_CONTENT_ROOTS" value="true" />
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="RUN_TOOL" value="" />
       <option name="SCRIPT_NAME" value="$PROJECT_DIR$/agent_files/multi_step_paper_review.py" />
       <option name="PARAMETERS" value="" />
       <option name="SHOW_COMMAND_LINE" value="false" />
@@ -145,6 +154,7 @@
       <option name="ADD_CONTENT_ROOTS" value="true" />
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="RUN_TOOL" value="" />
       <option name="SCRIPT_NAME" value="$PROJECT_DIR$/paper_review.py" />
       <option name="PARAMETERS" value="" />
       <option name="SHOW_COMMAND_LINE" value="true" />
@@ -168,6 +178,7 @@
       <option name="ADD_CONTENT_ROOTS" value="true" />
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="RUN_TOOL" value="" />
       <option name="SCRIPT_NAME" value="$PROJECT_DIR$/paper_review_logic.py" />
       <option name="PARAMETERS" value="" />
       <option name="SHOW_COMMAND_LINE" value="true" />
@@ -178,26 +189,27 @@
       <method v="2" />
     </configuration>
     <list>
+      <item itemvalue="Python.graph_visualizer" />
       <item itemvalue="Python.example_usage" />
-      <item itemvalue="Python.critique_figure" />
       <item itemvalue="Python.multi_step_paper_review" />
       <item itemvalue="Python.paper_review" />
       <item itemvalue="Python.paper_review_logic" />
     </list>
     <recent_temporary>
       <list>
+        <item itemvalue="Python.graph_visualizer" />
         <item itemvalue="Python.example_usage" />
         <item itemvalue="Python.paper_review_logic" />
         <item itemvalue="Python.paper_review" />
         <item itemvalue="Python.multi_step_paper_review" />
-        <item itemvalue="Python.critique_figure" />
       </list>
     </recent_temporary>
   </component>
   <component name="SharedIndexes">
     <attachedChunks>
       <set>
-        <option value="bundled-python-sdk-ce6832f46686-7b97d883f26b-com.jetbrains.pycharm.pro.sharedIndexes.bundled-PY-252.25557.178" />
+        <option value="bundled-js-predefined-d6986cc7102b-9b0f141eb926-JavaScript-PY-253.31033.139" />
+        <option value="bundled-python-sdk-2653e85de345-6d6dccd035ac-com.jetbrains.pycharm.pro.sharedIndexes.bundled-PY-253.31033.139" />
       </set>
     </attachedChunks>
   </component>
@@ -214,6 +226,7 @@
       <workItem from="1767933730518" duration="2483000" />
       <workItem from="1767937332090" duration="354000" />
       <workItem from="1767980820265" duration="1427000" />
+      <workItem from="1771957068381" duration="9422000" />
     </task>
     <servers />
   </component>
@@ -248,5 +261,8 @@
         </breakpoint>
       </default-breakpoints>
     </breakpoint-manager>
+  </component>
+  <component name="com.intellij.coverage.CoverageDataManagerImpl">
+    <SUITE FILE_PATH="coverage/research_agent$graph_visualizer.coverage" NAME="graph_visualizer Coverage Results" MODIFIED="1771974106118" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/advisor_pipeline/utils" />
   </component>
 </project>

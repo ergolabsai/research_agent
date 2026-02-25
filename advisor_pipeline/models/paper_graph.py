@@ -3,19 +3,15 @@
 Node types:
     - paper:        The paper itself
     - step:         A logical step in the paper's argument
-    - evidence:     A piece of evidence supporting a step
     - figure:       A figure evaluation result
     - math:         A math evaluation result
     - citation:     A citation check result
 
 Edge types:
-    - HAS_STEP:         paper -> step
-    - DEPENDS_ON:       step -> step
-    - SUPPORTED_BY:     step -> evidence
-    - IS_FIGURE:        evidence -> figure
-    - IS_MATH:          evidence -> math
-    - IS_CITATION:      evidence -> citation
-    - ASSESSES:         figure -> step  (carries confirmations/contradictions)
+    - HAS_STEP:     paper -> step
+    - DEPENDS_ON:   step -> step
+    - ASSESSES:     figure/math/citation -> step
+                    (carries location, description, confirmations/contradictions)
 """
 
 import json
@@ -26,6 +22,7 @@ import networkx as nx
 
 from advisor_pipeline.models.schemas import (
     CitationCheck,
+    Evidence,
     FigureEvaluation,
     MathEvaluation,
     PaperStructure,
@@ -88,30 +85,16 @@ def build_paper_graph(
             G.add_edge(step_node_id, f"step:{dep}", edge_type="DEPENDS_ON")
 
     # -------------------------------------------------------------------------
-    # Evidence nodes + SUPPORTED_BY edges
+    # Build a provenance lookup: location -> [Evidence]
+    # Used to attach provenance data to ASSESSES edges below
     # -------------------------------------------------------------------------
-    evidence_counts = {}  # track count per step for unique node ids
-
+    provenance: dict[str, list[Evidence]] = {}
     for step_ev in step_evidence:
-        step_node_id = f"step:{step_ev.step_number}"
         for ev in step_ev.evidence_list:
-            # Build a unique evidence node id
-            count = evidence_counts.get(step_ev.step_number, 0)
-            evidence_node_id = f"evidence:{step_ev.step_number}:{count}"
-            evidence_counts[step_ev.step_number] = count + 1
-
-            G.add_node(
-                evidence_node_id,
-                node_type="evidence",
-                evidence_type=ev.evidence_type,
-                description=ev.description,
-                location=ev.location,
-                supports_step=ev.supports_step,
-            )
-            G.add_edge(step_node_id, evidence_node_id, edge_type="SUPPORTED_BY")
+            provenance.setdefault(ev.location, []).append(ev)
 
     # -------------------------------------------------------------------------
-    # Figure evaluation nodes + IS_FIGURE and ASSESSES edges
+    # Figure evaluation nodes + ASSESSES edges
     # -------------------------------------------------------------------------
     for fig_eval in (figure_evaluations or []):
         fig_node_id = f"figure:{fig_eval.figure_name}"
@@ -125,18 +108,12 @@ def build_paper_graph(
             differences=fig_eval.comparison.differences,
         )
 
-        # Connect figure to its evidence node(s) via IS_FIGURE
-        for node_id, data in G.nodes(data=True):
-            if (
-                data.get("node_type") == "evidence"
-                and data.get("evidence_type") == "figure"
-                and data.get("location") == fig_eval.figure_name
-            ):
-                G.add_edge(node_id, fig_node_id, edge_type="IS_FIGURE")
-
-        # ASSESSES edges: figure -> step, with claim validity as edge properties
+        # ASSESSES edges: figure -> step
+        # Carries claim validity + provenance from the evidence finder
         for assessment in fig_eval.claim_assessments:
             step_node_id = f"step:{assessment.supports_step}"
+            ev_provenance = provenance.get(fig_eval.figure_name, [])
+            description = ev_provenance[0].description if ev_provenance else ""
             G.add_edge(
                 fig_node_id,
                 step_node_id,
@@ -144,55 +121,62 @@ def build_paper_graph(
                 claim=assessment.claim,
                 confirmations=assessment.validity.confirmations,
                 contradictions=assessment.validity.contradictions,
+                location=fig_eval.figure_name,
+                description=description,
             )
 
     # -------------------------------------------------------------------------
-    # Math evaluation nodes + IS_MATH edges
+    # Math evaluation nodes + ASSESSES edges
     # -------------------------------------------------------------------------
-    for i, math_eval in enumerate(math_evaluations or []):
-        math_node_id = f"math:{i}:{math_eval.equation_reference}"
+    for math_eval in (math_evaluations or []):
+        math_node_id = f"math:{math_eval.equation_reference}"
         G.add_node(
             math_node_id,
             node_type="math",
             equation_reference=math_eval.equation_reference,
-            supports_step=math_eval.supports_step,
             calculation_valid=math_eval.calculation_valid,
             details=math_eval.details,
             formula_used=math_eval.formula_used,
         )
 
-        # Connect math to its evidence node(s) via IS_MATH
-        for node_id, data in G.nodes(data=True):
-            if (
-                data.get("node_type") == "evidence"
-                and data.get("evidence_type") == "math"
-                and data.get("location") == math_eval.equation_reference
-            ):
-                G.add_edge(node_id, math_node_id, edge_type="IS_MATH")
+        step_node_id = f"step:{math_eval.supports_step}"
+        ev_provenance = provenance.get(math_eval.equation_reference, [])
+        description = ev_provenance[0].description if ev_provenance else ""
+        G.add_edge(
+            math_node_id,
+            step_node_id,
+            edge_type="ASSESSES",
+            location=math_eval.equation_reference,
+            description=description,
+            calculation_valid=math_eval.calculation_valid,
+        )
 
     # -------------------------------------------------------------------------
-    # Citation check nodes + IS_CITATION edges
+    # Citation check nodes + ASSESSES edges
     # -------------------------------------------------------------------------
-    for i, cit_check in enumerate(citation_checks or []):
-        cit_node_id = f"citation:{i}:{cit_check.citation[:40]}"
+    for cit_check in (citation_checks or []):
+        cit_node_id = f"citation:{cit_check.citation[:60]}"
         G.add_node(
             cit_node_id,
             node_type="citation",
             citation=cit_check.citation,
-            supports_step=cit_check.supports_step,
             accessible=cit_check.accessible,
             supports_claim=cit_check.supports_claim,
             notes=cit_check.notes,
         )
 
-        # Connect citation to its evidence node(s) via IS_CITATION
-        for node_id, data in G.nodes(data=True):
-            if (
-                data.get("node_type") == "evidence"
-                and data.get("evidence_type") == "citation"
-                and data.get("location") == cit_check.citation
-            ):
-                G.add_edge(node_id, cit_node_id, edge_type="IS_CITATION")
+        step_node_id = f"step:{cit_check.supports_step}"
+        ev_provenance = provenance.get(cit_check.citation, [])
+        description = ev_provenance[0].description if ev_provenance else ""
+        G.add_edge(
+            cit_node_id,
+            step_node_id,
+            edge_type="ASSESSES",
+            location=cit_check.citation,
+            description=description,
+            accessible=cit_check.accessible,
+            supports_claim=cit_check.supports_claim,
+        )
 
     return G
 
@@ -206,14 +190,11 @@ def build_graph_from_validation(result: ValidationResult) -> nx.DiGraph:
     Returns:
         A directed graph representing the paper's logical structure and evidence.
     """
-    # Extract step evidence from step_validations dict
     step_evidence = []
     for step_num, validation in result.step_validations.items():
-        from advisor_pipeline.models.schemas import Evidence, StepEvidence
         evidence_list = [Evidence(**ev) for ev in validation.get("evidence", [])]
         step_evidence.append(StepEvidence(step_number=step_num, evidence_list=evidence_list))
 
-    # Extract evaluation results
     figure_evaluations = []
     math_evaluations = []
     citation_checks = []
@@ -270,25 +251,25 @@ def get_steps(G: nx.DiGraph) -> list:
     )
 
 
-def get_evidence_for_step(G: nx.DiGraph, step_number: int) -> list:
-    """Return all evidence nodes connected to a given step."""
+def get_evaluation_nodes_for_step(G: nx.DiGraph, step_number: int) -> list:
+    """Return all figure/math/citation nodes that assess a given step."""
     step_node_id = f"step:{step_number}"
     return [
         G.nodes[n]
-        for n in G.successors(step_node_id)
-        if G.nodes[n].get("node_type") == "evidence"
+        for n in G.predecessors(step_node_id)
+        if G.nodes[n].get("node_type") in ("figure", "math", "citation")
     ]
 
 
-def get_steps_with_no_evidence(G: nx.DiGraph) -> list:
-    """Return logical steps that have no supporting evidence."""
+def get_steps_with_no_evaluation(G: nx.DiGraph) -> list:
+    """Return logical steps that have no figure/math/citation assessments."""
     return [
         data
         for _, data in G.nodes(data=True)
         if data.get("node_type") == "step"
         and not any(
-            G.nodes[n].get("node_type") == "evidence"
-            for n in G.successors(f"step:{data['step_number']}")
+            G.nodes[n].get("node_type") in ("figure", "math", "citation")
+            for n in G.predecessors(f"step:{data['step_number']}")
         )
     ]
 
@@ -309,7 +290,7 @@ def get_contradicted_steps(G: nx.DiGraph) -> list:
         if data.get("edge_type") == "ASSESSES" and data.get("contradictions"):
             contradicted.append({
                 "step": G.nodes[v],
-                "figure": G.nodes[u]["figure_name"],
+                "figure": G.nodes[u].get("figure_name"),
                 "contradictions": data["contradictions"],
             })
     return contradicted
