@@ -1,6 +1,6 @@
 """Shared LLM utilities replacing BaseAgent's dual-client pattern.
 
-Provides a single ChatAnthropic instance with helper methods for:
+Provides a single LLM instance (Anthropic or OpenRouter) with helper methods for:
 - Structured output via with_structured_output()
 - Vision calls with image content blocks
 - Simple text calls
@@ -9,6 +9,7 @@ Provides a single ChatAnthropic instance with helper methods for:
 from typing import Type, TypeVar
 
 from langchain_anthropic import ChatAnthropic
+from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import HumanMessage, SystemMessage
 from pydantic import BaseModel
 from tenacity import retry, stop_after_attempt, wait_exponential
@@ -17,19 +18,37 @@ from advisor_pipeline.config.settings import settings
 
 T = TypeVar("T", bound=BaseModel)
 
+
+def _build_llm() -> BaseChatModel:
+    """Build the LLM instance based on the configured provider."""
+    if settings.llm_provider == "openrouter":
+        from langchain_openai import ChatOpenAI
+
+        return ChatOpenAI(
+            model=settings.openrouter_model,
+            temperature=settings.temperature,
+            max_tokens=settings.max_tokens,
+            openai_api_key=settings.openrouter_api_key,
+            openai_api_base="https://openrouter.ai/api/v1",
+            timeout=settings.timeout_seconds,
+        )
+    else:
+        return ChatAnthropic(
+            model_name=settings.model_name,
+            temperature=settings.temperature,
+            max_tokens=settings.max_tokens,
+            api_key=settings.anthropic_api_key,
+            timeout=settings.timeout_seconds,
+            stop=None,
+        )
+
+
 # Single shared LLM instance
-_llm = ChatAnthropic(
-    model_name=settings.model_name,
-    temperature=settings.temperature,
-    max_tokens=settings.max_tokens,
-    api_key=settings.anthropic_api_key,
-    timeout=settings.timeout_seconds,
-    stop=None,
-)
+_llm = _build_llm()
 
 
-def get_llm() -> ChatAnthropic:
-    """Return the shared ChatAnthropic instance."""
+def get_llm() -> BaseChatModel:
+    """Return the shared LLM instance."""
     return _llm
 
 

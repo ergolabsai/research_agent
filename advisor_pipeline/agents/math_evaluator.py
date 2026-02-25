@@ -9,7 +9,7 @@ import re
 from typing import Dict, List
 
 from langchain_core.messages import HumanMessage
-from langchain_core.tools import Tool
+from langchain_core.tools import StructuredTool, Tool
 from langgraph.prebuilt import create_react_agent
 
 from advisor_pipeline.llm import get_llm, get_structured_output
@@ -78,30 +78,30 @@ class MathEvaluator:
                 return f"Error: {e}"
 
         return [
-            Tool(
-                name="call_mcp_calculator",
+            StructuredTool.from_function(
                 func=call_mcp_calculator,
+                name="call_mcp_calculator",
                 description=(
                     "Calculate unknown variable given formula and known values. "
-                    "Provide formula_name and known_values as JSON."
+                    "Provide formula_name and known_values as JSON string."
                 ),
             ),
-            Tool(
-                name="list_available_formulas",
+            StructuredTool.from_function(
                 func=list_available_formulas,
+                name="list_available_formulas",
                 description="Get list of all available formulas in the calculator",
             ),
-            Tool(
-                name="describe_formula",
+            StructuredTool.from_function(
                 func=describe_formula,
+                name="describe_formula",
                 description=(
                     "Get detailed information about a specific formula including "
                     "variables and units"
                 ),
             ),
-            Tool(
-                name="verify_calculation",
+            StructuredTool.from_function(
                 func=verify_calculation,
+                name="verify_calculation",
                 description="Verify that a complete set of values satisfies a formula equation",
             ),
         ]

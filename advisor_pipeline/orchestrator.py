@@ -168,10 +168,10 @@ def find_evidence_node(state: AdvisorState) -> dict:
     eval_types = []
     if has_figures:
         eval_types.append("figures")
-    # if has_math:
-    #     eval_types.append("math")
-    # if has_citations:
-    #     eval_types.append("citations")
+    if has_math:
+        eval_types.append("math")
+    if has_citations:
+        eval_types.append("citations")
 
     # Build the paper graph from structure + evidence
     paper_graph = build_paper_graph(
@@ -224,6 +224,7 @@ def evaluate_figures_node(state: AdvisorState) -> dict:
 def evaluate_math_node(state: AdvisorState) -> dict:
     """Evaluate math-based evidence."""
     from advisor_pipeline.agents.math_evaluator import MathEvaluator
+    from advisor_pipeline.mcp_client import CalculatorClient
 
     print("STEP 3b: Evaluating math-based evidence...")
     paper_structure: PaperStructure = state["paper_structure"]
@@ -238,12 +239,13 @@ def evaluate_math_node(state: AdvisorState) -> dict:
 
     claims = {step.step_number: step.description for step in paper_structure.logical_steps}
 
-    evaluator = MathEvaluator()
-    math_evaluations = evaluator.run(
-        evidence_list=math_evidence,
-        paper_text=state["paper_text"],
-        claims=claims,
-    )
+    with CalculatorClient() as client:
+        evaluator = MathEvaluator(mcp_client=client)
+        math_evaluations = evaluator.run(
+            evidence_list=math_evidence,
+            paper_text=state["paper_text"],
+            claims=claims,
+        )
     print(f"  Evaluated {len(math_evaluations)} math items")
     return {"math_evaluations": math_evaluations}
 
@@ -502,10 +504,10 @@ def get_evaluation_branches(state: AdvisorState) -> list[str]:
     branches = []
     if "figures" in eval_types:
         branches.append("evaluate_figures")
-    # if "math" in eval_types:
-    #     branches.append("evaluate_math")
-    # if "citations" in eval_types:
-    #     branches.append("check_citations")
+    if "math" in eval_types:
+        branches.append("evaluate_math")
+    if "citations" in eval_types:
+        branches.append("check_citations")
     if not branches:
         branches.append("compile_results")
     return branches
@@ -524,35 +526,18 @@ def _build_graph() -> StateGraph:
     workflow.add_node("map_logic", map_logic_node)
     workflow.add_node("find_evidence", find_evidence_node)
     workflow.add_node("evaluate_figures", evaluate_figures_node)
-    # workflow.add_node("evaluate_math", evaluate_math_node)
-    # workflow.add_node("check_citations", check_citations_node)
+    workflow.add_node("evaluate_math", evaluate_math_node)
+    workflow.add_node("check_citations", check_citations_node)
     workflow.add_node("compile_results", compile_results_node)
 
     # Edges
     workflow.add_edge(START, "make_context")
     workflow.add_edge("make_context", "map_logic")
     workflow.add_edge("map_logic", "find_evidence")
-
-
-    #COMENTING OUT OTHER TYPES OF CHECKS FOR NOW
-    # Conditional: route to evaluation branches
-    # workflow.add_conditional_edges(
-    #     "find_evidence",
-    #     get_evaluation_branches,
-    #     {
-    #         "evaluate_figures": "evaluate_figures",
-    #         "evaluate_math": "evaluate_math",
-    #         "check_citations": "check_citations",
-    #         "compile_results": "compile_results",
-    #     },
-    # )
-
     workflow.add_edge("find_evidence", "evaluate_figures")
-
-    # All evaluation branches converge on compile_results
-    workflow.add_edge("evaluate_figures", "compile_results")
-    # workflow.add_edge("evaluate_math", "compile_results")
-    # workflow.add_edge("check_citations", "compile_results")
+    workflow.add_edge("evaluate_figures", "evaluate_math")
+    workflow.add_edge("evaluate_math", "check_citations")
+    workflow.add_edge("check_citations", "compile_results")
     workflow.add_edge("compile_results", END)
 
     return workflow

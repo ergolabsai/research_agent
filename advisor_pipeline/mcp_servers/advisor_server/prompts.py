@@ -165,18 +165,22 @@ Based on the agent's work with the MCP calculator, determine:
 # Citation Checking (from citation_checker_agent.py)
 # ---------------------------------------------------------------------------
 
-CITATION_VERIFIER = """Verify this citation:
+CITATION_VERIFIER = """Verify this citation and assess whether it genuinely supports the claim.
 
 Citation reference: {citation_location}
 Full citation: {full_citation}
 Claim it supports: {claim}
-Context: {citation_description}
+How the citing paper uses this source: {citation_description}
 
 Tasks:
-1. Extract DOI if available
-2. Search for the paper in databases
-3. Check if it's accessible
-4. If accessible, get the abstract
+1. Extract the DOI if available
+2. Search for the paper in academic databases
+3. Get the abstract (which includes the Semantic Scholar URL and open-access PDF URL)
+4. If a URL is available, use fetch_paper_content to read the source's actual content
+5. **Critically compare** what the citing paper claims about this source vs. what the source actually says
+6. Assess whether the citation is used consistently with the source — does the source actually support the specific claim being made?
+
+Focus on identifying any misrepresentations, overstatements, or unsupported extrapolations from the cited source.
 """
 
 CITATION_REPORTER = """Create a citation verification report:
@@ -190,8 +194,12 @@ Agent's investigation:
 
 Determine:
 1. Whether the citation is accessible
-2. If accessible, whether it supports the claim
-3. Any notes about the verification
+2. Whether the source content is consistent with how it's referenced in the citing paper
+3. Whether the source actually supports the specific claim being made
+4. Any misrepresentations, overstatements, or unsupported extrapolations
+5. Overall assessment: does this citation genuinely support the claim?
+
+Include detailed notes about the consistency between the source and how it is cited.
 """
 
 

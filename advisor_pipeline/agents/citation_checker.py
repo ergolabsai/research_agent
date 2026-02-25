@@ -8,6 +8,7 @@ import re
 from typing import Dict, List
 
 import httpx
+from bs4 import BeautifulSoup
 from langchain_core.messages import HumanMessage
 from langchain_core.tools import Tool
 from langgraph.prebuilt import create_react_agent
@@ -106,7 +107,7 @@ class CitationChecker:
                 return f"Error: {e}"
 
         def get_paper_abstract(doi_or_url: str) -> str:
-            """Retrieve abstract of a cited paper via Semantic Scholar."""
+            """Retrieve abstract, URLs, and metadata of a cited paper via Semantic Scholar."""
             try:
                 identifier = doi_or_url.strip()
                 if identifier.startswith("10."):
@@ -115,7 +116,9 @@ class CitationChecker:
                     api_url = f"https://api.semanticscholar.org/graph/v1/paper/{identifier}"
 
                 response = httpx.get(
-                    api_url, params={"fields": "abstract,title,authors,year"}, timeout=10.0
+                    api_url,
+                    params={"fields": "abstract,title,authors,year,url,openAccessPdf"},
+                    timeout=10.0,
                 )
                 response.raise_for_status()
                 data = response.json()
@@ -124,10 +127,15 @@ class CitationChecker:
                 if len(authors_list) > 5:
                     author_names += " et al."
                 abstract = data.get("abstract", "No abstract available.")
+                s2_url = data.get("url", "N/A")
+                pdf_info = data.get("openAccessPdf")
+                pdf_url = pdf_info["url"] if pdf_info and pdf_info.get("url") else "Not available"
                 return (
                     f"Title: {data.get('title', 'Unknown')}\n"
                     f"Authors: {author_names}\n"
-                    f"Year: {data.get('year', 'Unknown')}\n\n"
+                    f"Year: {data.get('year', 'Unknown')}\n"
+                    f"Semantic Scholar URL: {s2_url}\n"
+                    f"Open Access PDF: {pdf_url}\n\n"
                     f"Abstract: {abstract}"
                 )
             except httpx.HTTPStatusError as e:
@@ -136,6 +144,43 @@ class CitationChecker:
                 return f"HTTP error: {e.response.status_code}"
             except Exception as e:
                 return f"Error: {e}"
+
+        def fetch_paper_content(url: str) -> str:
+            """Fetch and extract readable text content from a paper URL.
+
+            Use this to read the content of a paper's web page (e.g. Semantic Scholar
+            page or open-access HTML). For PDF URLs, returns a note suggesting
+            abstract-based verification instead.
+            """
+            try:
+                url = url.strip()
+                if url.lower().endswith(".pdf"):
+                    return (
+                        f"URL points to a PDF file: {url}\n"
+                        "PDF content cannot be extracted directly. "
+                        "Use the abstract and metadata from get_paper_abstract "
+                        "for verification instead."
+                    )
+                response = httpx.get(
+                    url,
+                    timeout=15.0,
+                    follow_redirects=True,
+                    headers={"User-Agent": "ResearchAdvisor/1.0 (academic verification tool)"},
+                )
+                response.raise_for_status()
+                soup = BeautifulSoup(response.text, "html.parser")
+                # Remove script/style elements
+                for tag in soup(["script", "style", "nav", "footer", "header"]):
+                    tag.decompose()
+                text = soup.get_text(separator="\n", strip=True)
+                # Collapse whitespace
+                lines = [line.strip() for line in text.splitlines() if line.strip()]
+                content = "\n".join(lines)
+                if len(content) > 3000:
+                    content = content[:3000] + "\n\n[Content truncated at 3000 characters]"
+                return f"Content from {url}:\n\n{content}"
+            except Exception as e:
+                return f"Error fetching {url}: {e}"
 
         return [
             Tool(
@@ -154,7 +199,12 @@ class CitationChecker:
             Tool(
                 name="get_paper_abstract",
                 func=get_paper_abstract,
-                description="Retrieve the abstract of a cited paper",
+                description="Retrieve the abstract, URLs, and metadata of a cited paper",
+            ),
+            Tool(
+                name="fetch_paper_content",
+                func=fetch_paper_content,
+                description="Fetch and read text content from a paper URL for deeper verification",
             ),
         ]
 
