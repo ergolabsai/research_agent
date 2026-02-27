@@ -22,9 +22,17 @@ from advisor_pipeline.mcp_servers.advisor_server.prompts import (
     SYSTEM_PROMPT,
 )
 from advisor_pipeline.models.paper_graph import (
+    add_citation_checks,
+    add_figure_evaluations,
+    add_math_evaluations,
     build_paper_graph,
+    get_citation_statistics,
     get_evidence_by_type,
+    get_evidence_for_step,
     get_figure_claims,
+    get_figure_confirmation_counts,
+    get_invalid_math,
+    get_nodes_by_type,
     get_step_claims,
     get_steps,
     save_graph,
@@ -60,7 +68,7 @@ class AdvisorState(TypedDict, total=False):
     # Populated by find_evidence
     step_evidence: list[StepEvidence]
 
-    # Paper graph (built after find_evidence, used by evaluation nodes)
+    # Paper graph (built after find_evidence, updated by evaluation nodes)
     paper_graph: nx.DiGraph
 
     # Evaluation results
@@ -168,7 +176,11 @@ def evaluate_figures_node(state: AdvisorState) -> dict:
         paper_text=state["paper_text"],
     )
     print(f"  Evaluated {len(figure_evaluations)} figures")
-    return {"figure_evaluations": figure_evaluations}
+
+    # Add evaluation results to the graph
+    add_figure_evaluations(G, figure_evaluations)
+
+    return {"figure_evaluations": figure_evaluations, "paper_graph": G}
 
 
 def evaluate_math_node(state: AdvisorState) -> dict:
@@ -191,7 +203,11 @@ def evaluate_math_node(state: AdvisorState) -> dict:
             claims=claims,
         )
     print(f"  Evaluated {len(math_evaluations)} math items")
-    return {"math_evaluations": math_evaluations}
+
+    # Add evaluation results to the graph
+    add_math_evaluations(G, math_evaluations)
+
+    return {"math_evaluations": math_evaluations, "paper_graph": G}
 
 
 def check_citations_node(state: AdvisorState) -> dict:
@@ -213,41 +229,28 @@ def check_citations_node(state: AdvisorState) -> dict:
         bibliography=state.get("bibliography", {}),
     )
     print(f"  Checked {len(citation_checks)} citations")
-    return {"citation_checks": citation_checks}
+
+    # Add evaluation results to the graph
+    add_citation_checks(G, citation_checks)
+
+    return {"citation_checks": citation_checks, "paper_graph": G}
 
 
 def compile_results_node(state: AdvisorState) -> dict:
     """Compile all evaluation results into a final assessment."""
     print("STEP 4: Compiling final assessment...")
     paper_structure: PaperStructure = state["paper_structure"]
-    step_evidence: list[StepEvidence] = state.get("step_evidence", [])
-    figure_evals: list[FigureEvaluation] = state.get("figure_evaluations", [])
-    math_evals: list[MathEvaluation] = state.get("math_evaluations", [])
-    citation_checks: list[CitationCheck] = state.get("citation_checks", [])
 
-    # Build final graph with all evaluation results
-    G = build_paper_graph(
-        paper_structure=paper_structure,
-        step_evidence=step_evidence,
-        figure_evaluations=figure_evals,
-        math_evaluations=math_evals,
-        citation_checks=citation_checks,
-        paper_id=state.get("paper_id", "unknown"),
-    )
+    # Use the graph that has been incrementally updated by evaluation nodes
+    G = state["paper_graph"]
 
     # Organize validations by step using graph queries
-    step_validations = _organize_by_step_from_graph(G, step_evidence)
+    step_validations = _organize_by_step_from_graph(G)
 
     # Count evaluations from graph nodes
-    num_figure_evals = sum(
-        1 for _, d in G.nodes(data=True) if d.get("node_type") == "figure"
-    )
-    num_math_evals = sum(
-        1 for _, d in G.nodes(data=True) if d.get("node_type") == "math"
-    )
-    num_citation_checks = sum(
-        1 for _, d in G.nodes(data=True) if d.get("node_type") == "citation"
-    )
+    num_figure_evals = len(get_nodes_by_type(G, "figure"))
+    num_math_evals = len(get_nodes_by_type(G, "math"))
+    num_citation_checks = len(get_nodes_by_type(G, "citation"))
 
     # Generate overall review
     review_prompt = RESULTS_COMPILER.format(
@@ -257,7 +260,7 @@ def compile_results_node(state: AdvisorState) -> dict:
         num_figure_evals=num_figure_evals,
         num_math_evals=num_math_evals,
         num_citation_checks=num_citation_checks,
-        step_validations_text=_format_step_validations(step_validations, paper_structure),
+        step_validations_text=_format_step_validations(G),
         figure_results_text=_format_figure_results_from_graph(G),
         math_results_text=_format_math_results_from_graph(G),
         citation_results_text=_format_citation_results_from_graph(G),
@@ -267,7 +270,7 @@ def compile_results_node(state: AdvisorState) -> dict:
         OverAllReview, review_prompt, system_prompt=SYSTEM_PROMPT
     )
 
-    confidence_score = _calculate_confidence_from_graph(G, step_validations)
+    confidence_score = _calculate_confidence_from_graph(G)
 
     result = ValidationResult(
         paper_id=state.get("paper_id", "unknown"),
@@ -293,22 +296,26 @@ def compile_results_node(state: AdvisorState) -> dict:
 # ---------------------------------------------------------------------------
 
 
-def _organize_by_step_from_graph(
-    G: nx.DiGraph,
-    step_evidence: list[StepEvidence],
-) -> Dict[int, Dict]:
+def _organize_by_step_from_graph(G: nx.DiGraph) -> Dict[int, Dict]:
     """Build step_validations dict by querying graph nodes and edges."""
-    # Build evidence lookup from step_evidence (evidence items aren't in the graph)
-    evidence_by_step: Dict[int, list] = {}
-    for se in step_evidence:
-        evidence_by_step[se.step_number] = [ev.model_dump() for ev in se.evidence_list]
-
     step_validations: Dict[int, Dict] = {}
 
     for step_data in get_steps(G):
         step_num = step_data["step_number"]
         step_node_id = f"step:{step_num}"
-        ev_list = evidence_by_step.get(step_num, [])
+
+        # Get evidence from SUPPORTS edges in the graph
+        ev_nodes = get_evidence_for_step(G, step_num)
+        ev_list = [
+            {
+                "evidence_type": ev["evidence_type"],
+                "description": ev["description"],
+                "location": ev["location"],
+                "supports_step": ev["supports_step"],
+                "excerpt": ev.get("excerpt", ""),
+            }
+            for ev in ev_nodes
+        ]
 
         figure_validations = []
         math_validations = []
@@ -317,6 +324,10 @@ def _organize_by_step_from_graph(
         for pred_id in G.predecessors(step_node_id):
             node = G.nodes[pred_id]
             node_type = node.get("node_type")
+
+            if node_type not in ("figure", "math", "citation"):
+                continue
+
             edge_data = G.edges[pred_id, step_node_id]
 
             if node_type == "figure":
@@ -367,28 +378,37 @@ def _organize_by_step_from_graph(
     return step_validations
 
 
-def _format_step_validations(
-    step_validations: Dict[int, Dict],
-    paper_structure: PaperStructure,
-) -> str:
+def _format_step_validations(G: nx.DiGraph) -> str:
+    """Format step validations summary by querying the graph."""
     lines = []
-    for step in paper_structure.logical_steps:
-        step_num = step.step_number
-        validation = step_validations.get(step_num, {})
-        lines.append(f"\nStep {step_num}: {step.description}")
-        lines.append(f"  Evidence pieces: {validation.get('evidence_count', 0)}")
-        lines.append(f"  Figure validations: {len(validation.get('figure_validations', []))}")
-        lines.append(f"  Math validations: {len(validation.get('math_validations', []))}")
-        lines.append(f"  Citation checks: {len(validation.get('citation_validations', []))}")
+    for step_data in get_steps(G):
+        step_num = step_data["step_number"]
+        step_node_id = f"step:{step_num}"
+
+        ev_count = len(get_evidence_for_step(G, step_num))
+        fig_count = 0
+        math_count = 0
+        cit_count = 0
+        for pred_id in G.predecessors(step_node_id):
+            nt = G.nodes[pred_id].get("node_type")
+            if nt == "figure":
+                fig_count += 1
+            elif nt == "math":
+                math_count += 1
+            elif nt == "citation":
+                cit_count += 1
+
+        lines.append(f"\nStep {step_num}: {step_data['description']}")
+        lines.append(f"  Evidence pieces: {ev_count}")
+        lines.append(f"  Figure validations: {fig_count}")
+        lines.append(f"  Math validations: {math_count}")
+        lines.append(f"  Citation checks: {cit_count}")
     return "\n".join(lines)
 
 
 def _format_figure_results_from_graph(G: nx.DiGraph) -> str:
     """Format figure evaluation results by querying graph nodes and edges."""
-    figure_nodes = [
-        (nid, data) for nid, data in G.nodes(data=True)
-        if data.get("node_type") == "figure"
-    ]
+    figure_nodes = get_nodes_by_type(G, "figure")
     if not figure_nodes:
         return "No figure evaluations performed"
 
@@ -401,7 +421,6 @@ def _format_figure_results_from_graph(G: nx.DiGraph) -> str:
             f"  Similarities: {len(fig_data['similarities'])}, "
             f"Differences: {len(fig_data['differences'])}"
         )
-        # Each outgoing ASSESSES edge represents a claim assessment for a step
         for _, step_id, edge_data in G.edges(fig_id, data=True):
             if edge_data.get("edge_type") == "ASSESSES":
                 step_num = G.nodes[step_id].get("step_number", "?")
@@ -415,10 +434,7 @@ def _format_figure_results_from_graph(G: nx.DiGraph) -> str:
 
 def _format_math_results_from_graph(G: nx.DiGraph) -> str:
     """Format math evaluation results by querying graph nodes."""
-    math_nodes = [
-        data for _, data in G.nodes(data=True)
-        if data.get("node_type") == "math"
-    ]
+    math_nodes = [data for _, data in get_nodes_by_type(G, "math")]
     if not math_nodes:
         return "No math evaluations performed"
 
@@ -432,72 +448,49 @@ def _format_math_results_from_graph(G: nx.DiGraph) -> str:
 
 def _format_citation_results_from_graph(G: nx.DiGraph) -> str:
     """Format citation check results by querying graph nodes."""
-    citation_nodes = [
-        data for _, data in G.nodes(data=True)
-        if data.get("node_type") == "citation"
-    ]
-    if not citation_nodes:
+    stats = get_citation_statistics(G)
+    if stats["total"] == 0:
         return "No citation checks performed"
 
-    accessible_count = sum(1 for c in citation_nodes if c["accessible"])
-    supported_count = sum(1 for c in citation_nodes if c["supports_claim"] is True)
     return (
-        f"Accessible citations: {accessible_count}/{len(citation_nodes)}\n"
-        f"Citations supporting claims: {supported_count}/"
-        f"{accessible_count if accessible_count > 0 else 'N/A'}"
+        f"Accessible citations: {stats['accessible']}/{stats['total']}\n"
+        f"Citations supporting claims: {stats['supporting']}/"
+        f"{stats['accessible'] if stats['accessible'] > 0 else 'N/A'}"
     )
 
 
-def _calculate_confidence_from_graph(
-    G: nx.DiGraph,
-    step_validations: Dict,
-) -> float:
+def _calculate_confidence_from_graph(G: nx.DiGraph) -> float:
     """Calculate confidence score by querying graph nodes and edges."""
     scores = []
 
     # Math score: fraction of valid calculations
-    math_nodes = [
-        data for _, data in G.nodes(data=True)
-        if data.get("node_type") == "math"
-    ]
-    if math_nodes:
-        math_score = sum(1 for m in math_nodes if m["calculation_valid"]) / len(math_nodes)
+    all_math = [data for _, data in get_nodes_by_type(G, "math")]
+    if all_math:
+        invalid = get_invalid_math(G)
+        math_score = (len(all_math) - len(invalid)) / len(all_math)
         scores.append(math_score)
 
-    # Figure score: confirmations vs contradictions from ASSESSES edges
-    figure_nodes = [
-        nid for nid, data in G.nodes(data=True)
-        if data.get("node_type") == "figure"
-    ]
-    if figure_nodes:
-        total_confirmations = 0
-        total_contradictions = 0
-        for fig_id in figure_nodes:
-            for _, _, edge_data in G.edges(fig_id, data=True):
-                if edge_data.get("edge_type") == "ASSESSES":
-                    total_confirmations += len(edge_data.get("confirmations", []))
-                    total_contradictions += len(edge_data.get("contradictions", []))
-        if total_confirmations + total_contradictions > 0:
-            fig_score = total_confirmations / (total_confirmations + total_contradictions)
-            scores.append(fig_score)
+    # Figure score: confirmations vs contradictions
+    fig_counts = get_figure_confirmation_counts(G)
+    total_assessments = fig_counts["confirmations"] + fig_counts["contradictions"]
+    if total_assessments > 0:
+        fig_score = fig_counts["confirmations"] / total_assessments
+        scores.append(fig_score)
 
     # Citation score: fraction of accessible citations that support their claim
-    citation_nodes = [
-        data for _, data in G.nodes(data=True)
-        if data.get("node_type") == "citation"
-    ]
-    if citation_nodes:
-        accessible = [c for c in citation_nodes if c["accessible"]]
-        if accessible:
-            cit_score = sum(1 for c in accessible if c["supports_claim"]) / len(accessible)
-            scores.append(cit_score)
+    cit_stats = get_citation_statistics(G)
+    if cit_stats["accessible"] > 0:
+        cit_score = cit_stats["supporting"] / cit_stats["accessible"]
+        scores.append(cit_score)
 
-    # Coverage score: fraction of steps that have evidence
-    if step_validations:
-        steps_with_evidence = sum(
-            1 for v in step_validations.values() if v.get("evidence_count", 0) > 0
+    # Coverage score: fraction of steps that have evidence (from SUPPORTS edges)
+    all_steps = get_steps(G)
+    if all_steps:
+        steps_with_ev = sum(
+            1 for s in all_steps
+            if get_evidence_for_step(G, s["step_number"])
         )
-        coverage_score = steps_with_evidence / len(step_validations)
+        coverage_score = steps_with_ev / len(all_steps)
         scores.append(coverage_score)
 
     return sum(scores) / len(scores) if scores else 0.5

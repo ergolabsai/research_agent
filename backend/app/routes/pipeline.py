@@ -8,10 +8,14 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException, Depends
 from pydantic import BaseModel, Field
 from typing import Optional
 
+import networkx as nx
+
 from app.security import get_current_user_id
 from app.services.pipeline_service import (
     create_job,
+    get_graph_analysis,
     get_job,
+    get_job_graph,
     list_jobs,
     run_pipeline_async,
     JobStatus,
@@ -120,20 +124,38 @@ async def get_job_results(
     user_id: int = Depends(get_current_user_id),
 ):
     """Get the full validation results for a completed job."""
-    job = get_job(job_id)
-    if not job:
-        raise HTTPException(status_code=404, detail="Job not found")
-
-    if job.status == JobStatus.PENDING or job.status == JobStatus.RUNNING:
-        raise HTTPException(status_code=202, detail="Job still in progress")
-
-    if job.status == JobStatus.FAILED:
-        raise HTTPException(status_code=500, detail=f"Job failed: {job.error}")
-
-    if not job.result:
-        raise HTTPException(status_code=500, detail="No results available")
-
+    job = _require_completed_job(job_id)
     return job.result.model_dump()
+
+
+@router.get("/graph/{job_id}")
+async def get_job_graph_data(
+    job_id: str,
+    user_id: int = Depends(get_current_user_id),
+):
+    """Get the paper graph for a completed job in node-link format."""
+    _require_completed_job(job_id)
+    G = get_job_graph(job_id)
+    if G is None:
+        raise HTTPException(status_code=500, detail="Graph not available")
+    return nx.node_link_data(G)
+
+
+@router.get("/analysis/{job_id}")
+async def get_job_analysis(
+    job_id: str,
+    user_id: int = Depends(get_current_user_id),
+):
+    """Get graph-based analysis for a completed job.
+
+    Returns contradicted steps, invalid math, citation statistics,
+    figure confirmation counts, and coverage gaps.
+    """
+    _require_completed_job(job_id)
+    analysis = get_graph_analysis(job_id)
+    if analysis is None:
+        raise HTTPException(status_code=500, detail="Analysis not available")
+    return analysis
 
 
 @router.get("/jobs")
@@ -155,3 +177,24 @@ async def list_all_jobs(
         )
         for j in jobs
     ]
+
+
+# --- Helpers ---
+
+
+def _require_completed_job(job_id: str) -> PipelineJob:
+    """Validate that a job exists, is completed, and has results."""
+    job = get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+
+    if job.status == JobStatus.PENDING or job.status == JobStatus.RUNNING:
+        raise HTTPException(status_code=202, detail="Job still in progress")
+
+    if job.status == JobStatus.FAILED:
+        raise HTTPException(status_code=500, detail=f"Job failed: {job.error}")
+
+    if not job.result:
+        raise HTTPException(status_code=500, detail="No results available")
+
+    return job
