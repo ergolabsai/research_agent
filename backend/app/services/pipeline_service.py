@@ -13,7 +13,6 @@ from typing import Optional
 from pydantic import BaseModel, Field
 
 from advisor_pipeline.pipeline import AdvisorPipeline
-from advisor_pipeline.database import Database
 from advisor_pipeline.models.schemas import ValidationResult
 
 
@@ -70,8 +69,7 @@ async def run_pipeline_async(
 
     def _run():
         try:
-            db = Database()
-            pipeline = AdvisorPipeline(db=db, on_step=_on_step)
+            pipeline = AdvisorPipeline(on_step=_on_step)
 
             result = pipeline.run(
                 paper_id=paper_id,
@@ -81,7 +79,6 @@ async def run_pipeline_async(
                 authors=authors,
                 abstract=abstract,
                 bibliography=bibliography,
-                save_to_db=True,
             )
 
             job.result = result

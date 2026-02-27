@@ -57,12 +57,18 @@ Available figure files: {figure_names}
 Paper text:
 {paper_text}
 
-List ALL evidence for this step, including:
+List ALL evidence for this step. Each piece of evidence must have an evidence_type \
+of "figure", "math", or "citation" — do NOT use "text" as a type.
 - Figures (with figure numbers). When referencing a figure, use the exact filename \
 from the available figure files list above.
 - Math/equations (with equation numbers)
 - Citations (with citation info)
-- Important textual arguments
+
+For every evidence item, populate the `excerpt` field with a short verbatim quote \
+(1-3 sentences) copied exactly from the paper text that directly supports the claim. \
+This is especially important for capturing textual arguments — instead of listing them \
+as separate "text" evidence, attach a supporting excerpt to the most relevant figure, \
+math, or citation evidence item.
 
 Be thorough - one step may have multiple pieces of evidence."""
 

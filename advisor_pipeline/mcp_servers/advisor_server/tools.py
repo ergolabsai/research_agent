@@ -11,8 +11,6 @@ from pathlib import Path
 import httpx
 from mcp.types import TextContent, Tool
 
-from advisor_pipeline.database import Database
-from advisor_pipeline.models.schemas import PaperDocument, ValidationResult
 
 
 def _success(result: dict) -> list[TextContent]:
@@ -40,58 +38,6 @@ TOOLS = [
                 },
             },
             "required": ["paper_folder"],
-        },
-    ),
-    Tool(
-        name="query_paper_db",
-        description="Retrieve a paper document from the database by paper_id.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "paper_id": {"type": "string", "description": "Unique paper identifier"},
-            },
-            "required": ["paper_id"],
-        },
-    ),
-    Tool(
-        name="save_paper",
-        description="Save a paper document to the database.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "paper_id": {"type": "string"},
-                "title": {"type": "string"},
-                "full_text": {"type": "string"},
-                "authors": {"type": "array", "items": {"type": "string"}},
-                "abstract": {"type": "string"},
-            },
-            "required": ["paper_id", "title", "full_text"],
-        },
-    ),
-    Tool(
-        name="query_evidence_db",
-        description="Get the latest validation result for a paper.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "paper_id": {"type": "string"},
-            },
-            "required": ["paper_id"],
-        },
-    ),
-    Tool(
-        name="save_validation",
-        description="Save a validation result to the database.",
-        inputSchema={
-            "type": "object",
-            "properties": {
-                "paper_id": {"type": "string"},
-                "validation_json": {
-                    "type": "string",
-                    "description": "JSON-serialized ValidationResult",
-                },
-            },
-            "required": ["paper_id", "validation_json"],
         },
     ),
     Tool(
@@ -168,58 +114,6 @@ async def handle_load_paper(arguments: dict) -> list[TextContent]:
                 figures[img_path.name] = {"data": img_data, "media_type": media_type}
 
     return _success({"paper_text": paper_text, "figures": figures})
-
-
-async def handle_query_paper_db(arguments: dict) -> list[TextContent]:
-    db = Database()
-    db.connect()
-    try:
-        paper = db.get_paper(arguments["paper_id"])
-        if paper:
-            return _success(paper.model_dump())
-        return _error(f"Paper not found: {arguments['paper_id']}")
-    finally:
-        db.disconnect()
-
-
-async def handle_save_paper(arguments: dict) -> list[TextContent]:
-    db = Database()
-    db.connect()
-    try:
-        doc = PaperDocument(
-            paper_id=arguments["paper_id"],
-            title=arguments["title"],
-            full_text=arguments["full_text"],
-            authors=arguments.get("authors", []),
-            abstract=arguments.get("abstract", ""),
-        )
-        paper_id = db.save_paper(doc)
-        return _success({"saved": paper_id})
-    finally:
-        db.disconnect()
-
-
-async def handle_query_evidence_db(arguments: dict) -> list[TextContent]:
-    db = Database()
-    db.connect()
-    try:
-        result = db.get_latest_validation(arguments["paper_id"])
-        if result:
-            return _success(result.model_dump())
-        return _error(f"No validation found for: {arguments['paper_id']}")
-    finally:
-        db.disconnect()
-
-
-async def handle_save_validation(arguments: dict) -> list[TextContent]:
-    db = Database()
-    db.connect()
-    try:
-        validation = ValidationResult.model_validate_json(arguments["validation_json"])
-        doc_id = db.save_validation(validation, arguments["paper_id"])
-        return _success({"saved": doc_id})
-    finally:
-        db.disconnect()
 
 
 async def handle_search_semantic_scholar(arguments: dict) -> list[TextContent]:
@@ -344,10 +238,6 @@ async def handle_extract_doi(arguments: dict) -> list[TextContent]:
 
 _HANDLERS = {
     "load_paper": handle_load_paper,
-    "query_paper_db": handle_query_paper_db,
-    "save_paper": handle_save_paper,
-    "query_evidence_db": handle_query_evidence_db,
-    "save_validation": handle_save_validation,
     "search_semantic_scholar": handle_search_semantic_scholar,
     "get_paper_abstract": handle_get_paper_abstract,
     "check_paper_accessibility": handle_check_paper_accessibility,

@@ -7,13 +7,12 @@ Replaces the old linear pipeline.py with a flexible graph that supports:
 """
 
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict
 
 import networkx as nx
 from langgraph.graph import END, START, StateGraph
 from typing_extensions import TypedDict
 
-from advisor_pipeline.database import Database
 from advisor_pipeline.llm import get_structured_output, invoke_text
 from advisor_pipeline.mcp_servers.advisor_server.prompts import (
     EVIDENCE_FINDER,
@@ -24,6 +23,10 @@ from advisor_pipeline.mcp_servers.advisor_server.prompts import (
 )
 from advisor_pipeline.models.paper_graph import (
     build_paper_graph,
+    get_evidence_by_type,
+    get_figure_claims,
+    get_step_claims,
+    get_steps,
     save_graph,
 )
 from advisor_pipeline.models.schemas import (
@@ -31,7 +34,6 @@ from advisor_pipeline.models.schemas import (
     FigureEvaluation,
     MathEvaluation,
     OverAllReview,
-    PaperDocument,
     PaperStructure,
     StepEvidence,
     ValidationResult,
@@ -47,7 +49,6 @@ class AdvisorState(TypedDict, total=False):
     paper_text: str
     figures: Dict[str, Dict[str, str]]
     bibliography: Dict[str, str]
-    save_to_db: bool
     output_folder: str  # folder path to save the final paper graph
 
     # Populated by make_context
@@ -58,7 +59,6 @@ class AdvisorState(TypedDict, total=False):
 
     # Populated by find_evidence
     step_evidence: list[StepEvidence]
-    evaluation_types_needed: list[str]
 
     # Paper graph (built after find_evidence, used by evaluation nodes)
     paper_graph: nx.DiGraph
@@ -103,24 +103,6 @@ def map_logic_node(state: AdvisorState) -> dict:
     )
     print(f"  Identified {len(paper_structure.logical_steps)} logical steps")
 
-    # Optionally save to database
-    if state.get("save_to_db"):
-        try:
-            db = Database()
-            db.connect()
-            paper_doc = PaperDocument(
-                paper_id=state["paper_id"],
-                title=paper_structure.title,
-                authors=[],
-                abstract="",
-                full_text=state["paper_text"],
-            )
-            db.save_paper(paper_doc)
-            db.disconnect()
-            print("  Paper saved to database")
-        except Exception as e:
-            print(f"  Warning: could not save paper to DB: {e}")
-
     return {"paper_structure": paper_structure}
 
 
@@ -154,25 +136,6 @@ def find_evidence_node(state: AdvisorState) -> dict:
     total_evidence = sum(len(se.evidence_list) for se in all_step_evidence)
     print(f"  Found {total_evidence} pieces of evidence across all steps")
 
-    # Determine which evaluation branches are needed
-    has_figures = any(
-        ev.evidence_type == "figure" for se in all_step_evidence for ev in se.evidence_list
-    )
-    has_math = any(
-        ev.evidence_type == "math" for se in all_step_evidence for ev in se.evidence_list
-    )
-    has_citations = any(
-        ev.evidence_type == "citation" for se in all_step_evidence for ev in se.evidence_list
-    )
-
-    eval_types = []
-    if has_figures:
-        eval_types.append("figures")
-    if has_math:
-        eval_types.append("math")
-    if has_citations:
-        eval_types.append("citations")
-
     # Build the paper graph from structure + evidence
     paper_graph = build_paper_graph(
         paper_structure=paper_structure,
@@ -183,7 +146,6 @@ def find_evidence_node(state: AdvisorState) -> dict:
 
     return {
         "step_evidence": all_step_evidence,
-        "evaluation_types_needed": eval_types,
         "paper_graph": paper_graph,
     }
 
@@ -193,23 +155,11 @@ def evaluate_figures_node(state: AdvisorState) -> dict:
     from advisor_pipeline.agents.figure_evaluator import FigureEvaluator
 
     print("STEP 3a: Evaluating figure-based evidence...")
-    paper_structure: PaperStructure = state["paper_structure"]
     figures = state.get("figures", {})
-    step_evidence = state["step_evidence"]
 
-    # Build figure-to-claims mapping
-    figure_claims: Dict[str, list] = {}
-    for se in step_evidence:
-        for ev in se.evidence_list:
-            if ev.evidence_type == "figure":
-                if ev.location not in figure_claims:
-                    figure_claims[ev.location] = []
-                figure_claims[ev.location].append(
-                    {
-                        "supports_step": ev.supports_step,
-                        "claim": paper_structure.logical_steps[ev.supports_step - 1].description,
-                    }
-                )
+    # Query the paper graph for figure claims
+    G = state["paper_graph"]
+    figure_claims = get_figure_claims(G)
 
     evaluator = FigureEvaluator()
     figure_evaluations = evaluator.run(
@@ -227,17 +177,11 @@ def evaluate_math_node(state: AdvisorState) -> dict:
     from advisor_pipeline.mcp_client import CalculatorClient
 
     print("STEP 3b: Evaluating math-based evidence...")
-    paper_structure: PaperStructure = state["paper_structure"]
-    step_evidence = state["step_evidence"]
 
-    # Collect all math evidence
-    math_evidence = []
-    for se in step_evidence:
-        for ev in se.evidence_list:
-            if ev.evidence_type == "math":
-                math_evidence.append(ev)
-
-    claims = {step.step_number: step.description for step in paper_structure.logical_steps}
+    # Query the paper graph for math evidence and step claims
+    G = state["paper_graph"]
+    math_evidence = get_evidence_by_type(G, "math")
+    claims = get_step_claims(G)
 
     with CalculatorClient() as client:
         evaluator = MathEvaluator(mcp_client=client)
@@ -255,17 +199,11 @@ def check_citations_node(state: AdvisorState) -> dict:
     from advisor_pipeline.agents.citation_checker import CitationChecker
 
     print("STEP 3c: Checking citations...")
-    paper_structure: PaperStructure = state["paper_structure"]
-    step_evidence = state["step_evidence"]
 
-    # Collect all citation evidence
-    citation_evidence = []
-    for se in step_evidence:
-        for ev in se.evidence_list:
-            if ev.evidence_type == "citation":
-                citation_evidence.append(ev)
-
-    claims = {step.step_number: step.description for step in paper_structure.logical_steps}
+    # Query the paper graph for citation evidence and step claims
+    G = state["paper_graph"]
+    citation_evidence = get_evidence_by_type(G, "citation")
+    claims = get_step_claims(G)
 
     checker = CitationChecker()
     citation_checks = checker.run(
@@ -297,30 +235,39 @@ def compile_results_node(state: AdvisorState) -> dict:
         paper_id=state.get("paper_id", "unknown"),
     )
 
-    # Organize validations by step
-    step_validations = _organize_by_step(step_evidence, figure_evals, math_evals, citation_checks)
+    # Organize validations by step using graph queries
+    step_validations = _organize_by_step_from_graph(G, step_evidence)
+
+    # Count evaluations from graph nodes
+    num_figure_evals = sum(
+        1 for _, d in G.nodes(data=True) if d.get("node_type") == "figure"
+    )
+    num_math_evals = sum(
+        1 for _, d in G.nodes(data=True) if d.get("node_type") == "math"
+    )
+    num_citation_checks = sum(
+        1 for _, d in G.nodes(data=True) if d.get("node_type") == "citation"
+    )
 
     # Generate overall review
     review_prompt = RESULTS_COMPILER.format(
         paper_title=paper_structure.title,
         main_claim=paper_structure.main_claim,
         num_steps=len(paper_structure.logical_steps),
-        num_figure_evals=len(figure_evals),
-        num_math_evals=len(math_evals),
-        num_citation_checks=len(citation_checks),
+        num_figure_evals=num_figure_evals,
+        num_math_evals=num_math_evals,
+        num_citation_checks=num_citation_checks,
         step_validations_text=_format_step_validations(step_validations, paper_structure),
-        figure_results_text=_format_figure_results(figure_evals),
-        math_results_text=_format_math_results(math_evals),
-        citation_results_text=_format_citation_results(citation_checks),
+        figure_results_text=_format_figure_results_from_graph(G),
+        math_results_text=_format_math_results_from_graph(G),
+        citation_results_text=_format_citation_results_from_graph(G),
     )
 
     overall_review = get_structured_output(
         OverAllReview, review_prompt, system_prompt=SYSTEM_PROMPT
     )
 
-    confidence_score = _calculate_confidence(
-        figure_evals, math_evals, citation_checks, step_validations
-    )
+    confidence_score = _calculate_confidence_from_graph(G, step_validations)
 
     result = ValidationResult(
         paper_id=state.get("paper_id", "unknown"),
@@ -330,17 +277,6 @@ def compile_results_node(state: AdvisorState) -> dict:
         confidence_score=confidence_score,
     )
     print(f"  Final confidence score: {result.confidence_score:.2%}")
-
-    # Save to database
-    if state.get("save_to_db"):
-        try:
-            db = Database()
-            db.connect()
-            db.save_validation(result, state["paper_id"])
-            db.disconnect()
-            print("  Validation saved to database")
-        except Exception as e:
-            print(f"  Warning: could not save validation to DB: {e}")
 
     # Save graph to output folder
     output_folder = state.get("output_folder")
@@ -353,43 +289,80 @@ def compile_results_node(state: AdvisorState) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# Helpers (absorbed from ResultsCompilerAgent)
+# Helpers — query the paper graph instead of iterating flat lists
 # ---------------------------------------------------------------------------
 
 
-def _organize_by_step(
+def _organize_by_step_from_graph(
+    G: nx.DiGraph,
     step_evidence: list[StepEvidence],
-    figure_evals: list[FigureEvaluation],
-    math_evals: list[MathEvaluation],
-    citation_checks: list[CitationCheck],
 ) -> Dict[int, Dict]:
+    """Build step_validations dict by querying graph nodes and edges."""
+    # Build evidence lookup from step_evidence (evidence items aren't in the graph)
+    evidence_by_step: Dict[int, list] = {}
+    for se in step_evidence:
+        evidence_by_step[se.step_number] = [ev.model_dump() for ev in se.evidence_list]
+
     step_validations: Dict[int, Dict] = {}
 
-    for step_ev in step_evidence:
-        step_num = step_ev.step_number
+    for step_data in get_steps(G):
+        step_num = step_data["step_number"]
+        step_node_id = f"step:{step_num}"
+        ev_list = evidence_by_step.get(step_num, [])
+
+        figure_validations = []
+        math_validations = []
+        citation_validations = []
+
+        for pred_id in G.predecessors(step_node_id):
+            node = G.nodes[pred_id]
+            node_type = node.get("node_type")
+            edge_data = G.edges[pred_id, step_node_id]
+
+            if node_type == "figure":
+                figure_validations.append({
+                    "figure_name": node["figure_name"],
+                    "actual_description": node["actual_description"],
+                    "expected_description": node["expected_description"],
+                    "comparison": {
+                        "similarities": node["similarities"],
+                        "differences": node["differences"],
+                    },
+                    "claim_assessments": [{
+                        "supports_step": step_num,
+                        "claim": edge_data.get("claim", ""),
+                        "validity": {
+                            "confirmations": edge_data.get("confirmations", []),
+                            "contradictions": edge_data.get("contradictions", []),
+                        },
+                    }],
+                })
+
+            elif node_type == "math":
+                math_validations.append({
+                    "equation_reference": node["equation_reference"],
+                    "supports_step": step_num,
+                    "calculation_valid": node["calculation_valid"],
+                    "details": node["details"],
+                    "formula_used": node.get("formula_used"),
+                })
+
+            elif node_type == "citation":
+                citation_validations.append({
+                    "citation": node["citation"],
+                    "supports_step": step_num,
+                    "accessible": node["accessible"],
+                    "supports_claim": node["supports_claim"],
+                    "notes": node.get("notes", ""),
+                })
+
         step_validations[step_num] = {
-            "evidence_count": len(step_ev.evidence_list),
-            "evidence": [ev.model_dump() for ev in step_ev.evidence_list],
-            "figure_validations": [],
-            "math_validations": [],
-            "citation_validations": [],
+            "evidence_count": len(ev_list),
+            "evidence": ev_list,
+            "figure_validations": figure_validations,
+            "math_validations": math_validations,
+            "citation_validations": citation_validations,
         }
-
-    for fig_eval in figure_evals:
-        for assessment in fig_eval.claim_assessments:
-            step_num = assessment.supports_step
-            if step_num in step_validations:
-                step_validations[step_num]["figure_validations"].append(fig_eval.model_dump())
-
-    for math_eval in math_evals:
-        step_num = math_eval.supports_step
-        if step_num in step_validations:
-            step_validations[step_num]["math_validations"].append(math_eval.model_dump())
-
-    for cit_check in citation_checks:
-        step_num = cit_check.supports_step
-        if step_num in step_validations:
-            step_validations[step_num]["citation_validations"].append(cit_check.model_dump())
 
     return step_validations
 
@@ -410,79 +383,116 @@ def _format_step_validations(
     return "\n".join(lines)
 
 
-def _format_figure_results(figure_evals: list[FigureEvaluation]) -> str:
-    if not figure_evals:
+def _format_figure_results_from_graph(G: nx.DiGraph) -> str:
+    """Format figure evaluation results by querying graph nodes and edges."""
+    figure_nodes = [
+        (nid, data) for nid, data in G.nodes(data=True)
+        if data.get("node_type") == "figure"
+    ]
+    if not figure_nodes:
         return "No figure evaluations performed"
+
     lines = []
-    for fig in figure_evals:
-        lines.append(f"\n- {fig.figure_name}:")
-        lines.append(f"  Actual: {fig.actual_description[:150]}...")
-        lines.append(f"  Expected: {fig.expected_description[:150]}...")
+    for fig_id, fig_data in figure_nodes:
+        lines.append(f"\n- {fig_data['figure_name']}:")
+        lines.append(f"  Actual: {fig_data['actual_description'][:150]}...")
+        lines.append(f"  Expected: {fig_data['expected_description'][:150]}...")
         lines.append(
-            f"  Similarities: {len(fig.comparison.similarities)}, "
-            f"Differences: {len(fig.comparison.differences)}"
+            f"  Similarities: {len(fig_data['similarities'])}, "
+            f"Differences: {len(fig_data['differences'])}"
         )
-        for assessment in fig.claim_assessments:
-            conf = len(assessment.validity.confirmations)
-            cont = len(assessment.validity.contradictions)
-            lines.append(
-                f"  Step {assessment.supports_step}: {conf} confirmations, {cont} contradictions"
-            )
+        # Each outgoing ASSESSES edge represents a claim assessment for a step
+        for _, step_id, edge_data in G.edges(fig_id, data=True):
+            if edge_data.get("edge_type") == "ASSESSES":
+                step_num = G.nodes[step_id].get("step_number", "?")
+                conf = len(edge_data.get("confirmations", []))
+                cont = len(edge_data.get("contradictions", []))
+                lines.append(
+                    f"  Step {step_num}: {conf} confirmations, {cont} contradictions"
+                )
     return "\n".join(lines)
 
 
-def _format_math_results(math_evals: list[MathEvaluation]) -> str:
-    if not math_evals:
+def _format_math_results_from_graph(G: nx.DiGraph) -> str:
+    """Format math evaluation results by querying graph nodes."""
+    math_nodes = [
+        data for _, data in G.nodes(data=True)
+        if data.get("node_type") == "math"
+    ]
+    if not math_nodes:
         return "No math evaluations performed"
-    valid_count = sum(1 for m in math_evals if m.calculation_valid)
-    lines = [f"Valid calculations: {valid_count}/{len(math_evals)}"]
-    for math in math_evals:
-        status = "Valid" if math.calculation_valid else "Invalid"
-        lines.append(f"- {math.equation_reference}: {status}")
+
+    valid_count = sum(1 for m in math_nodes if m["calculation_valid"])
+    lines = [f"Valid calculations: {valid_count}/{len(math_nodes)}"]
+    for m in math_nodes:
+        status = "Valid" if m["calculation_valid"] else "Invalid"
+        lines.append(f"- {m['equation_reference']}: {status}")
     return "\n".join(lines)
 
 
-def _format_citation_results(citation_checks: list[CitationCheck]) -> str:
-    if not citation_checks:
+def _format_citation_results_from_graph(G: nx.DiGraph) -> str:
+    """Format citation check results by querying graph nodes."""
+    citation_nodes = [
+        data for _, data in G.nodes(data=True)
+        if data.get("node_type") == "citation"
+    ]
+    if not citation_nodes:
         return "No citation checks performed"
-    accessible_count = sum(1 for c in citation_checks if c.accessible)
-    supported_count = sum(1 for c in citation_checks if c.supports_claim is True)
+
+    accessible_count = sum(1 for c in citation_nodes if c["accessible"])
+    supported_count = sum(1 for c in citation_nodes if c["supports_claim"] is True)
     return (
-        f"Accessible citations: {accessible_count}/{len(citation_checks)}\n"
+        f"Accessible citations: {accessible_count}/{len(citation_nodes)}\n"
         f"Citations supporting claims: {supported_count}/"
         f"{accessible_count if accessible_count > 0 else 'N/A'}"
     )
 
 
-def _calculate_confidence(
-    figure_evals: list[FigureEvaluation],
-    math_evals: list[MathEvaluation],
-    citation_checks: list[CitationCheck],
+def _calculate_confidence_from_graph(
+    G: nx.DiGraph,
     step_validations: Dict,
 ) -> float:
+    """Calculate confidence score by querying graph nodes and edges."""
     scores = []
 
-    if math_evals:
-        math_score = sum(1 for m in math_evals if m.calculation_valid) / len(math_evals)
+    # Math score: fraction of valid calculations
+    math_nodes = [
+        data for _, data in G.nodes(data=True)
+        if data.get("node_type") == "math"
+    ]
+    if math_nodes:
+        math_score = sum(1 for m in math_nodes if m["calculation_valid"]) / len(math_nodes)
         scores.append(math_score)
 
-    if figure_evals:
-        total_confirmations = sum(
-            len(a.validity.confirmations) for f in figure_evals for a in f.claim_assessments
-        )
-        total_contradictions = sum(
-            len(a.validity.contradictions) for f in figure_evals for a in f.claim_assessments
-        )
+    # Figure score: confirmations vs contradictions from ASSESSES edges
+    figure_nodes = [
+        nid for nid, data in G.nodes(data=True)
+        if data.get("node_type") == "figure"
+    ]
+    if figure_nodes:
+        total_confirmations = 0
+        total_contradictions = 0
+        for fig_id in figure_nodes:
+            for _, _, edge_data in G.edges(fig_id, data=True):
+                if edge_data.get("edge_type") == "ASSESSES":
+                    total_confirmations += len(edge_data.get("confirmations", []))
+                    total_contradictions += len(edge_data.get("contradictions", []))
         if total_confirmations + total_contradictions > 0:
             fig_score = total_confirmations / (total_confirmations + total_contradictions)
             scores.append(fig_score)
 
-    if citation_checks:
-        accessible = [c for c in citation_checks if c.accessible]
+    # Citation score: fraction of accessible citations that support their claim
+    citation_nodes = [
+        data for _, data in G.nodes(data=True)
+        if data.get("node_type") == "citation"
+    ]
+    if citation_nodes:
+        accessible = [c for c in citation_nodes if c["accessible"]]
         if accessible:
-            cit_score = sum(1 for c in accessible if c.supports_claim) / len(accessible)
+            cit_score = sum(1 for c in accessible if c["supports_claim"]) / len(accessible)
             scores.append(cit_score)
 
+    # Coverage score: fraction of steps that have evidence
     if step_validations:
         steps_with_evidence = sum(
             1 for v in step_validations.values() if v.get("evidence_count", 0) > 0
@@ -491,26 +501,6 @@ def _calculate_confidence(
         scores.append(coverage_score)
 
     return sum(scores) / len(scores) if scores else 0.5
-
-
-# ---------------------------------------------------------------------------
-# Conditional routing functions
-# ---------------------------------------------------------------------------
-
-
-def get_evaluation_branches(state: AdvisorState) -> list[str]:
-    """Determine which evaluation branches to run based on evidence found."""
-    eval_types = state.get("evaluation_types_needed", [])
-    branches = []
-    if "figures" in eval_types:
-        branches.append("evaluate_figures")
-    if "math" in eval_types:
-        branches.append("evaluate_math")
-    if "citations" in eval_types:
-        branches.append("check_citations")
-    if not branches:
-        branches.append("compile_results")
-    return branches
 
 
 # ---------------------------------------------------------------------------
@@ -562,11 +552,8 @@ class AdvisorOrchestrator:
           evaluate_* -> compile_results -> END
     """
 
-    def __init__(self, db: Database | None = None):
+    def __init__(self):
         print("Initializing Advisor Orchestrator...")
-        self.db = db
-        if self.db:
-            self.db.connect()
         self._graph = _build_graph().compile()
         print("Orchestrator initialized successfully")
 
@@ -575,7 +562,6 @@ class AdvisorOrchestrator:
         paper_text: str = None,
         figures: Dict[str, Dict[str, str]] = None,
         paper_bib: Dict[str, str] | None = None,
-        save_to_db: bool = True,
         output_folder: str | Path | None = None,
     ) -> ValidationResult:
         """Run the complete validation pipeline on a paper.
@@ -584,7 +570,6 @@ class AdvisorOrchestrator:
             paper_text: Full text of the paper.
             figures: Dict mapping figure names to image data.
             paper_bib: Dict of citation references.
-            save_to_db: Whether to save results to database.
             output_folder: Folder path to save the final paper graph JSON.
 
         Returns:
@@ -598,7 +583,6 @@ class AdvisorOrchestrator:
             "paper_text": paper_text,
             "figures": figures,
             "bibliography": paper_bib or {},
-            "save_to_db": save_to_db,
             "output_folder": str(output_folder) if output_folder else "",
             "figure_evaluations": [],
             "math_evaluations": [],
@@ -612,13 +596,3 @@ class AdvisorOrchestrator:
         print(f"{'=' * 60}\n")
 
         return final_state["validation_result"]
-
-    def load_from_database(self, paper_id: str) -> Optional[ValidationResult]:
-        """Load the latest validation for a paper from database."""
-        if not self.db:
-            raise ValueError("Database not initialized")
-        return self.db.get_latest_validation(paper_id)
-
-    def __del__(self):
-        if self.db:
-            self.db.disconnect()

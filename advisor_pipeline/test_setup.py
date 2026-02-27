@@ -71,7 +71,6 @@ def test_project_structure():
         "agents/math_evaluator_agent.py",
         "agents/citation_checker_agent.py",
         "agents/results_compiler_agent.py",
-        "database.py",
         "pipeline.py",
         "requirements.txt",
         "README.md"

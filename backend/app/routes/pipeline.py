@@ -17,9 +17,6 @@ from app.services.pipeline_service import (
     JobStatus,
     PipelineJob,
 )
-from advisor_pipeline.database import Database
-from advisor_pipeline.models.schemas import ValidationResult
-
 router = APIRouter(prefix="/api/pipeline", tags=["pipeline"])
 
 
@@ -137,23 +134,6 @@ async def get_job_results(
         raise HTTPException(status_code=500, detail="No results available")
 
     return job.result.model_dump()
-
-
-@router.get("/history/{paper_id}")
-async def get_paper_history(
-    paper_id: str,
-    user_id: int = Depends(get_current_user_id),
-):
-    """Get all validation results for a paper from MongoDB."""
-    try:
-        db = Database()
-        db.connect()
-        validations = db.get_all_validations(paper_id)
-        db.disconnect()
-
-        return [v.model_dump() for v in validations]
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/jobs")

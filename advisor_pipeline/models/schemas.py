@@ -37,7 +37,7 @@ class PaperStructure(BaseModel):
 class Evidence(BaseModel):
     """Generic evidence supporting a logical step."""
 
-    evidence_type: str = Field(description="Type: 'figure', 'math', 'citation', or 'text'")
+    evidence_type: str = Field(description="Type: 'figure', 'math', or 'citation'")
     description: str = Field(description="What this evidence shows")
     location: str = Field(
         description=(
@@ -47,6 +47,13 @@ class Evidence(BaseModel):
     )
     )
     supports_step: int = Field(description="Which logical step this supports")
+    excerpt: str = Field(
+        description=(
+            "A short direct quote from the paper text that supports this evidence item. "
+            "Should be copied verbatim from the paper."
+        ),
+        default="",
+    )
 
 
 class StepEvidence(BaseModel):

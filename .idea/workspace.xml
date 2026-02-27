@@ -5,22 +5,17 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="6cc51746-4537-4c5e-965f-ef86103f3ff2" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.env.example" beforeDir="false" afterPath="$PROJECT_DIR$/.env.example" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/advisor_pipeline/agents/citation_checker.py" beforeDir="false" afterPath="$PROJECT_DIR$/advisor_pipeline/agents/citation_checker.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/advisor_pipeline/agents/math_evaluator.py" beforeDir="false" afterPath="$PROJECT_DIR$/advisor_pipeline/agents/math_evaluator.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/advisor_pipeline/config/settings.py" beforeDir="false" afterPath="$PROJECT_DIR$/advisor_pipeline/config/settings.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/advisor_pipeline/llm.py" beforeDir="false" afterPath="$PROJECT_DIR$/advisor_pipeline/llm.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/advisor_pipeline/database.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/advisor_pipeline/example_usage.py" beforeDir="false" afterPath="$PROJECT_DIR$/advisor_pipeline/example_usage.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/advisor_pipeline/mcp_servers/advisor_server/prompts.py" beforeDir="false" afterPath="$PROJECT_DIR$/advisor_pipeline/mcp_servers/advisor_server/prompts.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/advisor_pipeline/mcp_servers/advisor_server/tools.py" beforeDir="false" afterPath="$PROJECT_DIR$/advisor_pipeline/mcp_servers/advisor_server/tools.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/advisor_pipeline/models/paper_graph.py" beforeDir="false" afterPath="$PROJECT_DIR$/advisor_pipeline/models/paper_graph.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/advisor_pipeline/models/schemas.py" beforeDir="false" afterPath="$PROJECT_DIR$/advisor_pipeline/models/schemas.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/advisor_pipeline/orchestrator.py" beforeDir="false" afterPath="$PROJECT_DIR$/advisor_pipeline/orchestrator.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/advisor_pipeline/utils/lib/bindings/utils.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/advisor_pipeline/utils/lib/tom-select/tom-select.complete.min.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/advisor_pipeline/utils/lib/tom-select/tom-select.css" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/advisor_pipeline/utils/lib/vis-9.1.2/vis-network.css" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/advisor_pipeline/utils/lib/vis-9.1.2/vis-network.min.js" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/advisor_pipeline/utils/paper_graph.html" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/advisor_pipeline/validation_result.pkl" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/todo.txt" beforeDir="false" afterPath="$PROJECT_DIR$/todo.txt" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/advisor_pipeline/test_setup.py" beforeDir="false" afterPath="$PROJECT_DIR$/advisor_pipeline/test_setup.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/routes/pipeline.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/routes/pipeline.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/backend/app/services/pipeline_service.py" beforeDir="false" afterPath="$PROJECT_DIR$/backend/app/services/pipeline_service.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -82,7 +77,7 @@
       <recent name="$PROJECT_DIR$/advisor_pipeline/utils" />
     </key>
   </component>
-  <component name="RunManager" selected="Python.example_usage">
+  <component name="RunManager" selected="Python.graph_visualizer">
     <configuration name="example_usage" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="research_agent" />
       <option name="ENV_FILES" value="" />
@@ -206,8 +201,8 @@
     </list>
     <recent_temporary>
       <list>
-        <item itemvalue="Python.example_usage" />
         <item itemvalue="Python.graph_visualizer" />
+        <item itemvalue="Python.example_usage" />
         <item itemvalue="Python.paper_review_logic" />
         <item itemvalue="Python.paper_review" />
         <item itemvalue="Python.multi_step_paper_review" />
@@ -235,7 +230,7 @@
       <workItem from="1767933730518" duration="2483000" />
       <workItem from="1767937332090" duration="354000" />
       <workItem from="1767980820265" duration="1427000" />
-      <workItem from="1771957068381" duration="18052000" />
+      <workItem from="1771957068381" duration="27037000" />
     </task>
     <servers />
   </component>
