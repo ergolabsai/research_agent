@@ -1,6 +1,6 @@
 """
 LanceDB Navigator - A Streamlit app for exploring and searching LanceDB tables
-streamlit run backend/scripts/sandbox.py
+streamlit run backend/scripts/lancedb_navigator.py
 """
 import streamlit as st
 import lancedb
