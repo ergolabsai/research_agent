@@ -1,5 +1,5 @@
 """
-Service layer wrapping the AdvisorPipeline for use from the FastAPI backend.
+Service layer wrapping the AdvisorOrchestrator for use from the FastAPI backend.
 
 Manages pipeline lifecycle, job tracking, and async execution.
 """
@@ -13,7 +13,7 @@ from typing import Optional
 import networkx as nx
 from pydantic import BaseModel, Field
 
-from advisor_pipeline.pipeline import AdvisorPipeline
+from advisor_pipeline.orchestrator import AdvisorOrchestrator
 from advisor_pipeline.models.paper_graph import (
     build_graph_from_validation,
     get_contradicted_steps,
@@ -148,17 +148,19 @@ async def run_pipeline_async(
 
     def _run():
         try:
-            pipeline = AdvisorPipeline(on_step=_on_step)
+            orchestrator = AdvisorOrchestrator(on_step=_on_step)
 
-            result = pipeline.run(
-                paper_id=paper_id,
+            normalized_figures = {
+                key: {"path": value} if isinstance(value, str) else value
+                for key, value in (figures or {}).items()
+            }
+
+            result = orchestrator.run(
                 paper_text=paper_text,
-                title=title,
-                figures=figures,
-                authors=authors,
-                abstract=abstract,
-                bibliography=bibliography,
+                figures=normalized_figures,
+                paper_bib=bibliography,
             )
+            result.paper_id = paper_id
 
             job.result = result
             job.status = JobStatus.COMPLETED
