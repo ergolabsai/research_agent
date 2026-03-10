@@ -16,7 +16,7 @@ class Settings(BaseSettings):
 
     # Backend / SQLite
     secret_key: str = os.getenv("SECRET_KEY", "change-this-to-a-random-secret-key")
-    database_url: str = os.getenv("DATABASE_URL", "sqlite:///./data/app.db")
+    database_url: str = os.getenv("DATABASE_URL", "sqlite:///./backend/data/app.db")
 
     # MongoDB (pipeline + calculator)
     mongodb_uri: str = os.getenv("MONGODB_URI", "mongodb://localhost:27017")
@@ -40,6 +40,14 @@ class Settings(BaseSettings):
     # Pipeline Settings
     max_retries: int = 3
     timeout_seconds: int = 300
+
+    # MinIO
+    minio_endpoint: str = os.getenv("MINIO_ENDPOINT", "localhost:9000")
+    minio_access_key: str = os.getenv("MINIO_ACCESS_KEY", "minioadmin")
+    minio_secret_key: str = os.getenv("MINIO_SECRET_KEY", "minioadmin")
+    minio_secure: bool = os.getenv("MINIO_SECURE", "false").lower() == "true"
+    minio_bucket: str = os.getenv("MINIO_BUCKET", "attachments")
+    storage_backend: str = os.getenv("STORAGE_BACKEND", "local").lower()  # "local" or "minio"
 
     class Config:
         env_file = ".env"

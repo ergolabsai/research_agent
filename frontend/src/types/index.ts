@@ -16,6 +16,16 @@ export interface Document {
   updated_at: string;
 }
 
+export interface Attachment {
+  id: number;
+  filename: string;
+  object_key: string;
+  content_type: string;
+  size: number;
+  created_at: string;
+  url?: string;
+}
+
 export interface Workspace {
   id: number;
   name: string;

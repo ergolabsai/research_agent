@@ -1,8 +1,12 @@
 # backend/app/routes/documents.py
-from fastapi import APIRouter, Depends, HTTPException, status
+import uuid
+
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from sqlmodel import Session, select
 from typing import List
 from app.models import (
+    Attachment,
+    AttachmentRead,
     Document,
     DocumentCreate,
     DocumentUpdate,
@@ -15,9 +19,12 @@ from app.models import (
     WorkspaceMember,
 )
 from app.security import get_session, get_current_user_id
+from backend.app.storage import delete_object, get_presigned_url, put_object
 
 router = APIRouter(prefix="/api/documents", tags=["documents"])
 
+
+# --- document routes ---
 
 @router.get("", response_model=List[DocumentResponse])
 def list_documents(
@@ -254,4 +261,101 @@ def unshare_document(
         )
 
     session.delete(share)
+    session.commit()
+
+
+# --- attachment routes ---
+
+@router.get("/{document_id}/attachments", response_model=List[AttachmentRead])
+def list_attachments(
+    document_id: int,
+    session: Session = Depends(get_session),
+    user_id: int = Depends(get_current_user_id),
+):
+    document = session.get(Document, document_id)
+    if not document:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+    if document.owner_id != user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+
+    attachments = session.exec(
+        select(Attachment).where(Attachment.document_id == document_id)
+    ).all()
+
+    return [AttachmentRead(**a.model_dump(), url=get_presigned_url(a.object_key)) for a in attachments]
+
+
+@router.get("/{document_id}/attachments/{attachment_id}", response_model=AttachmentRead)
+def get_attachment(
+    document_id: int,
+    attachment_id: int,
+    session: Session = Depends(get_session),
+    user_id: int = Depends(get_current_user_id),
+):
+    document = session.get(Document, document_id)
+    if not document:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+    if document.owner_id != user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
+
+    attachment = session.get(Attachment, attachment_id)
+    if not attachment or attachment.document_id != document_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Attachment not found")
+
+    return AttachmentRead(**attachment.model_dump(), url=get_presigned_url(attachment.object_key))
+
+
+@router.post("/{document_id}/attachments", response_model=AttachmentRead)
+def create_attachment(
+    document_id: int,
+    file: UploadFile = File(...),
+    session: Session = Depends(get_session),
+    user_id: int = Depends(get_current_user_id),
+):
+    document = session.get(Document, document_id)
+    if not document:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+    if document.owner_id != user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only owner can add attachments")
+
+    ext = file.filename.rsplit(".", 1)[-1] if "." in file.filename else ""
+    uuid_str = str(uuid.uuid4())[:12]
+    object_key = f"documents/{document_id}/{uuid_str}.{ext}" if ext else f"documents/{document_id}/{uuid_str}"
+
+    content = file.file.read()
+    put_object(object_key, content, file.content_type)
+
+    attachment = Attachment(
+        document_id=document_id,
+        filename=file.filename,
+        object_key=object_key,
+        content_type=file.content_type,
+        size=len(content),
+    )
+    session.add(attachment)
+    session.commit()
+    session.refresh(attachment)
+
+    return AttachmentRead(**attachment.model_dump(), url=get_presigned_url(attachment.object_key))
+
+
+@router.delete("/{document_id}/attachments/{attachment_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_attachment(
+    document_id: int,
+    attachment_id: int,
+    session: Session = Depends(get_session),
+    user_id: int = Depends(get_current_user_id),
+):
+    document = session.get(Document, document_id)
+    if not document:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Document not found")
+    if document.owner_id != user_id:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Only owner can delete attachments")
+
+    attachment = session.get(Attachment, attachment_id)
+    if not attachment or attachment.document_id != document_id:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Attachment not found")
+
+    delete_object(attachment.object_key)
+    session.delete(attachment)
     session.commit()
