@@ -39,6 +39,7 @@ node_modules/
 # Claude
 # ======================
 .archive/
+copilot-instructions.md
 
 # ======================
 # Pycharm
