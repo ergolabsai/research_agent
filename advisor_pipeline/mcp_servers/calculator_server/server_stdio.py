@@ -15,7 +15,7 @@ from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp.types import Tool, TextContent
 
-from tools.mcp_tools import get_all_tools, handle_tool
+from .tools.mcp_tools import get_all_tools, handle_tool
 
 # Create the MCP server
 server = Server("calculation-server")

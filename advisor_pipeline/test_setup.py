@@ -65,13 +65,12 @@ def test_project_structure():
         "models/schemas.py",
         "config/settings.py",
         "agents/base_agent.py",
-        "agents/paper_reader_agent.py",
+        "agents/logic_mapping_agent.py",
         "agents/evidence_finder_agent.py",
         "agents/figure_evaluator_agent.py",
         "agents/math_evaluator_agent.py",
         "agents/citation_checker_agent.py",
         "agents/results_compiler_agent.py",
-        "database.py",
         "pipeline.py",
         "requirements.txt",
         "README.md"
@@ -158,7 +157,7 @@ def test_agents():
         import os
         os.environ['ANTHROPIC_API_KEY'] = 'test-key-for-import-testing'
         
-        from agents.paper_reader_agent import PaperReaderAgent
+        from agents.logic_mapping_agent import PaperReaderAgent
         from agents.evidence_finder_agent import EvidenceFinderAgent
         
         print("✓ Agent classes can be imported")

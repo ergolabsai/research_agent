@@ -3,247 +3,140 @@
 Example usage of The Advisor pipeline.
 
 This script demonstrates how to:
-1. Set up the pipeline with database and MCP client
+1. Set up the orchestrator with database
 2. Run validation on a paper
 3. Retrieve and display results
+4. Query the paper graph for insights
 """
 
-import os
 from pathlib import Path
-from database import Database
-from pipeline import AdvisorPipeline
+
+from advisor_pipeline.orchestrator import AdvisorOrchestrator
+from advisor_pipeline.models.paper_graph import (
+    get_contradicted_steps,
+    get_dependency_chain,
+    get_invalid_math,
+    get_citation_statistics,
+    get_nodes_by_type,
+    get_steps,
+    get_steps_with_no_evaluation,
+    get_steps_with_no_evidence,
+    load_graph,
+)
+from utils import load_paper
 
 
 def example_basic_usage():
     """Basic example: Run pipeline on a paper without database."""
-    
-    # Sample paper (in practice, you'd load this from a file)
-    sample_paper = """
-    Title: Novel Approach to Quantum Error Correction
-    
-    Abstract: We present a new method for quantum error correction...
-    
-    Introduction:
-    Quantum computers are susceptible to errors from decoherence and noise.
-    Our approach uses a novel encoding scheme based on topological codes...
-    
-    Methods:
-    We implement a surface code with distance d=5 (Equation 1).
-    The error rate is given by: p_L = (p/p_th)^((d+1)/2)
-    
-    Results:
-    Figure 1 shows that our method achieves a 10^-6 error rate.
-    This is confirmed by simulations in Figure 2.
-    
-    Discussion:
-    As shown by Smith et al. (2023), topological codes are robust...
-    """
-    
-    # Initialize pipeline (no database, no MCP for this basic example)
-    pipeline = AdvisorPipeline()
-    
+
+    paper_folder = Path('/Users/chelsea/python_projects/project_files/shumlak2009_latex')
+
+    loaded_paper = load_paper.load_paper_from_file(
+        paper_file=paper_folder / 'main_text.tex',
+        figure_folder=paper_folder / 'images',
+        bib_file=paper_folder / 'bib.tex')
+
+    # Initialize orchestrator (no database for this basic example)
+    orchestrator = AdvisorOrchestrator()
+
     # Run validation
-    result = pipeline.run(
-        paper_id="example_001",
-        paper_text=sample_paper,
-        title="Novel Approach to Quantum Error Correction",
-        authors=["Jane Doe", "John Smith"],
-        save_to_db=False  # Don't save since no database
+
+    result = orchestrator.run(
+        paper_text=loaded_paper["paper_text"],
+        figures=loaded_paper["figures"],
+        paper_bib=loaded_paper["bib_text"],
+        output_folder=paper_folder,
     )
-    
+
     # Display results
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("VALIDATION RESULTS")
-    print("="*60)
+    print("=" * 60)
     print(f"Main Claim: {result.paper_structure.main_claim}")
     print(f"Logical Steps: {len(result.paper_structure.logical_steps)}")
     print(f"Confidence Score: {result.confidence_score:.2%}")
     print(f"\nOverall Review:\n{result.overall_assessment.review}")
-    print("="*60 + "\n")
-    
+    print("=" * 60 + "\n")
+
+    # --- Graph-based analysis ---
+    print("=" * 60)
+    print("GRAPH ANALYSIS")
+    print("=" * 60)
+
+    graph_path = paper_folder / "paper_graph.json"
+    if graph_path.exists():
+        G = load_graph(graph_path)
+        _print_graph_analysis(G)
+
     return result
 
 
-def example_with_database():
-    """Example with MongoDB persistence."""
-    
-    # Initialize database
-    db = Database()
-    
-    # Initialize pipeline with database
-    pipeline = AdvisorPipeline(db=db)
-    
-    # Load a paper (in practice, from file)
-    paper_text = "Your full paper text here..."
-    
-    # Run validation
-    result = pipeline.run(
-        paper_id="paper_001",
-        paper_text=paper_text,
-        title="Example Paper Title",
-        save_to_db=True  # Save to MongoDB
-    )
-    
-    print(f"Validation saved to database")
-    print(f"Confidence: {result.confidence_score:.2%}")
-    
-    # Later: retrieve the validation
-    loaded_result = pipeline.load_from_database("paper_001")
-    print(f"\nLoaded from DB - Confidence: {loaded_result.confidence_score:.2%}")
-    
-    # Get database stats
-    stats = db.get_statistics()
-    print(f"\nDatabase Statistics:")
-    print(f"  Total papers: {stats['total_papers']}")
-    print(f"  Total validations: {stats['total_validations']}")
-    print(f"  Average confidence: {stats['average_confidence']:.2%}")
-    
-    return result
+def _print_graph_analysis(G):
+    """Demonstrate graph query helpers on a completed paper graph."""
 
+    # Node counts
+    for node_type in ("step", "evidence", "figure", "math", "citation"):
+        count = len(get_nodes_by_type(G, node_type))
+        print(f"  {node_type} nodes: {count}")
 
-def example_with_mcp_calculator():
-    """Example with MCP calculator for math validation."""
-    
-    # You'll need to initialize your MCP client here
-    # This is a placeholder - use your actual MCP client
-    class MockMCPClient:
-        def call_tool(self, tool_name, **kwargs):
-            # Mock implementation
-            if tool_name == "list_formulas":
-                return {"formulas": ["wave_equation", "kinetic_energy"]}
-            elif tool_name == "calculate":
-                return {"result": 42, "unit": "m"}
-            elif tool_name == "verify":
-                return {"valid": True}
-            return {}
-    
-    mcp_client = MockMCPClient()
-    
-    # Initialize pipeline with MCP
-    pipeline = AdvisorPipeline(mcp_client=mcp_client)
-    
-    # Run validation - now math evaluation will use the calculator
-    result = pipeline.run(
-        paper_id="paper_with_math",
-        paper_text="Paper with equations...",
-        title="Mathematical Analysis Paper",
-        save_to_db=False
-    )
-    
-    return result
+    # Steps with no evidence
+    gaps = get_steps_with_no_evidence(G)
+    if gaps:
+        print(f"\nSteps with NO evidence ({len(gaps)}):")
+        for s in gaps:
+            print(f"  Step {s['step_number']}: {s['description'][:80]}")
 
+    # Steps with no evaluations
+    unevaluated = get_steps_with_no_evaluation(G)
+    if unevaluated:
+        print(f"\nSteps with NO evaluations ({len(unevaluated)}):")
+        for s in unevaluated:
+            print(f"  Step {s['step_number']}: {s['description'][:80]}")
 
-def example_with_figures():
-    """Example with figure files for evaluation."""
-    
-    # Map figure names to file paths
-    figures = {
-        "figure_1": "/path/to/figure1.png",
-        "figure_2": "/path/to/figure2.png",
-        "fig_3a": "/path/to/figure3a.png"
-    }
-    
-    pipeline = AdvisorPipeline()
-    
-    result = pipeline.run(
-        paper_id="paper_with_figs",
-        paper_text="Paper text...",
-        title="Paper with Figures",
-        figures=figures,
-        save_to_db=False
-    )
-    
-    # Check figure evaluations
-    print(f"\nFigure Evaluations:")
-    for step_num, validations in result.step_validations.items():
-        fig_vals = validations.get("figure_validations", [])
-        if fig_vals:
-            print(f"  Step {step_num}: {len(fig_vals)} figures evaluated")
-    
-    return result
-
-
-def example_full_pipeline():
-    """Complete example with all features."""
-    
-    # Initialize everything
-    db = Database()
-    
-    # Initialize your MCP client
-    # mcp_client = YourMCPClient()  # Replace with actual client
-    mcp_client = None  # For now
-    
-    pipeline = AdvisorPipeline(mcp_client=mcp_client, db=db)
-    
-    # Load paper from file
-    paper_path = Path("sample_papers/example_paper.txt")
-    if paper_path.exists():
-        with open(paper_path, 'r') as f:
-            paper_text = f.read()
+    # Contradicted steps
+    contradictions = get_contradicted_steps(G)
+    if contradictions:
+        print(f"\nContradicted steps ({len(contradictions)}):")
+        for c in contradictions:
+            step_num = c["step"].get("step_number", "?")
+            print(f"  Step {step_num} (figure: {c['figure']}):")
+            for item in c["contradictions"]:
+                print(f"    - {item}")
     else:
-        paper_text = "Sample paper text..."
-    
-    # Define figures
-    figures = {
-        "figure_1": "sample_papers/figures/fig1.png",
-        "figure_2": "sample_papers/figures/fig2.png"
-    }
-    
-    # Bibliography (optional)
-    bibliography = {
-        "[1]": "Smith, J. et al. (2023). Important Work. Nature, 123:456.",
-        "[2]": "Jones, A. (2022). Related Research. Science, 789:012."
-    }
-    
-    # Run complete pipeline
-    result = pipeline.run(
-        paper_id="full_example_001",
-        paper_text=paper_text,
-        title="Complete Example Paper",
-        authors=["Author One", "Author Two"],
-        abstract="This paper presents...",
-        figures=figures,
-        bibliography=bibliography,
-        save_to_db=True
-    )
-    
-    # Analyze results
-    print("\n" + "="*60)
-    print("DETAILED RESULTS")
-    print("="*60)
-    
-    print(f"\nPaper Structure:")
-    print(f"  Main claim: {result.paper_structure.main_claim}")
-    print(f"  Logical steps: {len(result.paper_structure.logical_steps)}")
-    
-    for step in result.paper_structure.logical_steps:
-        print(f"\n  Step {step.step_number}: {step.description[:80]}...")
-        validations = result.step_validations.get(step.step_number, {})
-        print(f"    Evidence: {validations.get('evidence_count', 0)} pieces")
-        print(f"    Figures: {len(validations.get('figure_validations', []))} evaluated")
-        print(f"    Math: {len(validations.get('math_validations', []))} validated")
-        print(f"    Citations: {len(validations.get('citation_validations', []))} checked")
-    
-    print(f"\nFinal Assessment:")
-    print(f"  Confidence: {result.confidence_score:.2%}")
-    print(f"  Review: {result.overall_assessment.review[:200]}...")
-    
-    print("="*60 + "\n")
-    
-    return result
+        print("\nNo contradictions found.")
+
+    # Invalid math
+    invalid = get_invalid_math(G)
+    if invalid:
+        print(f"\nInvalid math ({len(invalid)}):")
+        for m in invalid:
+            print(f"  {m['equation_reference']}: {m['details'][:100]}")
+    else:
+        print("No invalid math found.")
+
+    # Citation statistics
+    cit_stats = get_citation_statistics(G)
+    print(f"\nCitation stats: {cit_stats['accessible']}/{cit_stats['total']} accessible, "
+          f"{cit_stats['supporting']} supporting claims")
+
+    # Dependency chain for the last step
+    steps = get_steps(G)
+    if steps:
+        last_step = steps[-1]["step_number"]
+        chain = get_dependency_chain(G, last_step)
+        if chain:
+            print(f"\nDependency chain for step {last_step} ({len(chain)} ancestors):")
+            for s in chain:
+                print(f"  Step {s['step_number']}: {s['description'][:80]}")
+
+    print()
 
 
 if __name__ == "__main__":
     print("The Advisor Pipeline - Example Usage\n")
-    
+
     # Choose which example to run
     print("Running basic example...")
     result = example_basic_usage()
-    
-    # Uncomment to run other examples:
-    # result = example_with_database()
-    # result = example_with_mcp_calculator()
-    # result = example_with_figures()
-    # result = example_full_pipeline()
-    
+
     print("\nDone!")

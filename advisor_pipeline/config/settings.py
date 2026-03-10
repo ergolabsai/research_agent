@@ -1,7 +1,8 @@
 import os
-from pydantic_settings import BaseSettings
 from typing import Optional
+
 import dotenv
+from pydantic_settings import BaseSettings
 
 dotenv.load_dotenv()
 
@@ -24,9 +25,15 @@ class Settings(BaseSettings):
     # MCP Server
     mcp_server_url: Optional[str] = os.getenv("MCP_SERVER_URL", None)
     mcp_server_command: Optional[str] = os.getenv("MCP_SERVER_COMMAND", None)
+    advisor_mcp_command: Optional[str] = os.getenv("ADVISOR_MCP_COMMAND", None)
+    calculator_mcp_command: Optional[str] = os.getenv("CALCULATOR_MCP_COMMAND", None)
+    calculator_transport: str = os.getenv("CALCULATOR_TRANSPORT", "stdio")  # "stdio" or "sse"
 
     # LLM Settings
-    model_name: str = os.getenv("MODEL_NAME", "claude-sonnet-4-20250514")
+    llm_provider: str = os.getenv("LLM_PROVIDER", "anthropic")  # "anthropic" or "openrouter"
+    model_name: str = os.getenv("MODEL_NAME", "claude-haiku-4-5-20251001")
+    openrouter_api_key: str = os.getenv("OPENROUTER_API_KEY", "")
+    openrouter_model: str = os.getenv("OPENROUTER_MODEL", "google/gemma-2-9b-it")
     temperature: float = float(os.getenv("TEMPERATURE", "0.1"))
     max_tokens: int = int(os.getenv("MAX_TOKENS", "4000"))
 
