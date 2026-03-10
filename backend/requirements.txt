@@ -23,6 +23,7 @@ tzdata
 uvicorn
 
 # ML / Processing
+beautifulsoup4
 ijson
 numpy
 tantivy
