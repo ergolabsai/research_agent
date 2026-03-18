@@ -1,0 +1,63 @@
+# =============================================================================
+# Docker Compose — GPU overrides (NVIDIA CUDA)
+# =============================================================================
+# Layer on top of the base (or base + dev) compose file:
+#   Prod + GPU:  docker compose -f docker/docker-compose.yml -f docker/docker-compose.gpu.yml up
+#   Dev  + GPU:  docker compose -f docker/docker-compose.yml -f docker/docker-compose.dev.yml -f docker/docker-compose.gpu.yml up
+#
+# Prerequisites:
+#   - NVIDIA GPU drivers installed on the host
+#   - nvidia-container-toolkit installed
+#     (https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html)
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # API — GPU-accelerated
+  # ---------------------------------------------------------------------------
+  api:
+    build:
+      context: ..
+      dockerfile: docker/python.Dockerfile
+      target: api
+      args:
+        BASE_IMAGE: pytorch/pytorch:2.5.1-cuda12.4-cudnn9-runtime
+        TORCH_INDEX: skip
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  # ---------------------------------------------------------------------------
+  # Streamlit — GPU-accelerated (embedding model benefits from GPU)
+  # ---------------------------------------------------------------------------
+  streamlit:
+    build:
+      context: ..
+      dockerfile: docker/python.Dockerfile
+      target: streamlit
+      args:
+        BASE_IMAGE: pytorch/pytorch:2.5.1-cuda12.4-cudnn9-runtime
+        TORCH_INDEX: skip
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  # ---------------------------------------------------------------------------
+  # Calculator — no GPU needed, but rebuild with same base for consistency
+  # ---------------------------------------------------------------------------
+  calculator:
+    build:
+      context: ..
+      dockerfile: docker/python.Dockerfile
+      target: calculator
+      args:
+        BASE_IMAGE: pytorch/pytorch:2.5.1-cuda12.4-cudnn9-runtime
+        TORCH_INDEX: skip

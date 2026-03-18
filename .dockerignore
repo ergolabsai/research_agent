@@ -1,0 +1,56 @@
+# ========================
+# Python
+# ========================
+**/__pycache__/
+*.py[cod]
+*.so
+*.egg-info/
+.venv/
+backend/.venv/
+
+# ========================
+# Environment & Secrets
+# ========================
+.env
+.env.*
+!.env.example
+
+# ========================
+# Databases & Data
+# ========================
+*.db
+backend/data/
+# Explicitly excluded for clarity; already covered by backend/data/
+backend/data/arxiv_lancedb/
+backend/data/attachments/
+
+# ========================
+# Frontend
+# ========================
+frontend/node_modules/
+frontend/dist/
+
+# ========================
+# Git & IDE
+# ========================
+.git/
+.gitignore
+.idea/
+.vscode/
+.archive/
+
+# ========================
+# Documentation & Scripts
+# ========================
+docs/
+scripts/
+*.md
+!README.md
+!backend/requirements.txt
+!pyproject.toml
+
+# ========================
+# OS
+# ========================
+.DS_Store
+Thumbs.db

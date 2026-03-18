@@ -1,0 +1,76 @@
+# =============================================================================
+# Docker Compose — Development overrides
+# =============================================================================
+# Layer on top of the base compose file:
+#   docker compose -f docker/docker-compose.yml -f docker/docker-compose.dev.yml up
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # API — hot-reload with mounted source
+  # ---------------------------------------------------------------------------
+  api:
+    build:
+      context: ..
+      dockerfile: docker/python.Dockerfile
+      target: api
+    volumes:
+      - app_data:/app/backend/data
+      - ../backend:/app/backend
+      - ../advisor_pipeline:/app/advisor_pipeline
+    command:
+      [
+        "python",
+        "-m",
+        "uvicorn",
+        "app.main:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "${API_PORT:-8070}",
+        "--app-dir",
+        "/app/backend",
+        "--reload",
+        "--reload-dir",
+        "/app/backend",
+        "--reload-dir",
+        "/app/advisor_pipeline",
+      ]
+
+  # ---------------------------------------------------------------------------
+  # Frontend — Vite dev server with HMR
+  # ---------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ..
+      dockerfile: docker/frontend.Dockerfile
+      target: dev
+    volumes:
+      - ../frontend:/app
+      - /app/node_modules
+    environment:
+      - API_PROXY_TARGET=http://api:${API_PORT:-8070}
+    depends_on:
+      api:
+        condition: service_started
+
+  # ---------------------------------------------------------------------------
+  # Streamlit — mounted source for live edits
+  # ---------------------------------------------------------------------------
+  streamlit:
+    volumes:
+      - app_data:/app/backend/data:ro
+      - ../backend/scripts:/app/backend/scripts
+      - ../advisor_pipeline:/app/advisor_pipeline
+
+  # ---------------------------------------------------------------------------
+  # Calculator — mounted source for live edits
+  # ---------------------------------------------------------------------------
+  calculator:
+    volumes:
+      - app_data:/app/backend/data
+      - ../advisor_pipeline:/app/advisor_pipeline
+
+volumes:
+  app_data:
+    driver: local
