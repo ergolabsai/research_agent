@@ -1,68 +1,74 @@
 """
 Formula Data Model and Schema
 """
-from typing import List, Dict, Any, Optional
-from datetime import datetime
-from pydantic import BaseModel, Field
+import json
+from typing import List, Dict, Optional
+from datetime import datetime, timezone
+from sqlmodel import SQLModel, Field, Column
+from sqlalchemy import Text
 
 
-class FormulaVariable(BaseModel):
-    """Represents a variable in a formula"""
-    name: str
-    description: Optional[str] = None
-    unit: Optional[str] = None
-    
+class Formula(SQLModel, table=True):
+    """Formula stored in the shared SQLite database."""
 
-class Formula(BaseModel):
-    """
-    Formula document schema for MongoDB
-    
-    Example:
-    {
-        "formula_id": "kinetic_energy",
-        "name": "Kinetic Energy",
-        "description": "Kinetic energy: KE = ½mv²",
-        "equation": "energy = 0.5 * mass * velocity**2",
-        "variables": ["energy", "mass", "velocity"],
-        "variable_details": [
-            {"name": "energy", "description": "Kinetic energy", "unit": "J"},
-            {"name": "mass", "description": "Object mass", "unit": "kg"},
-            {"name": "velocity", "description": "Object velocity", "unit": "m/s"}
-        ],
-        "category": "mechanics",
-        "tags": ["physics", "energy", "motion"],
-        "created_at": "2025-01-28T...",
-        "updated_at": "2025-01-28T..."
-    }
-    """
-    formula_id: str = Field(..., description="Unique identifier for the formula")
-    name: str = Field(..., description="Human-readable name")
-    description: str = Field(..., description="Description with equation notation")
-    equation: str = Field(..., description="Python-evaluable equation string")
-    variables: List[str] = Field(..., description="List of variable names in the equation")
-    variable_details: Optional[List[Dict[str, str]]] = Field(
-        default=None, 
-        description="Detailed info about each variable (name, description, unit)"
+    __tablename__ = "formula"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    formula_id: str = Field(unique=True, index=True, description="Unique identifier for the formula")
+    name: str = Field(description="Human-readable name")
+    description: str = Field(description="Description with equation notation")
+    equation: str = Field(description="Python-evaluable equation string")
+    variables_json: str = Field(
+        sa_column=Column(Text), description="JSON list of variable names"
     )
-    category: Optional[str] = Field(default="general", description="Formula category")
-    tags: Optional[List[str]] = Field(default_factory=list, description="Searchable tags")
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
-    
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "formula_id": "kinetic_energy",
-                "name": "Kinetic Energy",
-                "description": "Kinetic energy: KE = ½mv²",
-                "equation": "energy = 0.5 * mass * velocity**2",
-                "variables": ["energy", "mass", "velocity"],
-                "variable_details": [
-                    {"name": "energy", "description": "Kinetic energy", "unit": "J"},
-                    {"name": "mass", "description": "Object mass", "unit": "kg"},
-                    {"name": "velocity", "description": "Object velocity", "unit": "m/s"}
-                ],
-                "category": "mechanics",
-                "tags": ["physics", "energy", "motion"]
-            }
+    variable_details_json: Optional[str] = Field(
+        default=None, sa_column=Column(Text),
+        description="JSON list of dicts with name/description/unit per variable",
+    )
+    category: Optional[str] = Field(default="general", index=True, description="Formula category")
+    tags_json: Optional[str] = Field(
+        default=None, sa_column=Column(Text), description="JSON list of searchable tags"
+    )
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+    # --- helpers for JSON columns ------------------------------------------
+
+    @property
+    def variables(self) -> List[str]:
+        return json.loads(self.variables_json) if self.variables_json else []
+
+    @variables.setter
+    def variables(self, value: List[str]) -> None:
+        self.variables_json = json.dumps(value)
+
+    @property
+    def variable_details(self) -> Optional[List[Dict[str, str]]]:
+        return json.loads(self.variable_details_json) if self.variable_details_json else None
+
+    @variable_details.setter
+    def variable_details(self, value: Optional[List[Dict[str, str]]]) -> None:
+        self.variable_details_json = json.dumps(value) if value is not None else None
+
+    @property
+    def tags(self) -> List[str]:
+        return json.loads(self.tags_json) if self.tags_json else []
+
+    @tags.setter
+    def tags(self, value: List[str]) -> None:
+        self.tags_json = json.dumps(value)
+
+    def to_dict(self) -> dict:
+        """Return a plain dict matching the shape the solver/MCP tools expect."""
+        return {
+            "formula_id": self.formula_id,
+            "name": self.name,
+            "description": self.description,
+            "equation": self.equation,
+            "variables": self.variables,
+            "variable_details": self.variable_details,
+            "category": self.category,
+            "tags": self.tags,
+            "created_at": self.created_at,
+            "updated_at": self.updated_at,
         }

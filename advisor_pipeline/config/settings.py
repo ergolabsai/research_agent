@@ -18,10 +18,6 @@ class Settings(BaseSettings):
     secret_key: str = os.getenv("SECRET_KEY", "change-this-to-a-random-secret-key")
     database_url: str = os.getenv("DATABASE_URL", "sqlite:///./backend/data/app.db")
 
-    # MongoDB (pipeline + calculator)
-    mongodb_uri: str = os.getenv("MONGODB_URI", "mongodb://localhost:27017")
-    database_name: str = os.getenv("DATABASE_NAME", "advisor_db")
-
     # MCP Server
     mcp_server_url: Optional[str] = os.getenv("MCP_SERVER_URL", None)
     mcp_server_command: Optional[str] = os.getenv("MCP_SERVER_COMMAND", None)
@@ -40,6 +36,10 @@ class Settings(BaseSettings):
     # Pipeline Settings
     max_retries: int = 3
     timeout_seconds: int = 300
+
+    # LanceDB
+    lancedb_path: str = os.getenv("LANCEDB_PATH", "backend/data/arxiv_lancedb")
+    embedding_model: str = os.getenv("EMBEDDING_MODEL", "BAAI/bge-small-en-v1.5")
 
     # MinIO
     minio_endpoint: str = os.getenv("MINIO_ENDPOINT", "localhost:9000")

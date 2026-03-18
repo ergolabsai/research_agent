@@ -4,7 +4,7 @@ Symbolic equation solver.
 Uses SymPy to rearrange equations and solve for any variable.
 """
 
-from .db_config import MongoDBConnection, DB_NAME, FORMULAS_COLLECTION
+from .db_config import get_engine
 from .repository import FormulaRepository
 import sympy as sp
 from typing import Dict, Any, Optional
@@ -12,15 +12,13 @@ from typing import Dict, Any, Optional
 
 class FormulaCalculator:
     """
-    Calculator that uses MongoDB for formula storage
-    Integrates with your MCP server
+    Calculator that uses SQLite for formula storage.
+    Integrates with the MCP server.
     """
 
     def __init__(self):
-        """Initialize with MongoDB connection"""
-        self.mongo = MongoDBConnection()
-        self.db = self.mongo.connect(DB_NAME)
-        self.repo = FormulaRepository(self.db[FORMULAS_COLLECTION])
+        """Initialize with SQLite engine."""
+        self.repo = FormulaRepository(get_engine())
 
     def list_formulas(self, category: Optional[str] = None) -> Dict[str, Any]:
         """
@@ -269,5 +267,5 @@ class FormulaCalculator:
             }
 
     def close(self):
-        """Close database connection"""
-        self.mongo.close()
+        """No-op — SQLite connections are managed per-session."""
+        pass

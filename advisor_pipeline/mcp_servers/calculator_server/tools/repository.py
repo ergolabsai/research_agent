@@ -1,244 +1,272 @@
 """
-CRUD Operations for Formula Management
+CRUD Operations for Formula Management (SQLite / SQLModel)
 """
+import json
 from typing import List, Dict, Any, Optional
-from datetime import datetime
-from pymongo.collection import Collection
-from pymongo import ASCENDING, TEXT
+from datetime import datetime, timezone
+
+from sqlmodel import Session, select
+from sqlalchemy import Engine
+
 from .models import Formula
 
 
 class FormulaRepository:
-    """Handles all database operations for formulas"""
-    
-    def __init__(self, collection: Collection):
-        """
-        Initialize repository with MongoDB collection
-        
-        Args:
-            collection: MongoDB collection for formulas
-        """
-        self.collection = collection
-        self._create_indexes()
-    
-    def _create_indexes(self):
-        """Create database indexes for better performance"""
-        # Unique index on formula_id
-        self.collection.create_index([("formula_id", ASCENDING)], unique=True)
-        
-        # Text index for searching
-        self.collection.create_index([
-            ("name", TEXT),
-            ("description", TEXT),
-            ("tags", TEXT)
-        ])
-        
-        # Category index
-        self.collection.create_index([("category", ASCENDING)])
-    
+    """Handles all database operations for formulas."""
+
+    def __init__(self, engine: Engine):
+        self.engine = engine
+
+    # --- helpers -----------------------------------------------------------
+
+    def _session(self) -> Session:
+        return Session(self.engine)
+
     # ADD
     def add_formula(self, formula: Formula) -> Dict[str, Any]:
         """
-        Add a new formula to the database
-        
+        Add a new formula to the database.
+
         Args:
             formula: Formula object to insert
-            
+
         Returns:
-            Inserted formula with MongoDB _id
+            Inserted formula as dict
         """
-        formula_dict = formula.model_dump()
-        result = self.collection.insert_one(formula_dict)
-        formula_dict['_id'] = str(result.inserted_id)
-        return formula_dict
-    
+        with self._session() as session:
+            session.add(formula)
+            session.commit()
+            session.refresh(formula)
+            return formula.to_dict()
+
     # READ
     def get_formula_by_id(self, formula_id: str) -> Optional[Dict[str, Any]]:
         """
-        Retrieve a formula by its ID
-        
+        Retrieve a formula by its formula_id.
+
         Args:
             formula_id: Unique formula identifier
-            
+
         Returns:
-            Formula document or None if not found
+            Formula dict or None if not found
         """
-        formula = self.collection.find_one({"formula_id": formula_id})
-        if formula:
-            formula['_id'] = str(formula['_id'])
-        return formula
-    
+        with self._session() as session:
+            formula = session.exec(
+                select(Formula).where(Formula.formula_id == formula_id)
+            ).first()
+            return formula.to_dict() if formula else None
+
     def get_all_formulas(self, category: Optional[str] = None) -> List[Dict[str, Any]]:
         """
-        Retrieve all formulas, optionally filtered by category
-        
+        Retrieve all formulas, optionally filtered by category.
+
         Args:
             category: Optional category filter
-            
+
         Returns:
-            List of formula documents
+            List of formula dicts
         """
-        query = {"category": category} if category else {}
-        formulas = list(self.collection.find(query))
-        
-        # Convert ObjectId to string
-        for formula in formulas:
-            formula['_id'] = str(formula['_id'])
-        
-        return formulas
-    
+        with self._session() as session:
+            stmt = select(Formula)
+            if category:
+                stmt = stmt.where(Formula.category == category)
+            formulas = session.exec(stmt).all()
+            return [f.to_dict() for f in formulas]
+
     def search_formulas(self, search_term: str) -> List[Dict[str, Any]]:
         """
-        Search formulas by text (name, description, tags)
-        
+        Search formulas by text (name, description, tags).
+
+        Uses SQL LIKE — sufficient for the expected scale (hundreds of formulas).
+
         Args:
             search_term: Text to search for
-            
+
         Returns:
-            List of matching formula documents
+            List of matching formula dicts
         """
-        formulas = list(self.collection.find(
-            {"$text": {"$search": search_term}}
-        ))
-        
-        for formula in formulas:
-            formula['_id'] = str(formula['_id'])
-        
-        return formulas
-    
+        pattern = f"%{search_term}%"
+        with self._session() as session:
+            stmt = select(Formula).where(
+                (Formula.name.ilike(pattern))
+                | (Formula.description.ilike(pattern))
+                | (Formula.tags_json.ilike(pattern))
+            )
+            formulas = session.exec(stmt).all()
+            return [f.to_dict() for f in formulas]
+
     def get_formulas_by_tag(self, tag: str) -> List[Dict[str, Any]]:
         """
-        Get all formulas with a specific tag
-        
+        Get all formulas that contain a specific tag.
+
         Args:
             tag: Tag to filter by
-            
+
         Returns:
-            List of formula documents
+            List of formula dicts
         """
-        formulas = list(self.collection.find({"tags": tag}))
-        
-        for formula in formulas:
-            formula['_id'] = str(formula['_id'])
-        
-        return formulas
-    
+        with self._session() as session:
+            # Tags are stored as a JSON list e.g. '["physics", "energy"]'
+            # A LIKE on the serialized form is sufficient here.
+            stmt = select(Formula).where(Formula.tags_json.ilike(f'%"{tag}"%'))
+            formulas = session.exec(stmt).all()
+            return [f.to_dict() for f in formulas]
+
     # UPDATE
     def update_formula(self, formula_id: str, updates: Dict[str, Any]) -> bool:
         """
-        Update a formula's fields
-        
+        Update a formula's fields.
+
         Args:
             formula_id: Formula to update
             updates: Dictionary of fields to update
-            
+
         Returns:
             True if updated, False if not found
         """
-        # Always update the updated_at timestamp
-        updates['updated_at'] = datetime.utcnow()
-        
-        result = self.collection.update_one(
-            {"formula_id": formula_id},
-            {"$set": updates}
-        )
-        
-        return result.modified_count > 0
-    
+        with self._session() as session:
+            formula = session.exec(
+                select(Formula).where(Formula.formula_id == formula_id)
+            ).first()
+            if not formula:
+                return False
+
+            for key, value in updates.items():
+                if key in ("variables", "variable_details", "tags"):
+                    # Use the property setter which serialises to JSON
+                    setattr(formula, key, value)
+                elif hasattr(formula, key):
+                    setattr(formula, key, value)
+
+            formula.updated_at = datetime.now(timezone.utc)
+            session.add(formula)
+            session.commit()
+            return True
+
     def add_tags(self, formula_id: str, tags: List[str]) -> bool:
         """
-        Add tags to a formula
-        
+        Add tags to a formula (no duplicates).
+
         Args:
             formula_id: Formula to update
-            tags: List of tags to add
-            
+            tags: Tags to add
+
         Returns:
             True if updated, False if not found
         """
-        result = self.collection.update_one(
-            {"formula_id": formula_id},
-            {
-                "$addToSet": {"tags": {"$each": tags}},
-                "$set": {"updated_at": datetime.utcnow()}
-            }
-        )
-        
-        return result.modified_count > 0
-    
+        with self._session() as session:
+            formula = session.exec(
+                select(Formula).where(Formula.formula_id == formula_id)
+            ).first()
+            if not formula:
+                return False
+
+            existing = set(formula.tags)
+            existing.update(tags)
+            formula.tags = list(existing)
+            formula.updated_at = datetime.now(timezone.utc)
+            session.add(formula)
+            session.commit()
+            return True
+
     def remove_tags(self, formula_id: str, tags: List[str]) -> bool:
         """
-        Remove tags from a formula
-        
+        Remove tags from a formula.
+
         Args:
             formula_id: Formula to update
-            tags: List of tags to remove
-            
+            tags: Tags to remove
+
         Returns:
             True if updated, False if not found
         """
-        result = self.collection.update_one(
-            {"formula_id": formula_id},
-            {
-                "$pull": {"tags": {"$in": tags}},
-                "$set": {"updated_at": datetime.utcnow()}
-            }
-        )
-        
-        return result.modified_count > 0
-    
+        with self._session() as session:
+            formula = session.exec(
+                select(Formula).where(Formula.formula_id == formula_id)
+            ).first()
+            if not formula:
+                return False
+
+            formula.tags = [t for t in formula.tags if t not in tags]
+            formula.updated_at = datetime.now(timezone.utc)
+            session.add(formula)
+            session.commit()
+            return True
+
     # DELETE
     def delete_formula(self, formula_id: str) -> bool:
         """
-        Delete a formula from the database
-        
+        Delete a formula.
+
         Args:
             formula_id: Formula to delete
-            
+
         Returns:
             True if deleted, False if not found
         """
-        result = self.collection.delete_one({"formula_id": formula_id})
-        return result.deleted_count > 0
-    
+        with self._session() as session:
+            formula = session.exec(
+                select(Formula).where(Formula.formula_id == formula_id)
+            ).first()
+            if not formula:
+                return False
+            session.delete(formula)
+            session.commit()
+            return True
+
     def delete_all_formulas(self) -> int:
         """
-        Delete all formulas (use with caution!)
-        
+        Delete all formulas.
+
         Returns:
             Number of formulas deleted
         """
-        result = self.collection.delete_many({})
-        return result.deleted_count
-    
+        with self._session() as session:
+            formulas = session.exec(select(Formula)).all()
+            count = len(formulas)
+            for f in formulas:
+                session.delete(f)
+            session.commit()
+            return count
+
     # UTILITY
     def count_formulas(self, category: Optional[str] = None) -> int:
         """
-        Count formulas, optionally by category
-        
+        Count formulas, optionally by category.
+
         Args:
             category: Optional category filter
-            
+
         Returns:
             Count of formulas
         """
-        query = {"category": category} if category else {}
-        return self.collection.count_documents(query)
-    
+        with self._session() as session:
+            stmt = select(Formula)
+            if category:
+                stmt = stmt.where(Formula.category == category)
+            return len(session.exec(stmt).all())
+
     def get_categories(self) -> List[str]:
         """
-        Get list of all unique categories
-        
+        Get list of all unique categories.
+
         Returns:
-            List of category names
+            Sorted list of category names
         """
-        return self.collection.distinct("category")
-    
+        with self._session() as session:
+            formulas = session.exec(select(Formula.category).distinct()).all()
+            return sorted([c for c in formulas if c])
+
     def get_all_tags(self) -> List[str]:
         """
-        Get list of all unique tags
-        
+        Get list of all unique tags across all formulas.
+
         Returns:
-            List of tags
+            Sorted list of tags
         """
-        return self.collection.distinct("tags")
+        with self._session() as session:
+            formulas = session.exec(select(Formula)).all()
+            all_tags: set[str] = set()
+            for f in formulas:
+                all_tags.update(f.tags)
+            return sorted(all_tags)

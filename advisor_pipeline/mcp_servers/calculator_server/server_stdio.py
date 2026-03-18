@@ -15,6 +15,7 @@ from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp.types import Tool, TextContent
 
+from .tools.initialization import seed_formulas_if_empty
 from .tools.mcp_tools import get_all_tools, handle_tool
 
 # Create the MCP server
@@ -34,6 +35,7 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
 
 
 async def main():
+    seed_formulas_if_empty()
     async with stdio_server() as (read_stream, write_stream):
         await server.run(
             read_stream,

@@ -18,7 +18,6 @@ dependencies = [
 
     # Database
     "sqlmodel>=0.0.22",
-    "pymongo>=4.8.0",
 
     # Auth & Security
     "python-jose[cryptography]>=3.3.0",

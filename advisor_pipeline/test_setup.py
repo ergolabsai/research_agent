@@ -40,13 +40,6 @@ def test_imports():
         return False
     
     try:
-        import pymongo
-        print("✓ pymongo")
-    except ImportError as e:
-        print(f"✗ pymongo: {e}")
-        return False
-    
-    try:
         from pydantic import BaseModel
         print("✓ pydantic")
     except ImportError as e:
@@ -210,8 +203,7 @@ def run_all_tests():
         print("✓ All tests passed! Setup is complete.")
         print("\nNext steps:")
         print("1. Set ANTHROPIC_API_KEY in .env file")
-        print("2. Start MongoDB (if using database features)")
-        print("3. Run: python example_usage.py")
+        print("2. Run: python example_usage.py")
     else:
         print("✗ Some tests failed. Please fix the issues above.")
         print("\nCommon fixes:")

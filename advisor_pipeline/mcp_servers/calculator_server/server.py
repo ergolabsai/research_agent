@@ -14,7 +14,11 @@ from mcp.server.sse import SseServerTransport
 from mcp.types import Tool, TextContent
 import uvicorn
 
+from .tools.initialization import seed_formulas_if_empty
 from .tools.mcp_tools import get_all_tools, handle_tool
+
+# Ensure formula table exists and is seeded on import.
+seed_formulas_if_empty()
 
 # Create the MCP server
 server = Server("calculation-server")

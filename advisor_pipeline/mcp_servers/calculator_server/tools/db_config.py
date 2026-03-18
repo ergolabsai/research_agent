@@ -1,55 +1,34 @@
 """
-MongoDB Configuration and Connection Management
+SQLite Configuration and Connection Management for the Calculator Server.
+
+Uses the same SQLite database as the backend (via ``settings.database_url``).
 """
-from pymongo import MongoClient
-from pymongo.errors import ConnectionFailure
-import os
-from typing import Optional
+from sqlmodel import SQLModel, Session, create_engine
 
-class MongoDBConnection:
-    """Manages MongoDB connection"""
-    
-    def __init__(self, connection_string: Optional[str] = None):
-        """
-        Initialize MongoDB connection
-        
-        Args:
-            connection_string: MongoDB connection string. 
-                             Defaults to MONGODB_URI env variable or localhost
-        """
-        self.connection_string = connection_string or os.getenv(
-            'MONGODB_URI', 
-            'mongodb://localhost:27017/'
+from advisor_pipeline.config.settings import settings
+
+# Lazy singleton engine – created once per process.
+_engine = None
+
+
+def get_engine():
+    """Return (and cache) a SQLAlchemy engine for the shared SQLite DB."""
+    global _engine
+    if _engine is None:
+        _engine = create_engine(
+            settings.database_url,
+            connect_args={"check_same_thread": False},
         )
-        self.client = None
-        self.db = None
-        
-    def connect(self, database_name: str = 'equations_db'):
-        """Connect to MongoDB and return database instance"""
-        try:
-            self.client = MongoClient(self.connection_string)
-            # Test connection
-            self.client.admin.command('ping')
-            self.db = self.client[database_name]
-            print(f"✓ Connected to MongoDB database: {database_name}")
-            return self.db
-        except ConnectionFailure as e:
-            print(f"✗ Failed to connect to MongoDB: {e}")
-            raise
-    
-    def close(self):
-        """Close MongoDB connection"""
-        if self.client:
-            self.client.close()
-            print("✓ MongoDB connection closed")
-    
-    def get_collection(self, collection_name: str):
-        """Get a specific collection from the database"""
-        if not self.db:
-            raise RuntimeError("Database not connected. Call connect() first.")
-        return self.db[collection_name]
+    return _engine
 
 
-# Database and collection names
-DB_NAME = 'equations_db'
-FORMULAS_COLLECTION = 'formulas'
+def get_session():
+    """Yield a SQLModel Session scoped to the shared engine."""
+    with Session(get_engine()) as session:
+        yield session
+
+
+def init_db():
+    """Create all SQLModel tables (including Formula) if they don't exist."""
+    from .models import Formula  # noqa: F401 – registers the table
+    SQLModel.metadata.create_all(get_engine())

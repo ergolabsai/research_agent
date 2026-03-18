@@ -14,7 +14,6 @@ minio
 pandas
 pydantic
 pydantic-settings
-pymongo
 python-dotenv
 python-jose[cryptography]
 python-multipart
@@ -27,7 +26,4 @@ beautifulsoup4
 ijson
 numpy
 tantivy
-torch
-torchvision
-torchaudio
 transformers

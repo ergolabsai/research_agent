@@ -10,6 +10,9 @@ from app.security import engine
 from app.routes import auth, documents, workspaces, users, pipeline
 from backend.app.storage import init_storage
 
+# Import models so they register with SQLModel.metadata
+import app.models  # noqa: F401
+from advisor_pipeline.mcp_servers.calculator_server.tools.models import Formula  # noqa: F401
 
 # Create tables
 SQLModel.metadata.create_all(engine)

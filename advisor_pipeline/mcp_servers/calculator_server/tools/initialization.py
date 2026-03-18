@@ -1,10 +1,13 @@
 """
-Migration Script: Populate MongoDB with Existing Formulas
+Seed the SQLite database with the starter set of formulas.
 """
-from tools.db_config import MongoDBConnection, DB_NAME, FORMULAS_COLLECTION
-from repository import FormulaRepository
-from models import Formula
+import json
 import math
+
+from sqlmodel import Session, select
+
+from .db_config import get_engine, init_db
+from .models import Formula
 
 
 def get_formula_data():
@@ -232,65 +235,37 @@ def get_formula_data():
     ]
 
 
-def migrate_formulas():
-    """Execute the migration"""
-    print("=" * 60)
-    print("Formula Migration to MongoDB")
-    print("=" * 60)
-    
-    # Connect to MongoDB
-    mongo = MongoDBConnection()
-    db = mongo.connect(DB_NAME)
-    collection = db[FORMULAS_COLLECTION]
-    
-    # Create repository
-    repo = FormulaRepository(collection)
-    
-    # Clear existing formulas (optional - comment out if you want to preserve existing data)
-    print("\n⚠ Clearing existing formulas...")
-    deleted = repo.delete_all_formulas()
-    print(f"  Deleted {deleted} existing formulas")
-    
-    # Get formula data
-    formulas_data = get_formula_data()
-    
-    # Insert formulas
-    print(f"\n📝 Inserting {len(formulas_data)} formulas...")
-    success_count = 0
-    error_count = 0
-    
-    for formula_data in formulas_data:
-        try:
-            formula = Formula(**formula_data)
-            repo.create_formula(formula)
-            print(f"  ✓ {formula.name} ({formula.formula_id})")
-            success_count += 1
-        except Exception as e:
-            print(f"  ✗ Failed to insert {formula_data['formula_id']}: {e}")
-            error_count += 1
-    
-    # Summary
-    print("\n" + "=" * 60)
-    print("Migration Summary")
-    print("=" * 60)
-    print(f"✓ Successfully inserted: {success_count}")
-    print(f"✗ Failed: {error_count}")
-    print(f"📊 Total formulas in database: {repo.count_formulas()}")
-    
-    # Show categories
-    categories = repo.get_categories()
-    print(f"\n📁 Categories: {', '.join(categories)}")
-    
-    # Show formula counts by category
-    print("\n📈 Formulas by category:")
-    for category in categories:
-        count = repo.count_formulas(category)
-        print(f"  {category}: {count}")
-    
-    # Close connection
-    mongo.close()
-    print("\n✅ Migration complete!")
+def seed_formulas_if_empty(engine=None):
+    """Populate the formula table with the starter set if it is empty.
+
+    Safe to call on every startup — does nothing when formulas already exist.
+    """
+    if engine is None:
+        engine = get_engine()
+
+    init_db()  # ensure table exists
+
+    with Session(engine) as session:
+        existing = session.exec(select(Formula)).first()
+        if existing is not None:
+            return  # already seeded
+
+        for data in get_formula_data():
+            formula = Formula(
+                formula_id=data["formula_id"],
+                name=data["name"],
+                description=data["description"],
+                equation=data["equation"],
+                variables_json=json.dumps(data["variables"]),
+                variable_details_json=json.dumps(data.get("variable_details")),
+                category=data.get("category", "general"),
+                tags_json=json.dumps(data.get("tags", [])),
+            )
+            session.add(formula)
+
+        session.commit()
+        print(f"Seeded {len(get_formula_data())} formulas into SQLite.")
 
 
 if __name__ == "__main__":
-    migrate_formulas()
+    seed_formulas_if_empty()
