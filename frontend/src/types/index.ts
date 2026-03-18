@@ -88,12 +88,6 @@ export interface StepValidation {
     calculation_valid: boolean;
     details: string;
   }>;
-  citation_validations: Array<{
-    citation: string;
-    accessible: boolean;
-    supports_claim: boolean | null;
-    notes: string;
-  }>;
 }
 
 export interface ValidationResult {

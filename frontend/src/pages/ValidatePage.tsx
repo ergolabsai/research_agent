@@ -99,7 +99,15 @@ export const ValidatePage = () => {
         : "error";
 
   return (
-    <Box sx={{ maxWidth: 900, mx: "auto", display: "flex", flexDirection: "column", gap: 3 }}>
+    <Box
+      sx={{
+        maxWidth: 900,
+        mx: "auto",
+        display: "flex",
+        flexDirection: "column",
+        gap: 3,
+      }}
+    >
       <Typography variant="h5" fontWeight={700}>
         Validate a Paper
       </Typography>
@@ -177,8 +185,14 @@ export const ValidatePage = () => {
       {result && (
         <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
           <Paper sx={{ p: 3 }}>
-            <Stack direction="row" justifyContent="space-between" alignItems="center">
-              <Typography variant="h6">{result.paper_structure.title}</Typography>
+            <Stack
+              direction="row"
+              justifyContent="space-between"
+              alignItems="center"
+            >
+              <Typography variant="h6">
+                {result.paper_structure.title}
+              </Typography>
               <Chip
                 label={`${(result.confidence_score * 100).toFixed(0)}% confidence`}
                 color={confidenceColor as any}
@@ -204,11 +218,17 @@ export const ValidatePage = () => {
           {/* Step-by-step breakdown */}
           <Typography variant="h6">Step-by-Step Analysis</Typography>
           {result.paper_structure.logical_steps.map((step) => {
-            const validation = result.step_validations[String(step.step_number)];
+            const validation =
+              result.step_validations[String(step.step_number)];
             return (
               <Accordion key={step.step_number}>
                 <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                  <Stack direction="row" spacing={1} alignItems="center" sx={{ width: "100%" }}>
+                  <Stack
+                    direction="row"
+                    spacing={1}
+                    alignItems="center"
+                    sx={{ width: "100%" }}
+                  >
                     <Typography fontWeight={600}>
                       Step {step.step_number}:
                     </Typography>
@@ -226,7 +246,12 @@ export const ValidatePage = () => {
                   {validation ? (
                     <Stack spacing={1}>
                       {validation.math_validations.map((m, i) => (
-                        <Stack key={i} direction="row" spacing={1} alignItems="center">
+                        <Stack
+                          key={i}
+                          direction="row"
+                          spacing={1}
+                          alignItems="center"
+                        >
                           {m.calculation_valid ? (
                             <CheckIcon color="success" fontSize="small" />
                           ) : (
@@ -237,30 +262,22 @@ export const ValidatePage = () => {
                           </Typography>
                         </Stack>
                       ))}
-                      {validation.citation_validations.map((c, i) => (
-                        <Stack key={i} direction="row" spacing={1} alignItems="center">
-                          {c.supports_claim === true ? (
-                            <CheckIcon color="success" fontSize="small" />
-                          ) : c.supports_claim === false ? (
-                            <FailIcon color="error" fontSize="small" />
-                          ) : (
-                            <UnknownIcon color="disabled" fontSize="small" />
-                          )}
-                          <Typography variant="body2">
-                            {c.citation}: {c.notes}
-                          </Typography>
-                        </Stack>
-                      ))}
+
                       {validation.figure_validations.map((f, i) => (
-                        <Stack key={i} direction="row" spacing={1} alignItems="center">
+                        <Stack
+                          key={i}
+                          direction="row"
+                          spacing={1}
+                          alignItems="center"
+                        >
                           <Typography variant="body2">
-                            {f.figure_name}: {f.validity.confirmations.length} confirmations,{" "}
-                            {f.validity.contradictions.length} contradictions
+                            {f.figure_name}: {f.validity.confirmations.length}{" "}
+                            confirmations, {f.validity.contradictions.length}{" "}
+                            contradictions
                           </Typography>
                         </Stack>
                       ))}
                       {!validation.math_validations.length &&
-                        !validation.citation_validations.length &&
                         !validation.figure_validations.length && (
                           <Typography variant="body2" color="text.secondary">
                             No detailed validations for this step.
