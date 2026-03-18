@@ -1,6 +1,6 @@
 # Research Advisor
 
-A multi-agent system that validates scientific research papers. Paste in a paper, and the system analyzes its logical structure, verifies math, checks citations against Semantic Scholar, evaluates figures, and produces a confidence-scored assessment.
+A multi-agent system that validates scientific research papers. Paste in a paper, and the system analyzes its logical structure, verifies math, finds related papers via LanceDB and Semantic Scholar, evaluates figures, and produces a confidence-scored assessment.
 
 Built with a LangGraph orchestrator, MCP tool servers, and structured LLM output via `ChatAnthropic.with_structured_output()`.
 
@@ -10,22 +10,21 @@ Built with a LangGraph orchestrator, MCP tool servers, and structured LLM output
 Frontend (localhost:5173)       Backend (localhost:8070)        Pipeline (LangGraph)
 ========================        =====================          ====================
 ValidatePage                    POST /api/pipeline/validate    1. Make Context
-  - paste paper text     --->     creates PipelineJob          2. Map Logic
-  - polls every 2s       <---   GET  /api/pipeline/status/:id  3. Find Evidence
-  - step-by-step results        GET  /api/pipeline/results/:id 4. Evaluate Figures
-                                                               5. Evaluate Math
-DashboardPage                   /api/documents/*               6. Check Citations
-EditorPage                      /api/workspaces/*              7. Compile Results
-Login / Register                /api/auth/*
+  - paste paper text     --->     creates PipelineJob          2. Gather Papers (pass 1)
+  - polls every 2s       <---   GET  /api/pipeline/status/:id  3. Map Logic
+  - step-by-step results        GET  /api/pipeline/results/:id 4. Find Evidence
+                                                               5. Evaluate Figures
+DashboardPage                   /api/documents/*               6. Evaluate Math
+EditorPage                      /api/workspaces/*              7. Score Papers (pass 2)
+Login / Register                /api/auth/*                    8. Compile Results
 ```
 
 The Vite dev server proxies `/api` requests to the FastAPI backend. The backend runs the pipeline in a thread pool via `loop.run_in_executor` and exposes progress via polling endpoints.
 
 **Data stores:**
 
-- **SQLite** (via SQLModel) — users, documents, workspaces, attachments, shares
-- **MongoDB** (via PyMongo) — formula definitions (calculator server)
-- **LanceDB** — arXiv paper embeddings (used by migration scripts)
+- **SQLite** (via SQLModel) — users, documents, workspaces, attachments, shares, pipeline jobs + step logs, calculator formulas
+- **LanceDB** — arXiv paper embeddings for vector + full-text search (used by Librarian agent and migration scripts)
 - **In-memory dicts** — pipeline job tracking (not persistent across restarts)
 
 ## Project Structure
@@ -33,22 +32,22 @@ The Vite dev server proxies `/api` requests to the FastAPI backend. The backend 
 ```
 .
 ├── advisor_pipeline/           # LangGraph validation pipeline
-│   ├── orchestrator.py         # StateGraph: 7 sequential nodes
+│   ├── orchestrator.py         # StateGraph: 8 sequential nodes (two-pass Librarian design)
 │   ├── llm.py                  # Shared ChatAnthropic + helpers (structured output, vision, text)
 │   ├── mcp_client.py           # Sync wrapper for async MCP SDK (CalculatorClient)
 │   ├── agents/
 │   │   ├── figure_evaluator.py # 4-stage vision+text LLM evaluation per figure
 │   │   ├── math_evaluator.py   # ReAct agent with MCP calculator tools
-│   │   └── citation_checker.py # ReAct agent with Semantic Scholar API tools
+│   │   └── librarian.py        # Two-pass agent: gather papers (LanceDB FTS/vector + S2 fallback), then score relevancy/convergence
 │   ├── mcp_servers/
 │   │   ├── advisor_server/     # Stdio MCP server: 12 prompt templates + 5 tools
 │   │   │   ├── server.py
-│   │   │   ├── prompts.py      # All prompt templates (logic_mapper, evidence_finder, etc.)
+│   │   │   ├── prompts.py      # All prompt templates (logic_mapper, evidence_finder, librarian_*, etc.)
 │   │   │   └── tools.py        # load_paper, search_semantic_scholar, get_paper_abstract, etc.
 │   │   └── calculator_server/  # HTTP/SSE + stdio MCP server: 4 math tools
 │   │       ├── server.py       # SSE transport
 │   │       ├── server_stdio.py # Stdio transport
-│   │       └── tools/          # MongoDB formulas + SymPy solver
+│   │       └── tools/          # SQLite formulas + SymPy solver
 │   ├── models/
 │   │   ├── schemas.py          # Pydantic models (PaperStructure, Evidence, ValidationResult, etc.)
 │   │   └── paper_graph.py      # NetworkX DiGraph with typed nodes/edges + query helpers
@@ -56,6 +55,7 @@ The Vite dev server proxies `/api` requests to the FastAPI backend. The backend 
 │   │   └── settings.py         # Pydantic BaseSettings from .env
 │   └── utils/
 │       ├── load_paper.py       # Load .tex + images + bibliography
+│       ├── lancedb_search.py   # Shared LanceDB utility (vector + FTS search, lazy connections)
 │       └── graph_visualizer.py # Pyvis interactive HTML visualization
 │
 ├── backend/                    # FastAPI application
@@ -108,7 +108,6 @@ The Vite dev server proxies `/api` requests to the FastAPI backend. The backend 
 
 - Python 3.12+
 - Node.js 18+
-- MongoDB running locally (default: `localhost:27017`) — needed for calculator server formulas
 - An [Anthropic API key](https://console.anthropic.com/)
 
 ### 1. Environment
@@ -141,21 +140,7 @@ cd frontend
 npm install
 ```
 
-### 4. Start MongoDB
-
-Skip if MongoDB is already running.
-
-```bash
-mongosh   # check if available
-
-# macOS:
-brew services start mongodb-community
-
-# Docker:
-docker run -d -p 27017:27017 mongo
-```
-
-### 5. Run
+### 4. Run
 
 ```bash
 # One command (Windows):
@@ -174,15 +159,16 @@ The frontend runs at `http://localhost:5173` and proxies `/api` calls to the bac
 
 ## How Validation Works
 
-The pipeline is a LangGraph `StateGraph` with 7 sequential nodes. When you submit a paper through the Validate page or API:
+The pipeline is a LangGraph `StateGraph` with 8 sequential nodes. When you submit a paper through the Validate page or API:
 
 1. **Make Context** — LLM enriches the paper text with relevant research context
-2. **Map Logic** — Extracts the paper's title, main claim, and ordered logical steps with dependencies (`PaperStructure`)
-3. **Find Evidence** — For each logical step, finds supporting figures, equations, and citations (`StepEvidence`). Builds a NetworkX `DiGraph` (paper → steps → evidence)
-4. **Evaluate Figures** — `FigureEvaluator` runs 4 LLM calls per figure: vision description → expected description → comparison → claim assessment
-5. **Evaluate Math** — `MathEvaluator` (LangGraph ReAct agent) uses the MCP calculator server to verify equations with SymPy
-6. **Check Citations** — `CitationChecker` (LangGraph ReAct agent) uses Semantic Scholar API tools to verify citations
-7. **Compile Results** — LLM synthesizes an `OverAllReview`, calculates a 0–1 confidence score (average of math validity, figure confirmations, citation support, evidence coverage)
+2. **Gather Papers** _(Librarian pass 1)_ — `Librarian` finds related papers: extracts cited paper titles from the bibliography, searches LanceDB via FTS (falling back to Semantic Scholar), then uses LLM-crafted vector search queries to discover additional related work. Produces a context summary that enriches downstream analysis.
+3. **Map Logic** — Extracts the paper's title, main claim, and ordered logical steps with dependencies (`PaperStructure`)
+4. **Find Evidence** — For each logical step, finds supporting figures, equations, and citations (`StepEvidence`). Builds a NetworkX `DiGraph` (paper → steps → evidence)
+5. **Evaluate Figures** — `FigureEvaluator` runs 4 LLM calls per figure: vision description → expected description → comparison → claim assessment
+6. **Evaluate Math** — `MathEvaluator` (LangGraph ReAct agent) uses the MCP calculator server to verify equations with SymPy
+7. **Score Papers** _(Librarian pass 2)_ — `Librarian` scores each discovered paper for relevancy (0–1) and convergence (−1 to +1, where negative means the paper contradicts the submitted work and positive means it supports/converges). Results are added to the paper graph.
+8. **Compile Results** — LLM synthesizes an `OverAllReview`, calculates a 0–1 confidence score
 
 The backend runs the pipeline as a background task. The frontend polls `/api/pipeline/status/:jobId` every 2 seconds and displays step-by-step progress.
 
@@ -192,7 +178,7 @@ The final score averages four metrics:
 
 - Math validity fraction (correct / total equations)
 - Figure confirmation ratio (confirmations vs contradictions)
-- Citation support ratio (supporting / total citations)
+- Librarian convergence score (relevancy-weighted average convergence of related papers, mapped from [−1, +1] to [0, 1])
 - Evidence coverage (steps with evidence / total steps)
 
 ## API Endpoints
@@ -252,8 +238,8 @@ The final score averages four metrics:
 | Orchestration | LangGraph StateGraph                                                                  |
 | LLM           | Claude (Anthropic) via LangChain's `ChatAnthropic` + `with_structured_output()`       |
 | Tool servers  | MCP (Model Context Protocol) — advisor server (stdio) + calculator server (SSE/stdio) |
-| Math solver   | SymPy via MCP calculator server, backed by MongoDB formula collection                 |
-| Citations     | Semantic Scholar API                                                                  |
+| Math solver   | SymPy via MCP calculator server, backed by SQLite formula table                        |
+| Related work  | LanceDB (FTS + vector search) primary, Semantic Scholar API fallback                  |
 | Vision        | LangChain `HumanMessage` with image content blocks                                    |
 | Backend       | FastAPI, SQLModel (SQLite), JWT HS256 auth                                            |
 | Storage       | Local filesystem or MinIO (S3-compatible)                                             |

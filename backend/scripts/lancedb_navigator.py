@@ -1,17 +1,27 @@
 """
 LanceDB Navigator - A Streamlit app for exploring and searching LanceDB tables
+Run:
 streamlit run backend/scripts/lancedb_navigator.py
 """
+from pathlib import Path
+import sys
+
 import streamlit as st
 import lancedb
 import pandas as pd
-from test_lancedb import vector_search, fts_search
+
+# Ensure imports work no matter which OS/shell cwd is used to launch Streamlit.
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from advisor_pipeline.utils.lancedb_search import vector_search, fts_search
 
 st.set_page_config(layout="wide", page_title="LanceDB Navigator")
 st.title("📂 LanceDB Navigator")
 
 # Path to your DB
-DB_PATH = "backend/data/arxiv_lancedb"
+DB_PATH = PROJECT_ROOT / "backend" / "data" / "arxiv_lancedb"
 
 
 def get_filterable_columns(df):
@@ -81,7 +91,7 @@ def apply_filters(df, filters):
 
 
 try:
-    db = lancedb.connect(DB_PATH)
+    db = lancedb.connect(str(DB_PATH))
     tables = db.table_names()
     
     # === SIDEBAR ===

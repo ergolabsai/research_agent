@@ -27,7 +27,7 @@ advisor_pipeline/
 │   └── tools/               # Formula DB, solver, etc.
 ├── config/
 │   └── settings.py          # Pydantic settings from .env
-└── database.py              # MongoDB interface (papers + validations collections)
+└── database.py              # MongoDB interface (papers + validations collections) [NOTE: never implemented; replaced by SQLite]
 ```
 
 ### Key characteristics of current code:
@@ -110,7 +110,7 @@ advisor_pipeline/
 │   └── schemas.py           # KEEP AS-IS (with minor additions)
 ├── config/
 │   └── settings.py          # KEEP AS-IS
-└── database.py              # KEEP AS-IS
+└── (database.py removed — persistence is handled by SQLite via SQLModel)
 ```
 
 ### Core Idea
@@ -167,14 +167,12 @@ Each current agent's prompt becomes an MCP prompt that the orchestrator can requ
 | MCP Tool Name | Current Source | Description |
 |--------------|---------------|-------------|
 | `load_paper` | `pipeline._node_load_paper()` | Load paper text + figures from disk |
-| `query_paper_db` | `database.py` | Query MongoDB for papers |
-| `save_paper` | `database.py` | Save paper to MongoDB |
-| `query_evidence_db` | `database.py` | Query stored evidence/validations |
-| `save_validation` | `database.py` | Save validation results |
 | `search_semantic_scholar` | `citation_checker_agent.search_paper_database()` | Search for papers |
 | `get_paper_abstract` | `citation_checker_agent.get_paper_abstract()` | Get abstract via DOI/ID |
 | `check_paper_accessibility` | `citation_checker_agent.check_accessibility()` | Check if paper is open access |
 | `extract_doi` | `citation_checker_agent.extract_doi()` | Extract DOI from citation text |
+
+> **Note (post-refactor):** The originally planned `query_paper_db`, `save_paper`, `query_evidence_db`, and `save_validation` tools (backed by MongoDB `database.py`) were never implemented. Pipeline jobs and step logs are persisted via SQLite/SQLModel in the backend instead.
 
 The **calculator MCP server** remains separate (it already works) and continues to provide `calculate`, `verify`, `list_formulas`, `describe_formula`.
 
@@ -438,8 +436,7 @@ Execute these in order:
 
 ## Files to Preserve (do not rewrite)
 - `models/schemas.py` — only add new schemas, don't modify existing ones
-- `database.py` — keep as-is, just wrap methods as MCP tools
-- `calculator_server/tools/` — keep all calculator tool implementations
+- `calculator_server/tools/` — keep all calculator tool implementations (now backed by SQLite instead of MongoDB)
 - `config/settings.py` — only add new settings
 - `backend/` — don't touch the web backend
 - `frontend/` — don't touch the frontend
@@ -461,7 +458,7 @@ Execute these in order:
 - **Anthropic Claude** as the LLM (keep using `claude-sonnet-4-20250514` default)
 - **LangChain `ChatAnthropic` as the sole LLM client** — use `with_structured_output()` for all Pydantic schema enforcement. Do NOT use `instructor` or direct `Anthropic()` client.
 - **`tenacity`** for retry logic on structured output validation failures
-- **MongoDB** for persistence (already set up)
+- **SQLite** for persistence (via SQLModel; MongoDB has been removed)
 - **MCP protocol** for server communication
 - **Pydantic v2** for all schemas
 - Keep the project installable via `pip install -e .`
