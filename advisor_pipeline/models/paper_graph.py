@@ -1,19 +1,21 @@
 """Paper graph — builds a NetworkX DiGraph from Advisor pipeline results.
 
 Node types:
-    - paper:        The paper itself
-    - step:         A logical step in the paper's argument
-    - evidence:     An evidence item (figure/math/citation) found for a step
-    - figure:       A figure evaluation result
-    - math:         A math evaluation result
-    - citation:     A citation check result
+    - paper:          The paper itself
+    - step:           A logical step in the paper's argument
+    - evidence:       An evidence item (figure/math/citation) found for a step
+    - figure:         A figure evaluation result
+    - math:           A math evaluation result
+    - related_paper:  A paper found by the Librarian agent
 
 Edge types:
     - HAS_STEP:     paper -> step
     - DEPENDS_ON:   step -> step
     - SUPPORTS:     evidence -> step
-    - ASSESSES:     figure/math/citation -> step
+    - ASSESSES:     figure/math -> step
                     (carries location, description, confirmations/contradictions)
+    - RELATED_TO:   related_paper -> paper
+                    (carries relevancy_score, convergence_score)
 """
 
 import json
@@ -23,11 +25,12 @@ from typing import Dict, List, Optional
 import networkx as nx
 
 from advisor_pipeline.models.schemas import (
-    CitationCheck,
     Evidence,
     FigureEvaluation,
+    LibrarianResult,
     MathEvaluation,
     PaperStructure,
+    RelatedPaper,
     StepEvidence,
     ValidationResult,
 )
@@ -177,33 +180,40 @@ def add_math_evaluations(
         )
 
 
-def add_citation_checks(
+def add_librarian_results(
     G: nx.DiGraph,
-    citation_checks: List[CitationCheck],
+    librarian_result: LibrarianResult,
 ) -> None:
-    """Add citation check nodes + ASSESSES edges to an existing graph."""
-    for cit_check in citation_checks:
-        cit_node_id = f"citation:{cit_check.citation[:60]}"
-        G.add_node(
-            cit_node_id,
-            node_type="citation",
-            citation=cit_check.citation,
-            accessible=cit_check.accessible,
-            supports_claim=cit_check.supports_claim,
-            notes=cit_check.notes,
-        )
+    """Add related-paper nodes + RELATED_TO edges to the paper node."""
+    paper_node_id = None
+    for nid, data in G.nodes(data=True):
+        if data.get("node_type") == "paper":
+            paper_node_id = nid
+            break
+    if paper_node_id is None:
+        return
 
-        step_node_id = f"step:{cit_check.supports_step}"
-        prov = _get_evidence_provenance(G, cit_check.citation)
+    for rp in librarian_result.related_papers:
+        rp_node_id = f"related_paper:{rp.paper_id}"
+        G.add_node(
+            rp_node_id,
+            node_type="related_paper",
+            paper_id=rp.paper_id,
+            title=rp.title,
+            authors=rp.authors,
+            abstract=rp.abstract[:500],
+            source=rp.source,
+            relevancy_score=rp.relevancy_score,
+            relevancy_reasoning=rp.relevancy_reasoning,
+            convergence_score=rp.convergence_score,
+            convergence_reasoning=rp.convergence_reasoning,
+        )
         G.add_edge(
-            cit_node_id,
-            step_node_id,
-            edge_type="ASSESSES",
-            location=cit_check.citation,
-            description=prov["description"],
-            excerpt=prov["excerpt"],
-            accessible=cit_check.accessible,
-            supports_claim=cit_check.supports_claim,
+            rp_node_id,
+            paper_node_id,
+            edge_type="RELATED_TO",
+            relevancy_score=rp.relevancy_score,
+            convergence_score=rp.convergence_score,
         )
 
 
@@ -222,7 +232,6 @@ def build_graph_from_validation(result: ValidationResult) -> nx.DiGraph:
 
     figure_evaluations = []
     math_evaluations = []
-    citation_checks = []
     for step_num, validation in result.step_validations.items():
         figure_evaluations.extend(
             FigureEvaluation(**f) for f in validation.get("figure_validations", [])
@@ -230,13 +239,22 @@ def build_graph_from_validation(result: ValidationResult) -> nx.DiGraph:
         math_evaluations.extend(
             MathEvaluation(**m) for m in validation.get("math_validations", [])
         )
-        citation_checks.extend(
-            CitationCheck(**c) for c in validation.get("citation_validations", [])
-        )
 
     add_figure_evaluations(G, figure_evaluations)
     add_math_evaluations(G, math_evaluations)
-    add_citation_checks(G, citation_checks)
+
+    # Reconstruct librarian results if present
+    librarian_data = result.step_validations.get("librarian", {})
+    if librarian_data:
+        related_papers = [
+            RelatedPaper(**rp) for rp in librarian_data.get("related_papers", [])
+        ]
+        lib_result = LibrarianResult(
+            related_papers=related_papers,
+            context_summary=librarian_data.get("context_summary", ""),
+            search_queries=librarian_data.get("search_queries", []),
+        )
+        add_librarian_results(G, lib_result)
 
     return G
 
@@ -292,23 +310,23 @@ def get_evidence_for_step(G: nx.DiGraph, step_number: int) -> list:
 
 
 def get_evaluation_nodes_for_step(G: nx.DiGraph, step_number: int) -> list:
-    """Return all figure/math/citation nodes that assess a given step."""
+    """Return all figure/math nodes that assess a given step."""
     step_node_id = f"step:{step_number}"
     return [
         G.nodes[n]
         for n in G.predecessors(step_node_id)
-        if G.nodes[n].get("node_type") in ("figure", "math", "citation")
+        if G.nodes[n].get("node_type") in ("figure", "math")
     ]
 
 
 def get_steps_with_no_evaluation(G: nx.DiGraph) -> list:
-    """Return logical steps that have no figure/math/citation assessments."""
+    """Return logical steps that have no figure/math assessments."""
     return [
         data
         for _, data in G.nodes(data=True)
         if data.get("node_type") == "step"
         and not any(
-            G.nodes[n].get("node_type") in ("figure", "math", "citation")
+            G.nodes[n].get("node_type") in ("figure", "math")
             for n in G.predecessors(f"step:{data['step_number']}")
         )
     ]
@@ -361,15 +379,59 @@ def get_figure_confirmation_counts(G: nx.DiGraph) -> dict:
     return {"confirmations": total_confirmations, "contradictions": total_contradictions}
 
 
-def get_citation_statistics(G: nx.DiGraph) -> dict:
-    """Return citation accessibility and support statistics."""
-    citation_nodes = [data for _, data in get_nodes_by_type(G, "citation")]
-    total = len(citation_nodes)
+def get_librarian_statistics(G: nx.DiGraph) -> dict:
+    """Return statistics about related papers found by the Librarian."""
+    rp_nodes = [data for _, data in get_nodes_by_type(G, "related_paper")]
+    total = len(rp_nodes)
     if total == 0:
-        return {"total": 0, "accessible": 0, "supporting": 0}
-    accessible = [c for c in citation_nodes if c["accessible"]]
-    supporting = sum(1 for c in accessible if c["supports_claim"])
-    return {"total": total, "accessible": len(accessible), "supporting": supporting}
+        return {
+            "total": 0,
+            "avg_relevancy": 0.0,
+            "avg_convergence": 0.0,
+            "supporting": 0,
+            "contradicting": 0,
+            "neutral": 0,
+        }
+    avg_rel = sum(r["relevancy_score"] for r in rp_nodes) / total
+    avg_conv = sum(r["convergence_score"] for r in rp_nodes) / total
+    supporting = sum(1 for r in rp_nodes if r["convergence_score"] > 0.3)
+    contradicting = sum(1 for r in rp_nodes if r["convergence_score"] < -0.3)
+    neutral = total - supporting - contradicting
+    return {
+        "total": total,
+        "avg_relevancy": round(avg_rel, 3),
+        "avg_convergence": round(avg_conv, 3),
+        "supporting": supporting,
+        "contradicting": contradicting,
+        "neutral": neutral,
+    }
+
+
+def get_related_papers(G: nx.DiGraph) -> list:
+    """Return all related-paper nodes sorted by relevancy (descending)."""
+    return sorted(
+        [data for _, data in get_nodes_by_type(G, "related_paper")],
+        key=lambda r: r.get("relevancy_score", 0),
+        reverse=True,
+    )
+
+
+def get_high_impact_papers(
+    G: nx.DiGraph,
+    relevancy_threshold: float = 0.6,
+    convergence_threshold: float = 0.5,
+) -> list:
+    """Return papers with high relevancy AND high |convergence|.
+
+    These are the most important for evaluating the user's paper — highly
+    relevant papers whose conclusions either strongly agree or disagree.
+    """
+    return [
+        data
+        for _, data in get_nodes_by_type(G, "related_paper")
+        if data.get("relevancy_score", 0) >= relevancy_threshold
+        and abs(data.get("convergence_score", 0)) >= convergence_threshold
+    ]
 
 
 def get_evidence_by_type(G: nx.DiGraph, evidence_type: str) -> List[Evidence]:
@@ -390,8 +452,8 @@ def get_evidence_by_type(G: nx.DiGraph, evidence_type: str) -> List[Evidence]:
 def get_step_claims(G: nx.DiGraph) -> Dict[int, str]:
     """Return a mapping of step number -> description from the graph.
 
-    This is the shape that MathEvaluator.run() and CitationChecker.run()
-    expect for their ``claims`` parameter.
+    This is the shape that MathEvaluator.run() expects for its
+    ``claims`` parameter.
     """
     return {
         data["step_number"]: data["description"]

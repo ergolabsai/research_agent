@@ -1,13 +1,14 @@
 """Advisor Pipeline Orchestrator — LangGraph graph with conditional routing.
 
-Replaces the old linear pipeline.py with a flexible graph that supports:
-- Context enrichment loop (make_context -> find_evidence -> loop back if needed)
-- Conditional evaluation routing (figures, math, citations — only branches with evidence)
-- All evaluation types enabled (figures, math, citations)
+Pipeline flow:
+    START → make_context → gather_papers → map_logic → find_evidence
+          → evaluate_figures → evaluate_math → score_papers
+          → compile_results → END
 """
 
+import time
 from pathlib import Path
-from typing import Dict
+from typing import Callable, Dict, List, Optional
 
 import networkx as nx
 from langgraph.graph import END, START, StateGraph
@@ -22,30 +23,36 @@ from advisor_pipeline.mcp_servers.advisor_server.prompts import (
     SYSTEM_PROMPT,
 )
 from advisor_pipeline.models.paper_graph import (
-    add_citation_checks,
     add_figure_evaluations,
+    add_librarian_results,
     add_math_evaluations,
     build_paper_graph,
-    get_citation_statistics,
     get_evidence_by_type,
     get_evidence_for_step,
     get_figure_claims,
     get_figure_confirmation_counts,
+    get_high_impact_papers,
     get_invalid_math,
+    get_librarian_statistics,
     get_nodes_by_type,
+    get_related_papers,
     get_step_claims,
     get_steps,
     save_graph,
 )
 from advisor_pipeline.models.schemas import (
-    CitationCheck,
     FigureEvaluation,
+    LibrarianResult,
     MathEvaluation,
     OverAllReview,
     PaperStructure,
+    RelatedPaper,
     StepEvidence,
     ValidationResult,
 )
+
+# Step callback type: (node_name, state_update_dict, duration_seconds) -> None
+StepCallback = Callable[[str, dict, float], None]
 
 # ---------------------------------------------------------------------------
 # Pipeline state
@@ -62,6 +69,10 @@ class AdvisorState(TypedDict, total=False):
     # Populated by make_context
     paper_context: str
 
+    # Populated by gather_papers (Librarian pass 1)
+    librarian_result: LibrarianResult
+    related_papers: list[RelatedPaper]
+
     # Populated by map_logic
     paper_structure: PaperStructure
 
@@ -74,7 +85,6 @@ class AdvisorState(TypedDict, total=False):
     # Evaluation results
     figure_evaluations: list[FigureEvaluation]
     math_evaluations: list[MathEvaluation]
-    citation_checks: list[CitationCheck]
 
     # Final output
     validation_result: ValidationResult
@@ -210,30 +220,65 @@ def evaluate_math_node(state: AdvisorState) -> dict:
     return {"math_evaluations": math_evaluations, "paper_graph": G}
 
 
-def check_citations_node(state: AdvisorState) -> dict:
-    """Check citation-based evidence."""
-    from advisor_pipeline.agents.citation_checker import CitationChecker
+def gather_papers_node(state: AdvisorState) -> dict:
+    """Librarian pass 1: find cited + related papers, enrich context."""
+    from advisor_pipeline.agents.librarian import Librarian
 
-    print("STEP 3c: Checking citations...")
-
-    # Query the paper graph for citation evidence and step claims
-    G = state["paper_graph"]
-    citation_evidence = get_evidence_by_type(G, "citation")
-    claims = get_step_claims(G)
-
-    checker = CitationChecker()
-    citation_checks = checker.run(
-        evidence_list=citation_evidence,
+    print("STEP 1b: Librarian gathering related papers...")
+    librarian = Librarian()
+    librarian_result = librarian.gather_papers(
         paper_text=state["paper_text"],
-        claims=claims,
         bibliography=state.get("bibliography", {}),
+        paper_structure=state.get("paper_structure"),
     )
-    print(f"  Checked {len(citation_checks)} citations")
+    print(f"  Found {len(librarian_result.related_papers)} related papers")
+    print(f"  Search queries used: {librarian_result.search_queries}")
 
-    # Add evaluation results to the graph
-    add_citation_checks(G, citation_checks)
+    # Enrich paper text with librarian context
+    enriched = state["paper_text"]
+    if librarian_result.context_summary:
+        enriched += f"\n\n--- Related Work Context ---\n{librarian_result.context_summary}"
 
-    return {"citation_checks": citation_checks, "paper_graph": G}
+    return {
+        "paper_text": enriched,
+        "librarian_result": librarian_result,
+        "related_papers": librarian_result.related_papers,
+    }
+
+
+def score_papers_node(state: AdvisorState) -> dict:
+    """Librarian pass 2: score each related paper for relevancy + convergence."""
+    from advisor_pipeline.agents.librarian import Librarian
+
+    print("STEP 3c: Scoring related papers...")
+    librarian = Librarian()
+    related_papers = state.get("related_papers", [])
+    paper_structure = state["paper_structure"]
+
+    if not related_papers:
+        print("  No related papers to score")
+        return {"librarian_result": state.get("librarian_result", LibrarianResult())}
+
+    scored = librarian.score_papers(
+        paper_text=state["paper_text"],
+        paper_structure=paper_structure,
+        related_papers=related_papers,
+    )
+    print(f"  Scored {len(scored)} papers")
+
+    # Update librarian result with scored papers
+    lib_result = state.get("librarian_result", LibrarianResult())
+    updated_result = LibrarianResult(
+        related_papers=scored,
+        context_summary=lib_result.context_summary,
+        search_queries=lib_result.search_queries,
+    )
+
+    # Add scored results to the paper graph
+    G = state["paper_graph"]
+    add_librarian_results(G, updated_result)
+
+    return {"librarian_result": updated_result, "paper_graph": G}
 
 
 def compile_results_node(state: AdvisorState) -> dict:
@@ -250,7 +295,7 @@ def compile_results_node(state: AdvisorState) -> dict:
     # Count evaluations from graph nodes
     num_figure_evals = len(get_nodes_by_type(G, "figure"))
     num_math_evals = len(get_nodes_by_type(G, "math"))
-    num_citation_checks = len(get_nodes_by_type(G, "citation"))
+    num_related_papers = len(get_nodes_by_type(G, "related_paper"))
 
     # Generate overall review
     review_prompt = RESULTS_COMPILER.format(
@@ -259,11 +304,11 @@ def compile_results_node(state: AdvisorState) -> dict:
         num_steps=len(paper_structure.logical_steps),
         num_figure_evals=num_figure_evals,
         num_math_evals=num_math_evals,
-        num_citation_checks=num_citation_checks,
+        num_related_papers=num_related_papers,
         step_validations_text=_format_step_validations(G),
         figure_results_text=_format_figure_results_from_graph(G),
         math_results_text=_format_math_results_from_graph(G),
-        citation_results_text=_format_citation_results_from_graph(G),
+        librarian_results_text=_format_librarian_results_from_graph(G),
     )
 
     overall_review = get_structured_output(
@@ -319,13 +364,12 @@ def _organize_by_step_from_graph(G: nx.DiGraph) -> Dict[int, Dict]:
 
         figure_validations = []
         math_validations = []
-        citation_validations = []
 
         for pred_id in G.predecessors(step_node_id):
             node = G.nodes[pred_id]
             node_type = node.get("node_type")
 
-            if node_type not in ("figure", "math", "citation"):
+            if node_type not in ("figure", "math"):
                 continue
 
             edge_data = G.edges[pred_id, step_node_id]
@@ -358,21 +402,11 @@ def _organize_by_step_from_graph(G: nx.DiGraph) -> Dict[int, Dict]:
                     "formula_used": node.get("formula_used"),
                 })
 
-            elif node_type == "citation":
-                citation_validations.append({
-                    "citation": node["citation"],
-                    "supports_step": step_num,
-                    "accessible": node["accessible"],
-                    "supports_claim": node["supports_claim"],
-                    "notes": node.get("notes", ""),
-                })
-
         step_validations[step_num] = {
             "evidence_count": len(ev_list),
             "evidence": ev_list,
             "figure_validations": figure_validations,
             "math_validations": math_validations,
-            "citation_validations": citation_validations,
         }
 
     return step_validations
@@ -388,21 +422,17 @@ def _format_step_validations(G: nx.DiGraph) -> str:
         ev_count = len(get_evidence_for_step(G, step_num))
         fig_count = 0
         math_count = 0
-        cit_count = 0
         for pred_id in G.predecessors(step_node_id):
             nt = G.nodes[pred_id].get("node_type")
             if nt == "figure":
                 fig_count += 1
             elif nt == "math":
                 math_count += 1
-            elif nt == "citation":
-                cit_count += 1
 
         lines.append(f"\nStep {step_num}: {step_data['description']}")
         lines.append(f"  Evidence pieces: {ev_count}")
         lines.append(f"  Figure validations: {fig_count}")
         lines.append(f"  Math validations: {math_count}")
-        lines.append(f"  Citation checks: {cit_count}")
     return "\n".join(lines)
 
 
@@ -446,17 +476,32 @@ def _format_math_results_from_graph(G: nx.DiGraph) -> str:
     return "\n".join(lines)
 
 
-def _format_citation_results_from_graph(G: nx.DiGraph) -> str:
-    """Format citation check results by querying graph nodes."""
-    stats = get_citation_statistics(G)
+def _format_librarian_results_from_graph(G: nx.DiGraph) -> str:
+    """Format librarian results (related papers) by querying graph nodes."""
+    stats = get_librarian_statistics(G)
     if stats["total"] == 0:
-        return "No citation checks performed"
+        return "No related papers found"
 
-    return (
-        f"Accessible citations: {stats['accessible']}/{stats['total']}\n"
-        f"Citations supporting claims: {stats['supporting']}/"
-        f"{stats['accessible'] if stats['accessible'] > 0 else 'N/A'}"
-    )
+    related = get_related_papers(G)
+    high_impact = get_high_impact_papers(G)
+    lines = [
+        f"Total related papers: {stats['total']}",
+        f"Avg relevancy: {stats['avg_relevancy']:.2f}",
+        f"Avg convergence: {stats['avg_convergence']:+.2f}",
+        f"Supporting: {stats['supporting']}, Contradicting: {stats['contradicting']}, Neutral: {stats['neutral']}",
+        f"High-impact papers: {len(high_impact)}",
+        "",
+    ]
+    for rp in related[:10]:
+        conv = rp.get('convergence_score', 0)
+        rel = rp.get('relevancy_score', 0)
+        direction = "supports" if conv > 0.3 else "contradicts" if conv < -0.3 else "neutral"
+        lines.append(
+            f"- [{rp.get('source', '?')}] {rp.get('title', '?')[:80]}\n"
+            f"    Relevancy: {rel:.2f}, Convergence: {conv:+.2f} ({direction})\n"
+            f"    {rp.get('convergence_reasoning', '')[:150]}"
+        )
+    return "\n".join(lines)
 
 
 def _calculate_confidence_from_graph(G: nx.DiGraph) -> float:
@@ -477,11 +522,21 @@ def _calculate_confidence_from_graph(G: nx.DiGraph) -> float:
         fig_score = fig_counts["confirmations"] / total_assessments
         scores.append(fig_score)
 
-    # Citation score: fraction of accessible citations that support their claim
-    cit_stats = get_citation_statistics(G)
-    if cit_stats["accessible"] > 0:
-        cit_score = cit_stats["supporting"] / cit_stats["accessible"]
-        scores.append(cit_score)
+    # Librarian score: relevancy-weighted convergence
+    lib_stats = get_librarian_statistics(G)
+    if lib_stats["total"] > 0:
+        # High-impact papers (large |convergence| + high relevancy) boost confidence
+        # when they agree, reduce it when they disagree
+        related = get_related_papers(G)
+        weighted_conv = sum(
+            r.get("relevancy_score", 0) * r.get("convergence_score", 0)
+            for r in related
+        )
+        total_weight = sum(r.get("relevancy_score", 0) for r in related)
+        if total_weight > 0:
+            # Map weighted convergence from [-1,1] to [0,1]
+            lib_score = (weighted_conv / total_weight + 1) / 2
+            scores.append(lib_score)
 
     # Coverage score: fraction of steps that have evidence (from SUPPORTS edges)
     all_steps = get_steps(G)
@@ -506,21 +561,66 @@ def _build_graph() -> StateGraph:
 
     # Add nodes
     workflow.add_node("make_context", make_context_node)
+    workflow.add_node("gather_papers", gather_papers_node)
     workflow.add_node("map_logic", map_logic_node)
     workflow.add_node("find_evidence", find_evidence_node)
     workflow.add_node("evaluate_figures", evaluate_figures_node)
     workflow.add_node("evaluate_math", evaluate_math_node)
-    workflow.add_node("check_citations", check_citations_node)
+    workflow.add_node("score_papers", score_papers_node)
     workflow.add_node("compile_results", compile_results_node)
 
     # Edges
     workflow.add_edge(START, "make_context")
-    workflow.add_edge("make_context", "map_logic")
+    workflow.add_edge("make_context", "gather_papers")
+    workflow.add_edge("gather_papers", "map_logic")
     workflow.add_edge("map_logic", "find_evidence")
     workflow.add_edge("find_evidence", "evaluate_figures")
     workflow.add_edge("evaluate_figures", "evaluate_math")
-    workflow.add_edge("evaluate_math", "check_citations")
-    workflow.add_edge("check_citations", "compile_results")
+    workflow.add_edge("evaluate_math", "score_papers")
+    workflow.add_edge("score_papers", "compile_results")
+    workflow.add_edge("compile_results", END)
+
+    return workflow
+
+
+def _build_graph_with_callbacks(base_workflow: StateGraph, callback: StepCallback) -> StateGraph:
+    """Rebuild the graph with wrapper nodes that call the callback after each step."""
+
+    NODE_FUNCS = {
+        "make_context": make_context_node,
+        "gather_papers": gather_papers_node,
+        "map_logic": map_logic_node,
+        "find_evidence": find_evidence_node,
+        "evaluate_figures": evaluate_figures_node,
+        "evaluate_math": evaluate_math_node,
+        "score_papers": score_papers_node,
+        "compile_results": compile_results_node,
+    }
+
+    def _wrap(name, fn):
+        def wrapper(state: AdvisorState) -> dict:
+            t0 = time.time()
+            result = fn(state)
+            duration = time.time() - t0
+            try:
+                callback(name, result, duration)
+            except Exception:
+                pass  # never let logging break the pipeline
+            return result
+        return wrapper
+
+    workflow = StateGraph(AdvisorState)
+    for name, fn in NODE_FUNCS.items():
+        workflow.add_node(name, _wrap(name, fn))
+
+    workflow.add_edge(START, "make_context")
+    workflow.add_edge("make_context", "gather_papers")
+    workflow.add_edge("gather_papers", "map_logic")
+    workflow.add_edge("map_logic", "find_evidence")
+    workflow.add_edge("find_evidence", "evaluate_figures")
+    workflow.add_edge("evaluate_figures", "evaluate_math")
+    workflow.add_edge("evaluate_math", "score_papers")
+    workflow.add_edge("score_papers", "compile_results")
     workflow.add_edge("compile_results", END)
 
     return workflow
@@ -534,20 +634,16 @@ def _build_graph() -> StateGraph:
 class AdvisorOrchestrator:
     """Main orchestrator for The Advisor validation pipeline.
 
-    Uses a LangGraph StateGraph with conditional routing:
+    Uses a LangGraph StateGraph:
 
-        START -> make_context -> map_logic -> find_evidence
-          find_evidence -> [conditional]
-            -> make_context (if more context needed, max 2 loops)
-            -> route_evaluations
-          route_evaluations -> [conditional]
-            -> evaluate_figures / evaluate_math / check_citations
-          evaluate_* -> compile_results -> END
+        START -> make_context -> gather_papers -> map_logic -> find_evidence
+              -> evaluate_figures -> evaluate_math -> score_papers
+              -> compile_results -> END
     """
 
     def __init__(self):
         print("Initializing Advisor Orchestrator...")
-        self._graph = _build_graph().compile()
+        self._workflow = _build_graph()
         print("Orchestrator initialized successfully")
 
     def run(
@@ -556,6 +652,7 @@ class AdvisorOrchestrator:
         figures: Dict[str, Dict[str, str]] = None,
         paper_bib: Dict[str, str] | None = None,
         output_folder: str | Path | None = None,
+        on_step_complete: Optional[StepCallback] = None,
     ) -> ValidationResult:
         """Run the complete validation pipeline on a paper.
 
@@ -564,6 +661,8 @@ class AdvisorOrchestrator:
             figures: Dict mapping figure names to image data.
             paper_bib: Dict of citation references.
             output_folder: Folder path to save the final paper graph JSON.
+            on_step_complete: Optional callback invoked after each node with
+                (node_name, state_update, duration_seconds).
 
         Returns:
             ValidationResult with complete assessment.
@@ -579,10 +678,14 @@ class AdvisorOrchestrator:
             "output_folder": str(output_folder) if output_folder else "",
             "figure_evaluations": [],
             "math_evaluations": [],
-            "citation_checks": [],
         }
 
-        final_state = self._graph.invoke(initial_state)
+        if on_step_complete:
+            graph = _build_graph_with_callbacks(self._workflow, on_step_complete).compile()
+        else:
+            graph = self._workflow.compile()
+
+        final_state = graph.invoke(initial_state)
 
         print(f"\n{'=' * 60}")
         print("Pipeline complete!")

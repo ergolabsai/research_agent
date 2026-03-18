@@ -168,44 +168,82 @@ Based on the agent's work with the MCP calculator, determine:
 
 
 # ---------------------------------------------------------------------------
-# Citation Checking (from citation_checker_agent.py)
+# Librarian (replaces Citation Checking)
 # ---------------------------------------------------------------------------
 
-CITATION_VERIFIER = """Verify this citation and assess whether it genuinely supports the claim.
+LIBRARIAN_QUERY_CRAFTER = """You are a research librarian. Given the following paper, generate 3–5 diverse,
+high-quality search queries that would help find the most relevant related work
+in an academic paper database.
 
-Citation reference: {citation_location}
-Full citation: {full_citation}
-Claim it supports: {claim}
-How the citing paper uses this source: {citation_description}
+Each query should target a different facet of the paper:
+- Core methodology or technique
+- Domain / application area
+- Theoretical foundations or key equations
+- Competing or alternative approaches
+- Specific phenomena or datasets studied
 
-Tasks:
-1. Extract the DOI if available
-2. Search for the paper in academic databases
-3. Get the abstract (which includes the Semantic Scholar URL and open-access PDF URL)
-4. If a URL is available, use fetch_paper_content to read the source's actual content
-5. **Critically compare** what the citing paper claims about this source vs. what the source actually says
-6. Assess whether the citation is used consistently with the source — does the source actually support the specific claim being made?
+Paper title: {title}
+Main claim: {main_claim}
 
-Focus on identifying any misrepresentations, overstatements, or unsupported extrapolations from the cited source.
-"""
+Abstract / key text:
+{paper_text_excerpt}
 
-CITATION_REPORTER = """Create a citation verification report:
+Return ONLY the search queries, one per line. Make them natural-language
+descriptions (not keyword lists) because they will be embedded for vector
+similarity search."""
 
-Citation: {citation_location}
-Full citation details: {full_citation}
-Supports step {supports_step}: {claim}
+LIBRARIAN_SCORER = """You are a research analyst comparing two papers.
 
-Agent's investigation:
-{agent_result}
+== USER-SUBMITTED PAPER ==
+Title: {user_title}
+Main claim: {user_main_claim}
+Key text excerpt:
+{user_excerpt}
 
-Determine:
-1. Whether the citation is accessible
-2. Whether the source content is consistent with how it's referenced in the citing paper
-3. Whether the source actually supports the specific claim being made
-4. Any misrepresentations, overstatements, or unsupported extrapolations
-5. Overall assessment: does this citation genuinely support the claim?
+== RELATED PAPER ==
+Title: {related_title}
+Authors: {related_authors}
+Abstract: {related_abstract}
+Source: {related_source}
 
-Include detailed notes about the consistency between the source and how it is cited.
+Score this related paper on two dimensions:
+
+1. **Relevancy** (0.0 – 1.0): How important is this related paper for
+   evaluating the user's paper?  Consider topical overlap, methodological
+   similarity, shared datasets, and whether the related paper's findings
+   could confirm or challenge the user's claims.
+
+2. **Convergence** (-1.0 – +1.0): How well do the conclusions align?
+   +1.0 = the related paper strongly supports / agrees with the user's
+   conclusions.
+   0.0 = neutral or unrelated conclusions.
+   -1.0 = the related paper strongly contradicts the user's conclusions.
+
+   IMPORTANT: Both strongly positive AND strongly negative convergence
+   scores are valuable.  Be precise and justify your score.
+
+Provide reasoning for both scores."""
+
+LIBRARIAN_CONTEXT = """You are a research librarian synthesising context for paper evaluation.
+
+Below are related papers found for the user-submitted paper.  Summarise the
+key themes, agreements, and disagreements across these related works so that
+downstream evaluation agents can use this context to assess the user's paper
+more rigorously.
+
+Do NOT bias towards the user's conclusions — present the landscape neutrally.
+
+User paper title: {user_title}
+User main claim: {user_main_claim}
+
+Related papers:
+{related_papers_text}
+
+Write a concise context summary (300–500 words) covering:
+1. Common methodologies and findings in the related work
+2. Where the related work agrees with the user's claims
+3. Where the related work contradicts or challenges the user's claims
+4. Notable gaps that the user's paper addresses (or fails to address)
 """
 
 
@@ -223,7 +261,7 @@ Logical Steps Analyzed: {num_steps}
 Validation Summary:
 - Figure evaluations: {num_figure_evals}
 - Math evaluations: {num_math_evals}
-- Citation checks: {num_citation_checks}
+- Related papers found: {num_related_papers}
 
 Detailed Results by Step:
 {step_validations_text}
@@ -234,15 +272,16 @@ Figure Evaluation Results:
 Math Validation Results:
 {math_results_text}
 
-Citation Verification Results:
-{citation_results_text}
+Librarian Results (Related Papers):
+{librarian_results_text}
 
 Write a comprehensive review that:
 1. Assesses the overall validity of the paper's claims
 2. Highlights strong evidence and weak evidence
 3. Notes any contradictions or unsupported claims
 4. Discusses the quality of the logical argument structure
-5. Provides an overall assessment
+5. Considers how related work (with relevancy and convergence scores) supports or undermines the claims
+6. Provides an overall assessment
 """
 
 
@@ -259,8 +298,9 @@ PROMPT_REGISTRY = {
     "claim_assessor": CLAIM_ASSESSOR,
     "math_verifier": MATH_VERIFIER,
     "math_reporter": MATH_REPORTER,
-    "citation_verifier": CITATION_VERIFIER,
-    "citation_reporter": CITATION_REPORTER,
+    "librarian_query_crafter": LIBRARIAN_QUERY_CRAFTER,
+    "librarian_scorer": LIBRARIAN_SCORER,
+    "librarian_context": LIBRARIAN_CONTEXT,
     "results_compiler": RESULTS_COMPILER,
     "librarian": CONTEXT_MAKER,
 }

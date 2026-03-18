@@ -132,17 +132,83 @@ class MathEvaluation(BaseModel):
     formula_used: Optional[str] = Field(description="Name of formula from MCP server", default=None)
 
 
-class CitationCheck(BaseModel):
-    """Output from Step 5: Citation verification."""
+class RelatedPaper(BaseModel):
+    """A paper found by the Librarian, scored for relevancy and convergence."""
 
-    citation: str = Field(description="The citation being checked")
-    supports_step: int = Field(description="Which logical step this citation supports")
-    accessible: bool = Field(description="Whether the citation could be accessed")
-    supports_claim: Optional[bool] = Field(
-        description="Whether citation actually supports the claim (None if not accessible)",
-        default=None,
+    paper_id: str = Field(description="arXiv ID, DOI, or Semantic Scholar ID")
+    title: str = Field(description="Title of the related paper")
+    authors: str = Field(description="Author list as a single string")
+    abstract: str = Field(description="Abstract of the related paper")
+    source: str = Field(
+        description="How this paper was found: 'lancedb_fts', 'lancedb_vector', or 'semantic_scholar'"
     )
-    notes: str = Field(description="Details about what the citation says", default="")
+    relevancy_score: float = Field(
+        description="0.0–1.0 indicating how important this paper is for evaluating the user's paper",
+        ge=0.0,
+        le=1.0,
+        default=0.0,
+    )
+    relevancy_reasoning: str = Field(
+        description="Why this relevancy score was assigned", default=""
+    )
+    convergence_score: float = Field(
+        description=(
+            "-1.0 to +1.0 indicating alignment of conclusions. "
+            "Positive = conclusions agree, Negative = conclusions contradict"
+        ),
+        ge=-1.0,
+        le=1.0,
+        default=0.0,
+    )
+    convergence_reasoning: str = Field(
+        description="Why this convergence score was assigned", default=""
+    )
+
+
+class RelatedPaperScored(BaseModel):
+    """LLM-produced relevancy + convergence scores for a single related paper."""
+
+    relevancy_score: float = Field(
+        description="0.0–1.0 indicating how important this paper is for evaluating the user's paper",
+        ge=0.0,
+        le=1.0,
+    )
+    relevancy_reasoning: str = Field(description="Why this relevancy score was assigned")
+    convergence_score: float = Field(
+        description=(
+            "-1.0 to +1.0 indicating alignment of conclusions. "
+            "Positive = conclusions agree, Negative = conclusions contradict"
+        ),
+        ge=-1.0,
+        le=1.0,
+    )
+    convergence_reasoning: str = Field(description="Why this convergence score was assigned")
+
+
+class LibrarianResult(BaseModel):
+    """Output of the Librarian agent — related papers with scores."""
+
+    related_papers: List[RelatedPaper] = Field(
+        description="Papers found and scored by the Librarian", default_factory=list
+    )
+    context_summary: str = Field(
+        description="Context summary derived from the related papers", default=""
+    )
+    search_queries: List[str] = Field(
+        description="The vector search queries crafted by the LLM", default_factory=list
+    )
+
+
+class SearchQueries(BaseModel):
+    """LLM-generated search queries for finding related papers via vector search."""
+
+    queries: List[str] = Field(
+        description=(
+            "3-5 diverse, high-quality search queries to find related papers. "
+            "Each should target a different aspect of the paper (methodology, "
+            "domain, specific techniques, theoretical foundations, etc.)"
+        )
+    )
 
 
 class ValidationResult(BaseModel):
@@ -158,55 +224,3 @@ class ValidationResult(BaseModel):
     confidence_score: float = Field(
         description="0-1 score for overall confidence in the paper's claims", ge=0.0, le=1.0
     )
-
-
-# ===== MongoDB Document Models =====
-
-
-class PaperDocument(BaseModel):
-    """MongoDB document for storing paper metadata and content."""
-
-    paper_id: str = Field(description="Unique identifier")
-    title: str
-    authors: List[str] = Field(default_factory=list)
-    abstract: str = Field(default="")
-    full_text: str = Field(description="Full paper text")
-    figures: Dict[str, str] = Field(
-        description="Figure name to file path mapping", default_factory=dict
-    )
-    created_at: datetime = Field(default_factory=datetime.now)
-
-
-class ContextRequest(BaseModel):
-    """Request for additional context about the paper."""
-
-    question: str = Field(description="What additional information is needed")
-    target_section: str = Field(description="Which section of the paper to look at", default="")
-    reason: str = Field(description="Why this context is needed for evaluation")
-
-
-class EvaluationRouting(BaseModel):
-    """Determines which evaluation branches are needed."""
-
-    has_figure_evidence: bool = Field(
-        default=False, description="Whether figure evidence was found"
-    )
-    has_math_evidence: bool = Field(default=False, description="Whether math evidence was found")
-    has_citation_evidence: bool = Field(
-        default=False, description="Whether citation evidence was found"
-    )
-    needs_more_context: bool = Field(default=False, description="Whether more context is needed")
-    context_requests: List[ContextRequest] = Field(
-        default_factory=list, description="Specific context requests if more context is needed"
-    )
-
-
-class ValidationDocument(BaseModel):
-    """MongoDB document for storing validation results."""
-
-    paper_id: str
-    validation_result: ValidationResult
-    created_at: datetime = Field(default_factory=datetime.now)
-
-    class Config:
-        json_encoders = {datetime: lambda v: v.isoformat()}
