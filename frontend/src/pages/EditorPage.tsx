@@ -1,4 +1,4 @@
-import { useParams, useNavigate } from "react-router-dom";
+﻿import { useParams } from "react-router-dom";
 import {
   Box,
   TextField,
@@ -6,8 +6,10 @@ import {
   Stack,
   Button,
   Typography,
+  Tooltip,
 } from "@mui/material";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
+import { createPortal } from "react-dom";
 import { documentsAPI } from "../api";
 import { Attachment } from "../types";
 import {
@@ -18,11 +20,12 @@ import {
   Insights as PlotsIcon,
   AttachFile as AttachFileIcon,
   Delete as DeleteIcon,
+  VerticalSplit as AgentPanelIcon,
 } from "@mui/icons-material";
+import { AgentPanel, AgentTab } from "../components/AgentPanel";
 
 export const EditorPage = () => {
   const { id } = useParams();
-  const navigate = useNavigate();
   const theme = useTheme();
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
@@ -31,6 +34,15 @@ export const EditorPage = () => {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [isLoadingAttachments, setIsLoadingAttachments] = useState(false);
   const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
+
+  // Right agent panel state
+  const [rightPanelOpen, setRightPanelOpen] = useState(false);
+  const [rightPanelWidth, setRightPanelWidth] = useState(320);
+  const [agentTab, setAgentTab] = useState<AgentTab>("validate");
+  const dragRef = useRef(false);
+  const startXRef = useRef(0);
+  const startWidthRef = useRef(0);
+  const rightPanelWidthRef = useRef(320);
 
   const formatFileSize = (sizeInBytes: number) => {
     if (sizeInBytes < 1024) return `${sizeInBytes} B`;
@@ -65,7 +77,6 @@ export const EditorPage = () => {
         setIsLoaded(true);
       }
     };
-
     loadDocument();
   }, [id]);
 
@@ -76,33 +87,63 @@ export const EditorPage = () => {
 
   useEffect(() => {
     if (!isLoaded) return;
-
-    const loadDocument = async () => {
+    const saveDocument = async () => {
       if (!id) return;
       try {
         await documentsAPI.update(Number(id), title, content);
       } catch (err) {
-        console.error("Failed to load document:", err);
+        console.error("Failed to save document:", err);
       }
     };
-
-    loadDocument();
+    saveDocument();
   }, [content, title, isLoaded]);
 
-  const handleMath = () => {};
-  const handleLogic = () => {
-    navigate("/app/validate");
+  // Drag-to-resize handler
+  const handleDragMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    dragRef.current = true;
+    startXRef.current = e.clientX;
+    startWidthRef.current = rightPanelWidthRef.current;
   };
+
+  useEffect(() => {
+    const onMouseMove = (e: MouseEvent) => {
+      if (!dragRef.current) return;
+      const delta = startXRef.current - e.clientX;
+      const newWidth = Math.min(
+        700,
+        Math.max(220, startWidthRef.current + delta),
+      );
+      setRightPanelWidth(newWidth);
+      rightPanelWidthRef.current = newWidth;
+    };
+    const onMouseUp = () => {
+      dragRef.current = false;
+    };
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    };
+  }, []);
+
+  const openPanel = (tab: AgentTab) => {
+    setAgentTab(tab);
+    setRightPanelOpen(true);
+  };
+
+  const handleMath = () => openPanel("math");
+  const handleLogic = () => openPanel("validate");
   const handleFormatter = () => {};
-  const handleLibrarian = () => {};
-  const handlePlots = () => {};
+  const handleLibrarian = () => openPanel("citations");
+  const handlePlots = () => openPanel("figures");
 
   const handleAttachmentUpload = async (
     event: React.ChangeEvent<HTMLInputElement>,
   ) => {
     const file = event.target.files?.[0];
     if (!file || !id) return;
-
     setIsUploadingAttachment(true);
     try {
       await documentsAPI.uploadAttachment(Number(id), file);
@@ -117,7 +158,6 @@ export const EditorPage = () => {
 
   const handleRemoveAttachment = async (attachmentId: number) => {
     if (!id) return;
-
     try {
       await documentsAPI.deleteAttachment(Number(id), attachmentId);
       await loadAttachments(Number(id));
@@ -144,7 +184,6 @@ export const EditorPage = () => {
     { id: "plots", label: "Plots", icon: PlotsIcon, handler: handlePlots },
   ];
 
-  const buttonVariant = "contained";
   const buttonSx = {
     height: "56px",
     minWidth: "56px",
@@ -162,180 +201,281 @@ export const EditorPage = () => {
     },
   };
 
+  const rpToolbar = document.getElementById("rp-toolbar");
+
   return (
     <Box
       sx={{
         height: "calc(100vh - 100px)",
         display: "flex",
-        flexDirection: "column",
-        gap: 2,
+        flexDirection: "row",
+        gap: 0,
+        overflow: "hidden",
       }}
     >
-      <Stack direction="row" sx={{ gap: 2, alignItems: "center" }}>
-        <Box
-          sx={{
-            flex: 1,
-            background: `linear-gradient(135deg, ${theme.palette.primary.main}10 0%, ${theme.palette.secondary.main}20 100%)`,
-            borderRadius: "12px",
-            border: "1px solid " + theme.palette.divider,
-          }}
-        >
-          <TextField
-            placeholder="Document Title"
-            fullWidth
-            size="small"
-            sx={{
-              height: "56px",
-              display: "flex",
-              alignItems: "center",
-              "& .MuiInputBase-root": {
-                height: "100%",
-                fontSize: "1.5rem",
-                fontWeight: 600,
-              },
-              "& .MuiOutlinedInput-root": { "& fieldset": { border: "none" } },
-            }}
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-          />
-        </Box>
-        <Stack direction="row" sx={{ gap: 1 }}>
-          {buttons.map((btn) => {
-            const IconComponent = btn.icon;
-            return (
-              <Box
-                key={btn.id}
-                onMouseEnter={() => setHoveredIcon(btn.id)}
-                onMouseLeave={() => setHoveredIcon(null)}
+      {/* Portal: Agents toggle button in the AppBar toolbar */}
+      {rpToolbar &&
+        createPortal(
+          <Tooltip
+            title={rightPanelOpen ? "Close agent panel" : "Open agent panel"}
+          >
+            <span>
+              <Button
+                size="small"
+                variant={rightPanelOpen ? "contained" : "outlined"}
+                startIcon={<AgentPanelIcon fontSize="small" />}
+                onClick={() => setRightPanelOpen((v) => !v)}
+                sx={{
+                  height: 32,
+                  fontSize: "0.75rem",
+                  fontWeight: 600,
+                  textTransform: "none",
+                  borderRadius: "8px",
+                  px: 1.5,
+                }}
               >
-                <Button
-                  onClick={btn.handler}
-                  variant={buttonVariant}
-                  sx={{ ...buttonSx, position: "relative" }}
-                >
-                  <Box
-                    sx={{
-                      display: "flex",
-                      flexDirection: "column",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      width: "100%",
-                      height: "100%",
-                    }}
-                  >
-                    <IconComponent fontSize="small" />
-                  </Box>
-                  {hoveredIcon === btn.id && (
-                    <Typography
-                      variant="caption"
-                      fontWeight={850}
-                      sx={{
-                        position: "absolute",
-                        top: "5px",
-                        fontSize: "0.65rem",
-                        color: "background.default",
-                        lineHeight: 1,
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {btn.label}
-                    </Typography>
-                  )}
-                </Button>
-              </Box>
-            );
-          })}
-        </Stack>
-      </Stack>
+                Agents
+              </Button>
+            </span>
+          </Tooltip>,
+          rpToolbar,
+        )}
+
+      {/* Editor column */}
       <Box
         sx={{
           flex: 1,
-          backgroundColor: theme.palette.background.paper,
-          borderRadius: "12px",
-          p: 2,
-          border: "1px solid" + theme.palette.divider,
+          display: "flex",
+          flexDirection: "column",
+          gap: 2,
+          minWidth: 0,
+          overflow: "hidden",
         }}
       >
-        <TextField
-          placeholder="Start writing your document..."
-          variant="standard"
-          fullWidth
-          multiline
-          minRows={10}
-          value={content}
-          onChange={(e) => setContent(e.target.value)}
-          sx={{ mt: 0 }}
-        />
-
-        <Box
-          sx={{ mt: 2, pt: 2, borderTop: "1px solid " + theme.palette.divider }}
-        >
-          <Stack
-            direction="row"
+        {/* Toolbar: title + action buttons */}
+        <Stack direction="row" sx={{ gap: 2, alignItems: "center" }}>
+          <Box
             sx={{
-              alignItems: "center",
-              justifyContent: "space-between",
-              mb: 1,
+              flex: 1,
+              background: `linear-gradient(135deg, ${theme.palette.primary.main}10 0%, ${theme.palette.secondary.main}20 100%)`,
+              borderRadius: "12px",
+              border: "1px solid " + theme.palette.divider,
             }}
           >
-            <Typography variant="subtitle2">Attachments</Typography>
-            <Button
-              variant="outlined"
+            <TextField
+              placeholder="Document Title"
+              fullWidth
               size="small"
-              component="label"
-              startIcon={<AttachFileIcon />}
-              disabled={!id || isUploadingAttachment}
-            >
-              {isUploadingAttachment ? "Uploading..." : "Upload"}
-              <input hidden type="file" onChange={handleAttachmentUpload} />
-            </Button>
-          </Stack>
-
-          {isLoadingAttachments ? (
-            <Typography variant="body2" color="text.secondary">
-              Loading attachments...
-            </Typography>
-          ) : attachments.length === 0 ? (
-            <Typography variant="body2" color="text.secondary">
-              No attachments yet.
-            </Typography>
-          ) : (
-            <Stack spacing={1}>
-              {attachments.map((attachment) => (
+              sx={{
+                height: "56px",
+                display: "flex",
+                alignItems: "center",
+                "& .MuiInputBase-root": {
+                  height: "100%",
+                  fontSize: "1.5rem",
+                  fontWeight: 600,
+                },
+                "& .MuiOutlinedInput-root": {
+                  "& fieldset": { border: "none" },
+                },
+              }}
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+            />
+          </Box>
+          <Stack direction="row" sx={{ gap: 1 }}>
+            {buttons.map((btn) => {
+              const IconComponent = btn.icon;
+              return (
                 <Box
-                  key={attachment.id}
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    border: "1px solid " + theme.palette.divider,
-                    borderRadius: "8px",
-                    px: 1.5,
-                    py: 1,
-                  }}
+                  key={btn.id}
+                  onMouseEnter={() => setHoveredIcon(btn.id)}
+                  onMouseLeave={() => setHoveredIcon(null)}
                 >
-                  <Box sx={{ minWidth: 0 }}>
-                    <Typography variant="body2" noWrap>
-                      {attachment.filename}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {formatFileSize(attachment.size)}
-                    </Typography>
-                  </Box>
                   <Button
-                    size="small"
-                    color="error"
-                    startIcon={<DeleteIcon />}
-                    onClick={() => handleRemoveAttachment(attachment.id)}
+                    onClick={btn.handler}
+                    variant="contained"
+                    sx={{ ...buttonSx, position: "relative" }}
                   >
-                    Remove
+                    <Box
+                      sx={{
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        width: "100%",
+                        height: "100%",
+                      }}
+                    >
+                      <IconComponent fontSize="small" />
+                    </Box>
+                    {hoveredIcon === btn.id && (
+                      <Typography
+                        variant="caption"
+                        fontWeight={850}
+                        sx={{
+                          position: "absolute",
+                          top: "5px",
+                          fontSize: "0.65rem",
+                          color: "background.default",
+                          lineHeight: 1,
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        {btn.label}
+                      </Typography>
+                    )}
                   </Button>
                 </Box>
-              ))}
+              );
+            })}
+          </Stack>
+        </Stack>
+
+        {/* Editor body */}
+        <Box
+          sx={{
+            flex: 1,
+            backgroundColor: theme.palette.background.paper,
+            borderRadius: "12px",
+            p: 2,
+            border: "1px solid" + theme.palette.divider,
+            overflow: "auto",
+          }}
+        >
+          <TextField
+            placeholder="Start writing your document..."
+            variant="standard"
+            fullWidth
+            multiline
+            minRows={10}
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            sx={{ mt: 0 }}
+          />
+
+          <Box
+            sx={{
+              mt: 2,
+              pt: 2,
+              borderTop: "1px solid " + theme.palette.divider,
+            }}
+          >
+            <Stack
+              direction="row"
+              sx={{
+                alignItems: "center",
+                justifyContent: "space-between",
+                mb: 1,
+              }}
+            >
+              <Typography variant="subtitle2">Attachments</Typography>
+              <Button
+                variant="outlined"
+                size="small"
+                component="label"
+                startIcon={<AttachFileIcon />}
+                disabled={!id || isUploadingAttachment}
+              >
+                {isUploadingAttachment ? "Uploading..." : "Upload"}
+                <input hidden type="file" onChange={handleAttachmentUpload} />
+              </Button>
             </Stack>
-          )}
+
+            {isLoadingAttachments ? (
+              <Typography variant="body2" color="text.secondary">
+                Loading attachments...
+              </Typography>
+            ) : attachments.length === 0 ? (
+              <Typography variant="body2" color="text.secondary">
+                No attachments yet.
+              </Typography>
+            ) : (
+              <Stack spacing={1}>
+                {attachments.map((attachment) => (
+                  <Box
+                    key={attachment.id}
+                    sx={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                      border: "1px solid " + theme.palette.divider,
+                      borderRadius: "8px",
+                      px: 1.5,
+                      py: 1,
+                    }}
+                  >
+                    <Box sx={{ minWidth: 0 }}>
+                      <Typography variant="body2" noWrap>
+                        {attachment.filename}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {formatFileSize(attachment.size)}
+                      </Typography>
+                    </Box>
+                    <Button
+                      size="small"
+                      color="error"
+                      startIcon={<DeleteIcon />}
+                      onClick={() => handleRemoveAttachment(attachment.id)}
+                    >
+                      Remove
+                    </Button>
+                  </Box>
+                ))}
+              </Stack>
+            )}
+          </Box>
         </Box>
       </Box>
+      {/* End editor column */}
+
+      {/* Drag handle */}
+      {rightPanelOpen && (
+        <Box
+          onMouseDown={handleDragMouseDown}
+          sx={{
+            width: 8,
+            flexShrink: 0,
+            cursor: "col-resize",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            userSelect: "none",
+            "&:hover > div": { bgcolor: "primary.main", opacity: 1 },
+          }}
+        >
+          <Box
+            sx={{
+              width: 2,
+              height: "100%",
+              bgcolor: "divider",
+              borderRadius: 999,
+              opacity: 0,
+              transition: "opacity 0.15s, background-color 0.15s",
+            }}
+          />
+        </Box>
+      )}
+
+      {/* Agent panel */}
+      {rightPanelOpen && (
+        <Box
+          sx={{
+            width: rightPanelWidth,
+            flexShrink: 0,
+            overflow: "hidden",
+          }}
+        >
+          <AgentPanel
+            content={content}
+            title={title}
+            activeTab={agentTab}
+            onTabChange={setAgentTab}
+            onCollapse={() => setRightPanelOpen(false)}
+          />
+        </Box>
+      )}
     </Box>
   );
 };

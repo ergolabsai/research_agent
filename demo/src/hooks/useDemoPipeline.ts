@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AdvisorStep, PipelineSnapshot } from "../types";
 
+const INSTANT_STEP_DURATION_MS = 0;
+
 const baseSteps: AdvisorStep[] = [
   {
     id: "make_context",
@@ -9,7 +11,7 @@ const baseSteps: AdvisorStep[] = [
     metric: "12 manuscript signals",
     deliverable: "Domain summary + manuscript profile",
     status: "pending",
-    durationMs: 1600,
+    durationMs: INSTANT_STEP_DURATION_MS,
   },
   {
     id: "gather_papers",
@@ -18,7 +20,7 @@ const baseSteps: AdvisorStep[] = [
     metric: "18 papers retrieved",
     deliverable: "Scored search set + abstract bundle",
     status: "pending",
-    durationMs: 2000,
+    durationMs: INSTANT_STEP_DURATION_MS,
   },
   {
     id: "map_logic",
@@ -27,7 +29,7 @@ const baseSteps: AdvisorStep[] = [
     metric: "7 linked claims",
     deliverable: "Logical dependency graph",
     status: "pending",
-    durationMs: 1900,
+    durationMs: INSTANT_STEP_DURATION_MS,
   },
   {
     id: "find_evidence",
@@ -36,7 +38,7 @@ const baseSteps: AdvisorStep[] = [
     metric: "24 evidence spans",
     deliverable: "Claim-to-evidence trace",
     status: "pending",
-    durationMs: 1800,
+    durationMs: INSTANT_STEP_DURATION_MS,
   },
   {
     id: "evaluate_figures",
@@ -45,7 +47,7 @@ const baseSteps: AdvisorStep[] = [
     metric: "3 figures audited",
     deliverable: "Figure discrepancy report",
     status: "pending",
-    durationMs: 2400,
+    durationMs: INSTANT_STEP_DURATION_MS,
   },
   {
     id: "evaluate_math",
@@ -54,7 +56,7 @@ const baseSteps: AdvisorStep[] = [
     metric: "4 equations traced",
     deliverable: "Equation consistency notes",
     status: "pending",
-    durationMs: 2200,
+    durationMs: INSTANT_STEP_DURATION_MS,
   },
   {
     id: "score_papers",
@@ -63,7 +65,7 @@ const baseSteps: AdvisorStep[] = [
     metric: "4 papers surfaced",
     deliverable: "Relevancy + convergence ranking",
     status: "pending",
-    durationMs: 2100,
+    durationMs: INSTANT_STEP_DURATION_MS,
   },
   {
     id: "compile_results",
@@ -72,7 +74,7 @@ const baseSteps: AdvisorStep[] = [
     metric: "0.82 confidence",
     deliverable: "Final advisor recommendation",
     status: "pending",
-    durationMs: 1700,
+    durationMs: INSTANT_STEP_DURATION_MS,
   },
 ];
 
@@ -111,10 +113,15 @@ export function useDemoPipeline() {
     setIsRunning(true);
     setActiveIndex(0);
     setElapsedSeconds(0);
-    setSteps(baseSteps.map((step, idx) => ({ ...step, status: idx === 0 ? "running" : "pending" })));
+    setSteps(
+      baseSteps.map((step, idx) => ({
+        ...step,
+        status: idx === 0 ? "running" : "pending",
+      })),
+    );
     intervalRef.current = window.setInterval(() => {
       setElapsedSeconds((current) => current + 1);
-    }, 1000);
+    }, 10);
 
     let elapsed = 0;
     baseSteps.forEach((step, idx) => {
@@ -129,7 +136,7 @@ export function useDemoPipeline() {
               return { ...item, status: "running" };
             }
             return item;
-          })
+          }),
         );
 
         if (idx === baseSteps.length - 1) {
@@ -153,22 +160,25 @@ export function useDemoPipeline() {
   const snapshot: PipelineSnapshot = useMemo(
     () => ({
       steps,
-      activeStepId: activeIndex !== null ? steps[activeIndex]?.id ?? null : null,
+      activeStepId:
+        activeIndex !== null ? (steps[activeIndex]?.id ?? null) : null,
       progressPercent: calculateProgress(steps),
       isRunning,
       isComplete: steps.every((s) => s.status === "complete"),
       elapsedSeconds,
     }),
-    [activeIndex, elapsedSeconds, isRunning, steps]
+    [activeIndex, elapsedSeconds, isRunning, steps],
   );
 
   const unlocks = useMemo(
     () => ({
-      plot: steps.find((s) => s.id === "evaluate_figures")?.status === "complete",
+      plot:
+        steps.find((s) => s.id === "evaluate_figures")?.status === "complete",
       math: steps.find((s) => s.id === "evaluate_math")?.status === "complete",
-      citations: steps.find((s) => s.id === "score_papers")?.status === "complete",
+      citations:
+        steps.find((s) => s.id === "score_papers")?.status === "complete",
     }),
-    [steps]
+    [steps],
   );
 
   return {

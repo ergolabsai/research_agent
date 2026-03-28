@@ -141,7 +141,7 @@ export const Sidebar = ({ onCollapse, isCollapsed = false }: SidebarProps) => {
       } catch (err) {
         // Silently fail on polling errors
       }
-    }, 3000);
+    }, 10);
 
     return () => clearInterval(interval);
   }, []);

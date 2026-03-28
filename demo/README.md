@@ -1,18 +1,14 @@
 # Research Advisor Visual Demo
 
-Standalone product demo for visualizing the full advisor workflow with no backend, auth, or LLM runtime.
+Standalone product demo that reuses the real app UI from `frontend/src` with an in-memory mocked API layer. No backend, auth server, or LLM runtime is required.
 
 ## What this demo includes
 
-- Full 8-step advisor progress indicator with stage-by-stage status.
-- PDF-like paper viewer pane (non-editable, presentation style).
-- Right analysis sidebar with gated tools:
-  - Plot Helper after figure evaluation completes.
-  - Math Assistant after math evaluation completes.
-  - Citation Review after citation scoring completes.
-- Plot panel with true vs predicted plot and discrepancy comments.
-- Math panel listing all equations and usage context with mock context updates and chat interaction.
-- Citation panel with relevancy/convergence scores and expandable paper-level comparison notes.
+- Real landing/auth/app shell/dashboard/editor/validate pages from the production frontend.
+- Full theme system and settings menu behavior identical to the main app.
+- Mocked auth, documents, workspaces, sharing, attachments, user search, and pipeline endpoints.
+- Simulated multi-step pipeline progress with deterministic final validation results.
+- Fully isolated runtime in the `demo/` folder.
 
 ## Run locally
 
@@ -22,7 +18,7 @@ npm install
 npm run dev
 ```
 
-Open: http://localhost:5174
+Open: http://localhost:4174
 
 ## Build for preview
 
@@ -35,5 +31,5 @@ npm run preview
 ## Notes
 
 - This is intentionally isolated from the main frontend/backend stack.
-- All content is mock fixture data in `src/data/fixtures.ts`.
-- Use `Replay Demo` to reset and rerun the full process.
+- API behavior is defined in `src/mocks/setupMockApi.ts`.
+- The mock layer intercepts Axios calls at runtime and returns in-memory demo data.

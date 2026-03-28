@@ -23,13 +23,25 @@ import {
   MoreVertRounded as MoreVertIcon,
   Add as AddIcon,
 } from "@mui/icons-material";
-import { useState, ReactNode, createContext, useContext } from "react";
+import {
+  useState,
+  useEffect,
+  useRef,
+  ReactNode,
+  createContext,
+  useContext,
+} from "react";
+import { createPortal } from "react-dom";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { useTheme as useAppTheme } from "../theme";
 import { Sidebar } from "../components/Sidebar";
 import { SettingsMenu } from "../components/SettingsMenu";
 import { documentsAPI, workspacesAPI, usersAPI } from "../api";
+
+const MIN_DRAWER_WIDTH = 200;
+const MAX_DRAWER_WIDTH = 450;
+const DEFAULT_DRAWER_WIDTH = 280;
 
 export interface DialogContextType {
   newDocDialogOpen: boolean;
@@ -76,8 +88,15 @@ export const MainPage = ({ children }: MainPageProps) => {
   const { themeName } = useAppTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
+  // Left sidebar drag state
   const [sidebarOpen, setSidebarOpen] = useState(!isMobile);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_DRAWER_WIDTH);
+  const dragRefLeft = useRef(false);
+  const startXRefLeft = useRef(0);
+  const startWidthRefLeft = useRef(0);
+  const sidebarWidthRef = useRef(DEFAULT_DRAWER_WIDTH);
+
   const [settingsMenuAnchor, setSettingsMenuAnchor] =
     useState<null | HTMLElement>(null);
   const [sidebarRefreshKey, setSidebarRefreshKey] = useState(0);
@@ -113,6 +132,36 @@ export const MainPage = ({ children }: MainPageProps) => {
   const [targetWorkspaceId, setTargetWorkspaceId] = useState<number | null>(
     null,
   );
+
+  // Left sidebar drag handler
+  const handleLeftDragMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    dragRefLeft.current = true;
+    startXRefLeft.current = e.clientX;
+    startWidthRefLeft.current = sidebarWidthRef.current;
+  };
+
+  useEffect(() => {
+    const onMouseMove = (e: MouseEvent) => {
+      if (!dragRefLeft.current) return;
+      const delta = e.clientX - startXRefLeft.current;
+      const newWidth = Math.min(
+        MAX_DRAWER_WIDTH,
+        Math.max(MIN_DRAWER_WIDTH, startWidthRefLeft.current + delta),
+      );
+      setSidebarWidth(newWidth);
+      sidebarWidthRef.current = newWidth;
+    };
+    const onMouseUp = () => {
+      dragRefLeft.current = false;
+    };
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    };
+  }, []);
 
   const handleOpenSettings = (event: React.MouseEvent<HTMLElement>) => {
     setSettingsMenuAnchor(event.currentTarget);
@@ -290,12 +339,15 @@ export const MainPage = ({ children }: MainPageProps) => {
           open={sidebarOpen}
           onClose={() => setSidebarOpen(false)}
           sx={{
-            width: sidebarCollapsed ? DRAWER_COLLAPSED_WIDTH : DRAWER_WIDTH,
+            width: sidebarCollapsed ? DRAWER_COLLAPSED_WIDTH : sidebarWidth,
             flexShrink: 0,
             "& .MuiDrawer-paper": {
-              width: sidebarCollapsed ? DRAWER_COLLAPSED_WIDTH : DRAWER_WIDTH,
+              width: sidebarCollapsed ? DRAWER_COLLAPSED_WIDTH : sidebarWidth,
               borderRadius: 0,
               backgroundColor: "background.default",
+              transition: sidebarCollapsed
+                ? "width 0.3s ease"
+                : "width 0.1s ease",
             },
           }}
         >
@@ -305,6 +357,34 @@ export const MainPage = ({ children }: MainPageProps) => {
             refreshKey={sidebarRefreshKey}
           />
         </Drawer>
+
+        {/* Left sidebar drag handle */}
+        {!isMobile && sidebarOpen && !sidebarCollapsed && (
+          <Box
+            onMouseDown={handleLeftDragMouseDown}
+            sx={{
+              width: 8,
+              flexShrink: 0,
+              cursor: "col-resize",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              userSelect: "none",
+              "&:hover > div": { bgcolor: "primary.main", opacity: 1 },
+            }}
+          >
+            <Box
+              sx={{
+                width: 2,
+                height: "100%",
+                bgcolor: "divider",
+                borderRadius: 999,
+                opacity: 0,
+                transition: "opacity 0.15s, background-color 0.15s",
+              }}
+            />
+          </Box>
+        )}
 
         {/* Main Content */}
         <Box
@@ -361,7 +441,19 @@ export const MainPage = ({ children }: MainPageProps) => {
                 )}
               </Box>
 
-              <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+              <Stack
+                direction="row"
+                spacing={0.5}
+                sx={{ alignItems: "center" }}
+              >
+                {/* portal target — panel page icon buttons mount here */}
+                <Box
+                  id="rp-toolbar"
+                  sx={{ display: "flex", alignItems: "center", gap: 0.5 }}
+                />
+                <Box
+                  sx={{ width: 1, bgcolor: "divider", height: 20, mx: 0.5 }}
+                />
                 <IconButton
                   size="small"
                   onClick={() => setNewDocDialogOpen(true)}
@@ -591,3 +683,18 @@ export const MainPage = ({ children }: MainPageProps) => {
     </DialogContext.Provider>
   );
 };
+
+/**
+ * Mounts children into the AppBar's right-hand icon slot via a React portal.
+ * Use inside any page that needs to inject toolbar icon buttons.
+ */
+export function RightToolbarPortal({ children }: { children: ReactNode }) {
+  const [target, setTarget] = useState<HTMLElement | null>(null);
+
+  useEffect(() => {
+    setTarget(document.getElementById("rp-toolbar"));
+  }, []);
+
+  if (!target) return null;
+  return createPortal(children, target);
+}

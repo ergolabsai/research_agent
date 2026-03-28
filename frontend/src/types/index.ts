@@ -90,6 +90,23 @@ export interface StepValidation {
   }>;
 }
 
+export interface RelatedPaper {
+  paper_id: string;
+  title: string;
+  authors: string;
+  abstract: string;
+  source: string;
+  relevancy_score: number;
+  relevancy_reasoning: string;
+  convergence_score: number;
+  convergence_reasoning: string;
+  /** Legacy demo fields */
+  venue?: string;
+  year?: number;
+  context?: string;
+  comparison?: string;
+}
+
 export interface ValidationResult {
   paper_id: string;
   confidence_score: number;
@@ -104,4 +121,5 @@ export interface ValidationResult {
     }>;
   };
   step_validations: Record<string, StepValidation>;
+  related_papers?: RelatedPaper[];
 }
