@@ -5,6 +5,7 @@ import {
   PipelineJob,
   ValidateRequest,
   ValidationResult,
+  NodeLinkGraph,
   Attachment,
 } from "../types";
 
@@ -204,10 +205,30 @@ export const pipelineAPI = {
   results: (jobId: string) =>
     api.get<ValidationResult>(`/pipeline/results/${jobId}`),
 
+  figures: (jobId: string) =>
+    api.get<{
+      job_id: string;
+      figures: Array<{
+        figure_name: string;
+        submitted?: {
+          filename?: string;
+          media_type?: string;
+          url?: string | null;
+        };
+        predicted?: {
+          filename?: string;
+          media_type?: string;
+          url?: string | null;
+        };
+      }>;
+    }>(`/pipeline/figures/${jobId}`),
+
   history: (paperId: string) =>
     api.get<ValidationResult[]>(`/pipeline/history/${paperId}`),
 
   jobs: () => api.get<PipelineJob[]>("/pipeline/jobs"),
+
+  graph: (jobId: string) => api.get<NodeLinkGraph>(`/pipeline/graph/${jobId}`),
 };
 
 export default api;

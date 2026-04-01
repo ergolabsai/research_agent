@@ -1,6 +1,111 @@
 import { createTheme } from "@mui/material/styles";
 import { ReactNode } from "react";
 
+// --- MUI theme augmentation: discrete color palette for plots/graphs ---
+declare module "@mui/material/styles" {
+  interface Palette {
+    discrete: string[];
+  }
+  interface PaletteOptions {
+    discrete?: string[];
+  }
+}
+
+// --- Discrete color palettes (10 colors each) ---
+
+// Matplotlib tab10 — vivid, good on white/light-gray backgrounds
+export const TAB10: readonly string[] = [
+  "#1f77b4", // blue
+  "#ff7f0e", // orange
+  "#2ca02c", // green
+  "#d62728", // red
+  "#9467bd", // purple
+  "#8c564b", // brown
+  "#e377c2", // pink
+  "#7f7f7f", // gray
+  "#bcbd22", // olive
+  "#17becf", // cyan
+];
+
+// Muted blues/golds — professional light backgrounds
+const PROFESSIONAL_LIGHT: readonly string[] = [
+  "#2E5090", // navy
+  "#E8A425", // gold
+  "#3A7D44", // forest
+  "#C44E52", // brick
+  "#7B68AE", // slate purple
+  "#C97B3A", // copper
+  "#D17BA2", // mauve
+  "#6B6B6B", // charcoal
+  "#A3A832", // moss
+  "#2B9EB3", // teal
+];
+
+// High-contrast monochrome accents — minimal light backgrounds
+const MINIMAL_LIGHT: readonly string[] = [
+  "#222222", // black
+  "#E45C3A", // vermillion
+  "#2A7F62", // emerald
+  "#3269A8", // cobalt
+  "#8B5CF6", // violet
+  "#D97706", // amber
+  "#0D9488", // teal
+  "#6B7280", // gray
+  "#B45309", // rust
+  "#7C3AED", // indigo
+];
+
+// Bright pastels — dark neutral backgrounds
+const DARK_DEFAULT: readonly string[] = [
+  "#60A5FA", // sky blue
+  "#F97316", // vivid orange
+  "#34D399", // emerald
+  "#F87171", // coral red
+  "#A78BFA", // lavender
+  "#FB923C", // peach
+  "#F472B6", // pink
+  "#9CA3AF", // silver
+  "#FACC15", // yellow
+  "#22D3EE", // cyan
+];
+
+// Nord Aurora + Frost — Nord dark backgrounds
+const NORD_DARK: readonly string[] = [
+  "#88C0D0", // frost blue
+  "#EBCB8B", // aurora yellow
+  "#A3BE8C", // aurora green
+  "#BF616A", // aurora red
+  "#B48EAD", // aurora purple
+  "#D08770", // aurora orange
+  "#81A1C1", // frost
+  "#8FBCBB", // teal frost
+  "#5E81AC", // deep frost
+  "#D8DEE9", // snow
+];
+
+// Dracula palette — Dracula dark backgrounds
+const DRACULA_DARK: readonly string[] = [
+  "#8BE9FD", // cyan
+  "#FFB86C", // orange
+  "#50FA7B", // green
+  "#FF5555", // red
+  "#BD93F9", // purple
+  "#FF79C6", // pink
+  "#F1FA8C", // yellow
+  "#6272A4", // comment
+  "#8BE9FD", // cyan alt
+  "#F8F8F2", // foreground
+];
+
+export const discretePalettes: Record<ThemeName, readonly string[]> = {
+  "light-default": TAB10,
+  "light-professional": PROFESSIONAL_LIGHT,
+  "light-minimal": MINIMAL_LIGHT,
+  "dark-default": DARK_DEFAULT,
+  "dark-nord": NORD_DARK,
+  "dark-dracula": DRACULA_DARK,
+};
+
 export type ThemeName =
   | "light-default"
   | "light-professional"
@@ -209,6 +314,7 @@ export const createAppTheme = (themeName: ThemeName) => {
         secondary: colors.text.secondary,
       },
       divider: colors.divider,
+      discrete: [...discretePalettes[themeName]],
     },
     typography: {
       fontFamily:

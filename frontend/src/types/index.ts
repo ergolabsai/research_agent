@@ -74,6 +74,33 @@ export interface ValidateRequest {
   paper_id?: string;
   authors?: string[];
   abstract?: string;
+  document_id?: number;
+  figures?: Record<
+    string,
+    | {
+        object_key?: string;
+        media_type?: string;
+        filename?: string;
+        url?: string;
+        data?: string;
+      }
+    | {
+        submitted?: {
+          object_key?: string;
+          media_type?: string;
+          filename?: string;
+          url?: string;
+          data?: string;
+        };
+        predicted?: {
+          object_key?: string;
+          media_type?: string;
+          filename?: string;
+          url?: string;
+          data?: string;
+        };
+      }
+  >;
 }
 
 export interface StepValidation {
@@ -122,4 +149,41 @@ export interface ValidationResult {
   };
   step_validations: Record<string, StepValidation>;
   related_papers?: RelatedPaper[];
+}
+
+// Paper graph types (from NetworkX node_link_data format)
+export type GraphNodeType =
+  | "paper"
+  | "step"
+  | "evidence"
+  | "figure"
+  | "math"
+  | "related_paper";
+
+export type GraphEdgeType =
+  | "HAS_STEP"
+  | "DEPENDS_ON"
+  | "SUPPORTS"
+  | "ASSESSES"
+  | "RELATED_TO";
+
+export interface GraphNode {
+  id: string;
+  node_type: GraphNodeType;
+  [key: string]: unknown;
+}
+
+export interface GraphLink {
+  source: string;
+  target: string;
+  edge_type: GraphEdgeType;
+  [key: string]: unknown;
+}
+
+export interface NodeLinkGraph {
+  directed: boolean;
+  multigraph: boolean;
+  graph: Record<string, unknown>;
+  nodes: GraphNode[];
+  links: GraphLink[];
 }
