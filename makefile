@@ -33,7 +33,7 @@ help: ## Show this help message
 	@echo -e '    $(ORANGE) make $(CYAN)[target]$(RESET)'
 	@echo ''
 	@echo -e '$(YELLOW) Development:$(RESET)'
-	@grep -E '^(dev|dev-gpu|up|up-cpu|gpu|down|restart|build|build-gpu|rebuild)[[:space:]]*:.*##' $(MAKEFILE_LIST) \
+	@grep -E '^(dev|dev-gpu|mock|up|up-cpu|gpu|down|restart|build|build-gpu|rebuild)[[:space:]]*:.*##' $(MAKEFILE_LIST) \
 		| awk -F ':.*## ' '{printf "    $(CYAN) %-18s$(RESET) %s\n", $$1, $$2}'
 	@echo ''
 	@echo -e '$(YELLOW) Logs:$(RESET)'
@@ -49,7 +49,11 @@ help: ## Show this help message
 #  Development
 # =============================================================================
 
-.PHONY: dev dev-gpu up up-cpu gpu down restart build build-gpu rebuild
+.PHONY: dev dev-gpu dev-mock up up-cpu gpu down restart build build-gpu rebuild
+
+mock: ## Run frontend in mock mode (no backend required)
+	@echo -e '$(GREEN)Starting frontend in mock mode...$(RESET)'
+	cd frontend && npm run dev:mock
 
 dev: _ensure-env ## Preferred daily workflow: dev mode (CPU, hot-reload)
 	@echo -e '$(GREEN)Starting dev environment (CPU)...$(RESET)'
