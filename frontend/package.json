@@ -6,7 +6,6 @@
     "dev": "vite",
     "dev:mock": "vite --mode mock",
     "build": "tsc && vite build",
-    "build:mock": "tsc && vite build --mode mock",
     "preview": "vite preview",
     "lint": "eslint src --ext ts,tsx --report-unused-disable-directives",
     "lint:fix": "eslint src --ext ts,tsx --fix"
@@ -25,7 +24,6 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-draft-wysiwyg": "^1.15.0",
-    "react-force-graph-2d": "^1.29.1",
     "react-router-dom": "^6.20.0",
     "zustand": "^4.4.1"
   },
