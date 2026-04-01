@@ -328,16 +328,16 @@ def _build_figure_refs_from_document(
     document_id: int,
     user_id: int,
 ) -> dict[str, dict]:
-        """Build figure references from image attachments on a document.
+    """Build figure references from image attachments on a document.
 
-        Each figure entry supports both submitted and predicted images:
-            {
-                "Figure 1": {
-                    "submitted": {...},
-                    "predicted": {...}
-                }
+    Each figure entry supports both submitted and predicted images:
+        {
+            "Figure 1": {
+                "submitted": {...},
+                "predicted": {...}
             }
-        """
+        }
+    """
     document = session.get(Document, document_id)
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
