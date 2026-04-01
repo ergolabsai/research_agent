@@ -231,6 +231,67 @@ def get_formula_data():
             ],
             "category": "mathematics",
             "tags": ["math", "percentage", "percent"]
+        },
+
+        # ML Validation — formulas used by the paper validation pipeline
+        {
+            "formula_id": "confidence_aggregation",
+            "name": "Confidence Aggregation",
+            "description": "Weighted sum of sub-scores into final confidence: C_final = 0.35·S_evidence + 0.25·S_figure + 0.25·S_math + 0.15·S_citation",
+            "equation": "C_final = 0.35 * S_evidence + 0.25 * S_figure + 0.25 * S_math + 0.15 * S_citation",
+            "variables": ["C_final", "S_evidence", "S_figure", "S_math", "S_citation"],
+            "variable_details": [
+                {"name": "C_final", "description": "Final confidence score in [0, 1]", "unit": "dimensionless"},
+                {"name": "S_evidence", "description": "Evidence density sub-score", "unit": "dimensionless"},
+                {"name": "S_figure", "description": "Figure agreement sub-score", "unit": "dimensionless"},
+                {"name": "S_math", "description": "Symbolic validity sub-score", "unit": "dimensionless"},
+                {"name": "S_citation", "description": "Citation convergence sub-score", "unit": "dimensionless"}
+            ],
+            "category": "ml_validation",
+            "tags": ["confidence", "aggregation", "scoring", "ml_validation", "pipeline"]
+        },
+        {
+            "formula_id": "citation_scoring",
+            "name": "Citation Scoring",
+            "description": "Combines semantic relevancy and directional convergence: S_citation = mean(relevancy_i × (1 + convergence_i))",
+            "equation": "S_citation = sum(relevancy_i * (1 + convergence_i)) / n_papers",
+            "variables": ["S_citation", "relevancy_i", "convergence_i", "n_papers"],
+            "variable_details": [
+                {"name": "S_citation", "description": "Aggregated citation score in [0, 2]", "unit": "dimensionless"},
+                {"name": "relevancy_i", "description": "Relevancy score for paper i in [0, 1]", "unit": "dimensionless"},
+                {"name": "convergence_i", "description": "Convergence score for paper i in [-1, 1]", "unit": "dimensionless"},
+                {"name": "n_papers", "description": "Number of related papers", "unit": "count"}
+            ],
+            "category": "ml_validation",
+            "tags": ["citation", "scoring", "convergence", "ml_validation", "pipeline"]
+        },
+        {
+            "formula_id": "plot_agreement",
+            "name": "Plot Agreement",
+            "description": "Scores slope trend agreement between extracted and predicted curves: E_plot = 1 − |slope_true − slope_pred| / max(|slope_true|, ε)",
+            "equation": "E_plot = 1 - abs(slope_true - slope_pred) / max(abs(slope_true), 1e-6)",
+            "variables": ["E_plot", "slope_true", "slope_pred"],
+            "variable_details": [
+                {"name": "E_plot", "description": "Plot agreement score in [0, 1]; 1 = perfect", "unit": "dimensionless"},
+                {"name": "slope_true", "description": "Slope extracted from actual figure", "unit": "dimensionless"},
+                {"name": "slope_pred", "description": "Slope predicted from paper narrative", "unit": "dimensionless"}
+            ],
+            "category": "ml_validation",
+            "tags": ["figures", "plot", "agreement", "slope", "ml_validation", "pipeline"]
+        },
+        {
+            "formula_id": "contradiction_penalty",
+            "name": "Contradiction Penalty",
+            "description": "Reduces confidence for unresolved contradictions (clipped at 0.35): Penalty = 0.1·N_unverified + 0.07·N_inconsistent",
+            "equation": "Penalty = min(0.35, 0.1 * N_unverified_claims + 0.07 * N_inconsistent_figures)",
+            "variables": ["Penalty", "N_unverified_claims", "N_inconsistent_figures"],
+            "variable_details": [
+                {"name": "Penalty", "description": "Confidence penalty in [0, 0.35]", "unit": "dimensionless"},
+                {"name": "N_unverified_claims", "description": "Count of claims without supporting evidence", "unit": "count"},
+                {"name": "N_inconsistent_figures", "description": "Count of figures with contradictions", "unit": "count"}
+            ],
+            "category": "ml_validation",
+            "tags": ["penalty", "contradiction", "confidence", "ml_validation", "pipeline"]
         }
     ]
 

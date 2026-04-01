@@ -39,6 +39,19 @@ def delete_object(object_key: str):
         _minio().remove_object(settings.minio_bucket, object_key)
 
 
+def get_object_bytes(object_key: str) -> bytes:
+    """Read an object from storage and return its raw bytes."""
+    if settings.storage_backend == "local":
+        return (LOCAL_BASE / object_key).read_bytes()
+
+    response = _minio().get_object(settings.minio_bucket, object_key)
+    try:
+        return response.read()
+    finally:
+        response.close()
+        response.release_conn()
+
+
 def _minio():
     from minio import Minio
     return Minio(settings.minio_endpoint, access_key=settings.minio_access_key, secret_key=settings.minio_secret_key, secure=settings.minio_secure)

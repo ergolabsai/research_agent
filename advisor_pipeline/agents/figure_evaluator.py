@@ -1,8 +1,10 @@
 """Figure evaluator — evaluates whether figures support the claims made about them.
 
 4-stage evaluation per figure:
-1. Describe what the figure actually shows (vision)
-2. Describe what it should show based on text alone
+1. Describe what the submitted/observed figure shows (vision)
+2. Describe what the expected/predicted figure should show
+    - Prefer predicted image if provided
+    - Fallback to text-only expected description
 3. Compare similarities and differences
 4. Assess each associated claim based on the comparison
 """
@@ -35,7 +37,13 @@ class FigureEvaluator:
         """Evaluate all figures.
 
         Args:
-            figures: Dict mapping figure names to {'data': base64_str, 'media_type': str}.
+            figures: Dict mapping figure names to:
+                {
+                    'data': base64_str,
+                    'media_type': str,
+                    'predicted_data': Optional[base64_str],
+                    'predicted_media_type': Optional[str],
+                }
             figure_claims: Dict mapping figure names to list of
                 {'supports_step': int, 'claim': str}.
             paper_text: Full paper text.
@@ -59,8 +67,15 @@ class FigureEvaluator:
             )
             print("  Actual description complete")
 
-            # Step B: Describe what it should show based on text
-            expected_description = self._describe_expected(figure_name, paper_text)
+            # Step B: Describe expected output.
+            # If a predicted figure image is provided, use it directly.
+            if figure_data.get("predicted_data") and figure_data.get("predicted_media_type"):
+                expected_description = self._describe_figure(
+                    figure_data["predicted_media_type"],
+                    figure_data["predicted_data"],
+                )
+            else:
+                expected_description = self._describe_expected(figure_name, paper_text)
             print("  Expected description complete")
 
             # Step C: Compare

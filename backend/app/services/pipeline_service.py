@@ -6,16 +6,20 @@ Each pipeline step's full agent output is logged to PipelineStepLog for transpar
 """
 
 import asyncio
+import base64
 import json
 import logging
+import mimetypes
 import time
 import uuid
+from pathlib import Path
 from datetime import datetime
 from enum import Enum
 from typing import Optional
 
 import networkx as nx
 from sqlmodel import Session, select
+import httpx
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +40,7 @@ from advisor_pipeline.models.paper_graph import (
 from advisor_pipeline.models.schemas import ValidationResult
 from app.models import PipelineJob, PipelineStepLog
 from app.security import engine
+from app.storage import get_object_bytes
 from app.time import now
 
 
@@ -366,7 +371,7 @@ async def run_pipeline_async(
     paper_text: str,
     title: str,
     user_id: int,
-    figures: dict[str, str] | None = None,
+    figures: dict[str, dict] | None = None,
     authors: list[str] | None = None,
     abstract: str = "",
     bibliography: dict[str, str] | None = None,
@@ -384,11 +389,7 @@ async def run_pipeline_async(
         try:
             logger.info("Pipeline job %s started for paper %s", job_id, paper_id)
             orchestrator = AdvisorOrchestrator()
-
-            normalized_figures = {
-                key: {"path": value} if isinstance(value, str) else value
-                for key, value in (figures or {}).items()
-            }
+            hydrated_figures = _hydrate_figure_payloads(figures or {})
 
             # Create step callback for logging
             def on_step_complete(node_name: str, state_update: dict, duration: float):
@@ -400,7 +401,7 @@ async def run_pipeline_async(
 
             result = orchestrator.run(
                 paper_text=paper_text,
-                figures=normalized_figures,
+                figures=hydrated_figures,
                 paper_bib=bibliography,
                 on_step_complete=on_step_complete,
             )
@@ -462,3 +463,70 @@ def create_job(
         session.refresh(job)
         session.expunge(job)
     return job
+
+
+def _hydrate_figure_payloads(figure_refs: dict[str, dict]) -> dict[str, dict[str, str]]:
+    """Resolve figure refs into base64 payloads for submitted/predicted images."""
+    hydrated: dict[str, dict[str, str]] = {}
+    for figure_name, payload in figure_refs.items():
+        try:
+            submitted_payload = payload.get("submitted") if isinstance(payload.get("submitted"), dict) else payload
+            predicted_payload = payload.get("predicted") if isinstance(payload.get("predicted"), dict) else None
+
+            resolved_submitted = _resolve_single_figure(submitted_payload)
+            if not resolved_submitted:
+                continue
+
+            combined = {
+                "data": resolved_submitted["data"],
+                "media_type": resolved_submitted["media_type"],
+            }
+
+            resolved_predicted = _resolve_single_figure(predicted_payload)
+            if resolved_predicted:
+                combined["predicted_data"] = resolved_predicted["data"]
+                combined["predicted_media_type"] = resolved_predicted["media_type"]
+
+            hydrated[figure_name] = combined
+        except Exception as exc:
+            logger.warning("Failed to hydrate figure '%s': %s", figure_name, exc)
+    return hydrated
+
+
+def _resolve_single_figure(payload: dict) -> Optional[dict[str, str]]:
+    if not isinstance(payload, dict):
+        return None
+
+    # Already in orchestrator-ready shape.
+    if payload.get("data") and payload.get("media_type"):
+        return {
+            "data": payload["data"],
+            "media_type": payload["media_type"],
+        }
+
+    media_type = payload.get("media_type")
+    object_key = payload.get("object_key")
+    image_bytes: Optional[bytes] = None
+
+    if object_key:
+        image_bytes = get_object_bytes(object_key)
+        media_type = media_type or mimetypes.guess_type(object_key)[0] or "image/jpeg"
+    else:
+        url = payload.get("url") or payload.get("path")
+        if isinstance(url, str) and url.startswith("/static/attachments/"):
+            inferred_key = url[len("/static/attachments/"):]
+            image_bytes = get_object_bytes(inferred_key)
+            media_type = media_type or mimetypes.guess_type(inferred_key)[0] or "image/jpeg"
+        elif isinstance(url, str) and url:
+            response = httpx.get(url, timeout=20.0)
+            response.raise_for_status()
+            image_bytes = response.content
+            media_type = media_type or response.headers.get("content-type") or "image/jpeg"
+
+    if not image_bytes:
+        return None
+
+    return {
+        "data": base64.standard_b64encode(image_bytes).decode("utf-8"),
+        "media_type": media_type or "image/jpeg",
+    }

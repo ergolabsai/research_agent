@@ -4,6 +4,7 @@
 from fastapi import FastAPI
 from fastapi.concurrency import asynccontextmanager
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from sqlmodel import SQLModel
 # Internal imports
 from app.security import engine
@@ -25,6 +26,9 @@ async def lifespan(app: FastAPI):
 
 # FastAPI app with lifespan for startup tasks
 app = FastAPI(title="Advisor API", version="0.1.0", lifespan=lifespan)
+
+# Static attachment serving for local storage backend.
+app.mount("/static/attachments", StaticFiles(directory="backend/data/attachments"), name="attachments")
 
 # CORS middleware
 app.add_middleware(
