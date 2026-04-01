@@ -12,7 +12,6 @@ import { RegisterPage } from "./pages/RegisterPage";
 import { MainPage } from "./pages/MainPage";
 import { DashboardPage } from "./pages/DashboardPage";
 import { EditorPage } from "./pages/EditorPage";
-import { ValidatePage } from "./pages/ValidatePage";
 import { CircularProgress, Box } from "@mui/material";
 
 // Protected wrapper that redirects to landing page if not authenticated
@@ -43,7 +42,6 @@ function ProtectedApp() {
       <Routes>
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="/editor/:id" element={<EditorPage />} />
-        <Route path="/validate" element={<ValidatePage />} />
         <Route path="*" element={<Navigate to="/app/dashboard" replace />} />
       </Routes>
     </MainPage>

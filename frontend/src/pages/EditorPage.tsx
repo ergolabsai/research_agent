@@ -13,11 +13,11 @@ import { createPortal } from "react-dom";
 import { documentsAPI } from "../api";
 import { Attachment } from "../types";
 import {
-  Functions as MathIcon,
-  Psychology as LogicIcon,
-  LineStyle as FormatterIcon,
-  LocalLibrary as LibrarianIcon,
-  Insights as PlotsIcon,
+  // Functions as MathIcon,
+  // Psychology as LogicIcon,
+  // LineStyle as FormatterIcon,
+  // LocalLibrary as LibrarianIcon,
+  // Insights as PlotsIcon,
   AttachFile as AttachFileIcon,
   Delete as DeleteIcon,
   VerticalSplit as AgentPanelIcon,
@@ -37,12 +37,12 @@ export const EditorPage = () => {
 
   // Right agent panel state
   const [rightPanelOpen, setRightPanelOpen] = useState(false);
-  const [rightPanelWidth, setRightPanelWidth] = useState(320);
+  const [rightPanelWidth, setRightPanelWidth] = useState(500);
   const [agentTab, setAgentTab] = useState<AgentTab>("validate");
   const dragRef = useRef(false);
   const startXRef = useRef(0);
   const startWidthRef = useRef(0);
-  const rightPanelWidthRef = useRef(320);
+  const rightPanelWidthRef = useRef(400);
 
   const formatFileSize = (sizeInBytes: number) => {
     if (sizeInBytes < 1024) return `${sizeInBytes} B`;
@@ -111,7 +111,7 @@ export const EditorPage = () => {
       if (!dragRef.current) return;
       const delta = startXRef.current - e.clientX;
       const newWidth = Math.min(
-        700,
+        1400,
         Math.max(220, startWidthRef.current + delta),
       );
       setRightPanelWidth(newWidth);
@@ -128,16 +128,16 @@ export const EditorPage = () => {
     };
   }, []);
 
-  const openPanel = (tab: AgentTab) => {
-    setAgentTab(tab);
-    setRightPanelOpen(true);
-  };
+  // const openPanel = (tab: AgentTab) => {
+  //   setAgentTab(tab);
+  //   setRightPanelOpen(true);
+  // };
 
-  const handleMath = () => openPanel("math");
-  const handleLogic = () => openPanel("validate");
-  const handleFormatter = () => {};
-  const handleLibrarian = () => openPanel("citations");
-  const handlePlots = () => openPanel("figures");
+  // const handleMath = () => openPanel("math");
+  // const handleLogic = () => openPanel("validate");
+  // const handleFormatter = () => {};
+  // const handleLibrarian = () => openPanel("citations");
+  // const handlePlots = () => openPanel("figures");
 
   const handleAttachmentUpload = async (
     event: React.ChangeEvent<HTMLInputElement>,
@@ -166,22 +166,22 @@ export const EditorPage = () => {
     }
   };
 
-  const buttons = [
-    { id: "math", label: "Math", icon: MathIcon, handler: handleMath },
-    { id: "logic", label: "Logic", icon: LogicIcon, handler: handleLogic },
-    {
-      id: "formatter",
-      label: "Format",
-      icon: FormatterIcon,
-      handler: handleFormatter,
-    },
-    {
-      id: "librarian",
-      label: "Library",
-      icon: LibrarianIcon,
-      handler: handleLibrarian,
-    },
-    { id: "plots", label: "Plots", icon: PlotsIcon, handler: handlePlots },
+  const buttons: any = [
+    // { id: "math", label: "Math", icon: MathIcon, handler: handleMath },
+    // { id: "logic", label: "Logic", icon: LogicIcon, handler: handleLogic },
+    // {
+    //   id: "formatter",
+    //   label: "Format",
+    //   icon: FormatterIcon,
+    //   handler: handleFormatter,
+    // },
+    // {
+    //   id: "librarian",
+    //   label: "Library",
+    //   icon: LibrarianIcon,
+    //   handler: handleLibrarian,
+    // },
+    // { id: "plots", label: "Plots", icon: PlotsIcon, handler: handlePlots },
   ];
 
   const buttonSx = {
@@ -284,7 +284,7 @@ export const EditorPage = () => {
             />
           </Box>
           <Stack direction="row" sx={{ gap: 1 }}>
-            {buttons.map((btn) => {
+            {buttons.map((btn: any) => {
               const IconComponent = btn.icon;
               return (
                 <Box
@@ -470,6 +470,7 @@ export const EditorPage = () => {
           <AgentPanel
             content={content}
             title={title}
+            documentId={id ? Number(id) : undefined}
             activeTab={agentTab}
             onTabChange={setAgentTab}
             onCollapse={() => setRightPanelOpen(false)}

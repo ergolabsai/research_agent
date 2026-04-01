@@ -78,7 +78,6 @@ interface MainPageProps {
   children: ReactNode;
 }
 
-const DRAWER_WIDTH = 280;
 const DRAWER_COLLAPSED_WIDTH = 0;
 
 export const MainPage = ({ children }: MainPageProps) => {
