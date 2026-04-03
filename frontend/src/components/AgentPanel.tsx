@@ -27,7 +27,7 @@ import {
   CheckCircle as ValidIcon,
   Cancel as InvalidIcon,
   Close as CloseIcon,
-  ZoomInMap as ZoomIcon,
+  ZoomOutMap as ZoomIcon,
 } from "@mui/icons-material";
 import {
   FormEvent,
@@ -261,7 +261,7 @@ function ZoomableFigureCard({
   placeholder,
 }: {
   title: string;
-  subtitle: string;
+  subtitle?: string;
   imageUrl?: string | null;
   alt: string;
   placeholder: ReactNode;
@@ -1860,21 +1860,21 @@ function FiguresContent({
           <Box sx={{ mb: 1 }}>
             <Stack direction={{ xs: "column", md: "row" }} spacing={1}>
               <ZoomableFigureCard
-                title="Observed / Submitted"
-                subtitle={
-                  selectedFigureAsset?.submitted?.filename ??
-                  "Placeholder figure"
-                }
+                title="Observed"
+                // subtitle={
+                //   selectedFigureAsset?.submitted?.filename ??
+                //   "Placeholder figure"
+                // }
                 imageUrl={selectedFigureAsset?.submitted?.url}
                 alt={`${selectedFigureData.figure_name} submitted`}
                 placeholder={submittedPlaceholder}
               />
               <ZoomableFigureCard
-                title="Predicted / Expected"
-                subtitle={
-                  selectedFigureAsset?.predicted?.filename ??
-                  "Placeholder figure"
-                }
+                title="Predicted"
+                // subtitle={
+                //   selectedFigureAsset?.predicted?.filename ??
+                //   "Placeholder figure"
+                // }
                 imageUrl={selectedFigureAsset?.predicted?.url}
                 alt={`${selectedFigureData.figure_name} predicted`}
                 placeholder={predictedPlaceholder}

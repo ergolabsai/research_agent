@@ -423,17 +423,11 @@ export function setupMockApi(): void {
   });
 
   apiMock.onPost("/auth/try").reply(() => {
-    const guest: UserRecord = {
-      id: nextUserId++,
-      email: `guest${Date.now()}@ergolabs.ai`,
-      username: `guest-${Date.now().toString().slice(-4)}`,
-      created_at: nowIso(),
-      updated_at: nowIso(),
-    };
-    users.push(guest);
-    currentUserId = guest.id;
-    const token = makeToken(guest.id);
-    tokenUserId.set(token, guest.id);
+    // Log in as the pre-seeded demo user so the demo shows existing documents.
+    const demo = users.find((u) => u.email === "demo@ergolabs.ai") ?? users[0];
+    currentUserId = demo.id;
+    const token = makeToken(demo.id);
+    tokenUserId.set(token, demo.id);
     return [
       200,
       {
