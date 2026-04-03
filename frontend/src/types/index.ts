@@ -1,3 +1,5 @@
+export * from "./contentJson";
+
 export interface User {
   id: number;
   email: string;
@@ -180,10 +182,32 @@ export interface GraphLink {
   [key: string]: unknown;
 }
 
+/** Raw shape from NetworkX — may use "links" or "edges" depending on version. */
+export interface NodeLinkGraphRaw {
+  directed: boolean;
+  multigraph: boolean;
+  graph: Record<string, unknown>;
+  nodes: GraphNode[];
+  links?: GraphLink[];
+  edges?: GraphLink[];
+}
+
+/** Normalized graph with `links` always populated. */
 export interface NodeLinkGraph {
   directed: boolean;
   multigraph: boolean;
   graph: Record<string, unknown>;
   nodes: GraphNode[];
   links: GraphLink[];
+}
+
+/** Normalize a raw NetworkX node-link payload so `links` is always present. */
+export function normalizeGraph(raw: NodeLinkGraphRaw): NodeLinkGraph {
+  return {
+    directed: raw.directed,
+    multigraph: raw.multigraph,
+    graph: raw.graph,
+    nodes: raw.nodes,
+    links: raw.links ?? raw.edges ?? [],
+  };
 }
