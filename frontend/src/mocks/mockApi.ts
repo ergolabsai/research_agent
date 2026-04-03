@@ -13,7 +13,9 @@ import AxiosMockAdapter from "axios-mock-adapter";
 import axios, { type AxiosRequestConfig } from "axios";
 import api from "../api/client";
 import { MOCK_AGENTS } from "./agentConfig";
-import { validationResult, buildMockGraph } from "./fixtures";
+import { validationResult } from "./fixtures";
+import paperGraph from "./paper_graph.json";
+import { demoPaperContentString, demoPaperTitle } from "./demoPaperContent";
 
 // ---------------------------------------------------------------------------
 // Local in-memory "DB"
@@ -96,7 +98,7 @@ const makeToken = (userId: number) => `mock-token-${userId}`;
 const tokenUserId = new Map<string, number>();
 let currentUserId = 1;
 let nextUserId = 3;
-let nextDocumentId = 6;
+let nextDocumentId = 7;
 let nextWorkspaceId = 3;
 let nextAttachmentId = 2;
 let nextJobId = 1;
@@ -165,6 +167,15 @@ const documents: DocumentRecord[] = [
     title: "Advisor Walkthrough Script",
     content:
       "Use this script during the demo to explain step-by-step scoring and confidence rollup.",
+    owner_id: 1,
+    workspace_id: null,
+    created_at: nowIso(),
+    updated_at: nowIso(),
+  },
+  {
+    id: 6,
+    title: demoPaperTitle,
+    content: demoPaperContentString,
     owner_id: 1,
     workspace_id: null,
     created_at: nowIso(),
@@ -295,25 +306,47 @@ function makeMockFigureDataUrl(
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
 
-function buildMockFigureAssets(
-  result: typeof validationResult,
-): PipelineFigureAssetRecord[] {
-  const names = Object.values(result.step_validations).flatMap((step) =>
-    (step.figure_validations ?? []).map((f) => f.figure_name),
-  );
-  return names.map((figureName, idx) => ({
-    figure_name: figureName,
-    submitted: {
-      filename: `figure-${idx + 1}-submitted.png`,
-      media_type: "image/png",
-      url: makeMockFigureDataUrl(figureName, idx + 1, "submitted"),
-    },
-    predicted: {
-      filename: `figure-${idx + 1}-predicted.png`,
-      media_type: "image/png",
-      url: makeMockFigureDataUrl(figureName, idx + 1, "predicted"),
-    },
-  }));
+function buildMockFigureAssets(): PipelineFigureAssetRecord[] {
+  // Source figure names from graph nodes (preferred) or fall back to result fixtures
+  const graphFigureNames = paperGraph.nodes
+    .filter((n: { node_type: string }) => n.node_type === "figure")
+    .map((n: { figure_name?: string }) => String(n.figure_name ?? ""));
+  const resultFigureNames = Object.values(validationResult.step_validations)
+    .flatMap((step) => (step.figure_validations ?? []).map((f) => f.figure_name));
+  const names = graphFigureNames.length > 0 ? graphFigureNames : resultFigureNames;
+
+  return names.map((figureName, idx) => {
+    // Try to import from mocks/figures/ — the user places real images there
+    // matching the graph node's figure_name (e.g. excitation_scheme.jpg)
+    let submittedUrl: string | undefined;
+    try {
+      // Vite eager glob for mock figure images
+      const figureModules = import.meta.glob<{ default: string }>(
+        "./figures/*",
+        { eager: true },
+      );
+      const key = `./figures/${figureName}`;
+      if (figureModules[key]) {
+        submittedUrl = figureModules[key].default;
+      }
+    } catch {
+      // Glob not available or file missing — fall through to SVG placeholder
+    }
+
+    return {
+      figure_name: figureName,
+      submitted: {
+        filename: figureName,
+        media_type: "image/jpeg",
+        url: submittedUrl ?? makeMockFigureDataUrl(figureName, idx + 1, "submitted"),
+      },
+      predicted: {
+        filename: `${figureName}-predicted`,
+        media_type: "image/png",
+        url: makeMockFigureDataUrl(figureName, idx + 1, "predicted"),
+      },
+    };
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -672,8 +705,8 @@ export function setupMockApi(): void {
 
     pipelineJobs.set(jobId, job);
     pipelineResults.set(jobId, result);
-    pipelineGraphs.set(jobId, buildMockGraph(result));
-    pipelineFigureAssets.set(jobId, buildMockFigureAssets(result));
+    pipelineGraphs.set(jobId, structuredClone(paperGraph));
+    pipelineFigureAssets.set(jobId, buildMockFigureAssets());
     nextJobId++;
 
     return [200, { ...job }];
