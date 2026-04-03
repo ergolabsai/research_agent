@@ -53,7 +53,7 @@ help: ## Show this help message
 
 mock: ## Run frontend in mock mode (no backend required)
 	@echo -e '$(GREEN)Starting frontend in mock mode...$(RESET)'
-	cd frontend && npm run dev:mock
+	cd frontend && npm install && npm run dev:mock
 
 dev: _ensure-env ## Preferred daily workflow: dev mode (CPU, hot-reload)
 	@echo -e '$(GREEN)Starting dev environment (CPU)...$(RESET)'
