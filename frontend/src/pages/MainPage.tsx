@@ -331,7 +331,7 @@ export const MainPage = ({ children }: MainPageProps) => {
 
   return (
     <DialogContext.Provider value={dialogContextValue}>
-      <Box sx={{ display: "flex", minHeight: "100vh" }}>
+      <Box sx={{ display: "flex", height: "100vh", overflow: "hidden" }}>
         {/* Sidebar */}
         <Drawer
           variant={isMobile ? "temporary" : "permanent"}
@@ -482,6 +482,7 @@ export const MainPage = ({ children }: MainPageProps) => {
           <Box
             sx={{
               flex: 1,
+              minHeight: 0,
               overflow: "auto",
               p: 2,
             }}
