@@ -33,7 +33,7 @@ import {
 } from "react";
 import { createPortal } from "react-dom";
 import { useAuth } from "../context/AuthContext";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useTheme as useAppTheme } from "../theme";
 import { Sidebar } from "../components/Sidebar";
 import { SettingsMenu } from "../components/SettingsMenu";
@@ -74,6 +74,24 @@ export const useDialogs = () => {
   return useContext(DialogContext);
 };
 
+export interface RightPanelContextType {
+  rightPanelOpen: boolean;
+  setRightPanelOpen: (open: boolean | ((v: boolean) => boolean)) => void;
+}
+
+const defaultRightPanelContext: RightPanelContextType = {
+  rightPanelOpen: false,
+  setRightPanelOpen: () => {},
+};
+
+export const RightPanelContext = createContext<RightPanelContextType>(
+  defaultRightPanelContext,
+);
+
+export const useRightPanel = () => {
+  return useContext(RightPanelContext);
+};
+
 interface MainPageProps {
   children: ReactNode;
 }
@@ -84,6 +102,8 @@ export const MainPage = ({ children }: MainPageProps) => {
   const theme = useTheme();
   const { logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+  const isEditorPage = location.pathname.startsWith("/app/editor");
   const { themeName } = useAppTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
@@ -140,19 +160,52 @@ export const MainPage = ({ children }: MainPageProps) => {
     startWidthRefLeft.current = sidebarWidthRef.current;
   };
 
+  // Right agent panel state
+  const [rightPanelOpen, setRightPanelOpen] = useState(false);
+  const [rightPanelWidth, setRightPanelWidth] = useState(500);
+  const dragRefRight = useRef(false);
+  const startXRefRight = useRef(0);
+  const startWidthRefRight = useRef(0);
+  const rightPanelWidthRef = useRef(500);
+
+  // Close agent panel when navigating away from editor
+  useEffect(() => {
+    if (!isEditorPage) {
+      setRightPanelOpen(false);
+    }
+  }, [isEditorPage]);
+
+  const handleRightDragMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    dragRefRight.current = true;
+    startXRefRight.current = e.clientX;
+    startWidthRefRight.current = rightPanelWidthRef.current;
+  };
+
   useEffect(() => {
     const onMouseMove = (e: MouseEvent) => {
-      if (!dragRefLeft.current) return;
-      const delta = e.clientX - startXRefLeft.current;
-      const newWidth = Math.min(
-        MAX_DRAWER_WIDTH,
-        Math.max(MIN_DRAWER_WIDTH, startWidthRefLeft.current + delta),
-      );
-      setSidebarWidth(newWidth);
-      sidebarWidthRef.current = newWidth;
+      if (dragRefLeft.current) {
+        const delta = e.clientX - startXRefLeft.current;
+        const newWidth = Math.min(
+          MAX_DRAWER_WIDTH,
+          Math.max(MIN_DRAWER_WIDTH, startWidthRefLeft.current + delta),
+        );
+        setSidebarWidth(newWidth);
+        sidebarWidthRef.current = newWidth;
+      }
+      if (dragRefRight.current) {
+        const delta = startXRefRight.current - e.clientX;
+        const newWidth = Math.min(
+          1400,
+          Math.max(220, startWidthRefRight.current + delta),
+        );
+        setRightPanelWidth(newWidth);
+        rightPanelWidthRef.current = newWidth;
+      }
     };
     const onMouseUp = () => {
       dragRefLeft.current = false;
+      dragRefRight.current = false;
     };
     window.addEventListener("mousemove", onMouseMove);
     window.addEventListener("mouseup", onMouseUp);
@@ -329,8 +382,14 @@ export const MainPage = ({ children }: MainPageProps) => {
     openAddDocDialog,
   };
 
+  const rightPanelContextValue: RightPanelContextType = {
+    rightPanelOpen,
+    setRightPanelOpen,
+  };
+
   return (
     <DialogContext.Provider value={dialogContextValue}>
+    <RightPanelContext.Provider value={rightPanelContextValue}>
       <Box sx={{ display: "flex", height: "100vh", overflow: "hidden" }}>
         {/* Sidebar */}
         <Drawer
@@ -394,102 +453,152 @@ export const MainPage = ({ children }: MainPageProps) => {
             backgroundColor: theme.palette.background.default,
           }}
         >
-          {/* Top Navigation */}
-          <AppBar
-            position="static"
-            sx={{
-              backgroundColor: "transparent",
-              boxShadow: "none",
-              borderBottom: "none",
-            }}
-          >
-            <Toolbar
+          {/* Top Navigation — hidden on editor when both panels are open */}
+          {!(isEditorPage && !sidebarCollapsed && sidebarOpen && rightPanelOpen) && (
+            <AppBar
+              position="static"
               sx={{
-                display: "flex",
-                justifyContent: "space-between",
-                backgroundColor: theme.palette.background.default,
-                alignItems: "center",
-                px: 2,
-                py: 1,
-                minHeight: "64px",
+                backgroundColor: "transparent",
+                boxShadow: "none",
+                borderBottom: "none",
               }}
             >
-              <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-                {!isMobile && sidebarCollapsed && (
-                  <IconButton
-                    onClick={() => setSidebarCollapsed(false)}
-                    size="small"
-                    sx={{
-                      color: "text.primary",
-                    }}
-                    title="Expand sidebar"
-                  >
-                    <MenuIcon />
-                  </IconButton>
-                )}
-                {isMobile && (
-                  <IconButton
-                    onClick={() => setSidebarOpen(true)}
-                    size="small"
-                    sx={{
-                      color: "text.primary",
-                    }}
-                  >
-                    <MenuIcon />
-                  </IconButton>
-                )}
-              </Box>
-
-              <Stack
-                direction="row"
-                spacing={0.5}
-                sx={{ alignItems: "center" }}
+              <Toolbar
+                sx={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  backgroundColor: theme.palette.background.default,
+                  alignItems: "center",
+                  px: 2,
+                  py: 1,
+                  minHeight: "64px",
+                }}
               >
-                {/* portal target — panel page icon buttons mount here */}
-                <Box
-                  id="rp-toolbar"
-                  sx={{ display: "flex", alignItems: "center", gap: 0.5 }}
-                />
-                <Box
-                  sx={{ width: 1, bgcolor: "divider", height: 20, mx: 0.5 }}
-                />
-                <IconButton
-                  size="small"
-                  onClick={() => setNewDocDialogOpen(true)}
-                  title="New Document"
-                  sx={{
-                    color: "text.primary",
-                  }}
-                >
-                  <AddIcon fontSize="small" />
-                </IconButton>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+                  {!isMobile && sidebarCollapsed && (
+                    <IconButton
+                      onClick={() => setSidebarCollapsed(false)}
+                      size="small"
+                      sx={{
+                        color: "text.primary",
+                      }}
+                      title="Expand sidebar"
+                    >
+                      <MenuIcon />
+                    </IconButton>
+                  )}
+                  {isMobile && (
+                    <IconButton
+                      onClick={() => setSidebarOpen(true)}
+                      size="small"
+                      sx={{
+                        color: "text.primary",
+                      }}
+                    >
+                      <MenuIcon />
+                    </IconButton>
+                  )}
+                </Box>
 
-                <IconButton
-                  size="small"
-                  onClick={handleOpenSettings}
-                  title="Settings"
-                  sx={{
-                    color: "text.primary",
-                  }}
+                <Stack
+                  direction="row"
+                  spacing={0.5}
+                  sx={{ alignItems: "center" }}
                 >
-                  <MoreVertIcon fontSize="small" />
-                </IconButton>
-              </Stack>
-            </Toolbar>
-          </AppBar>
+                  {/* portal target — panel page icon buttons mount here */}
+                  <Box
+                    id="rp-toolbar"
+                    sx={{ display: "flex", alignItems: "center", gap: 0.5 }}
+                  />
+                  {!isEditorPage && (
+                    <>
+                      <Box
+                        sx={{ width: 1, bgcolor: "divider", height: 20, mx: 0.5 }}
+                      />
+                      <IconButton
+                        size="small"
+                        onClick={() => setNewDocDialogOpen(true)}
+                        title="New Document"
+                        sx={{
+                          color: "text.primary",
+                        }}
+                      >
+                        <AddIcon fontSize="small" />
+                      </IconButton>
+
+                      <IconButton
+                        size="small"
+                        onClick={handleOpenSettings}
+                        title="Settings"
+                        sx={{
+                          color: "text.primary",
+                        }}
+                      >
+                        <MoreVertIcon fontSize="small" />
+                      </IconButton>
+                    </>
+                  )}
+                </Stack>
+              </Toolbar>
+            </AppBar>
+          )}
 
           {/* Page Content */}
           <Box
             sx={{
               flex: 1,
               minHeight: 0,
-              overflow: "auto",
-              p: 2,
+              overflow: isEditorPage ? "hidden" : "auto",
+              p: isEditorPage ? 0 : 2,
             }}
           >
             {children}
           </Box>
         </Box>
+
+        {/* Right panel drag handle */}
+        {isEditorPage && rightPanelOpen && (
+          <Box
+            onMouseDown={handleRightDragMouseDown}
+            sx={{
+              width: 8,
+              flexShrink: 0,
+              cursor: "col-resize",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              userSelect: "none",
+              "&:hover > div": { bgcolor: "primary.main", opacity: 1 },
+            }}
+          >
+            <Box
+              sx={{
+                width: 2,
+                height: "100%",
+                bgcolor: "divider",
+                borderRadius: 999,
+                opacity: 0,
+                transition: "opacity 0.15s, background-color 0.15s",
+              }}
+            />
+          </Box>
+        )}
+
+        {/* Right agent panel */}
+        {isEditorPage && rightPanelOpen && (
+          <Box
+            sx={{
+              width: rightPanelWidth,
+              flexShrink: 0,
+              backgroundColor: "background.default",
+            }}
+          >
+            <Box
+              id="agent-panel-root"
+              sx={{ height: "100%", display: "flex", flexDirection: "column" }}
+            />
+          </Box>
+        )}
 
         {/* Settings Menu */}
         <SettingsMenu
@@ -680,6 +789,7 @@ export const MainPage = ({ children }: MainPageProps) => {
           </Button>
         </DialogActions>
       </Dialog>
+    </RightPanelContext.Provider>
     </DialogContext.Provider>
   );
 };

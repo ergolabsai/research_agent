@@ -5,8 +5,8 @@ import {
   useTheme,
   Stack,
   Button,
+  IconButton,
   Typography,
-  Tooltip,
 } from "@mui/material";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
@@ -15,9 +15,10 @@ import { Attachment, ContentJson } from "../types";
 import {
   AttachFile as AttachFileIcon,
   Delete as DeleteIcon,
-  VerticalSplit as AgentPanelIcon,
+  Psychology as BrainIcon,
 } from "@mui/icons-material";
 import { AgentPanel, AgentTab } from "../components/AgentPanel";
+import { useRightPanel } from "./MainPage";
 import { ViewModeToggle, ViewMode } from "../components/editor/ViewModeToggle";
 import { RichView } from "../components/editor/RichView";
 import { JsonView } from "../components/editor/JsonView";
@@ -40,14 +41,9 @@ export const EditorPage = () => {
   const [isLoadingAttachments, setIsLoadingAttachments] = useState(false);
   const [isUploadingAttachment, setIsUploadingAttachment] = useState(false);
 
-  // Right agent panel state
-  const [rightPanelOpen, setRightPanelOpen] = useState(false);
-  const [rightPanelWidth, setRightPanelWidth] = useState(500);
+  // Right agent panel state (layout managed by MainPage)
+  const { rightPanelOpen, setRightPanelOpen } = useRightPanel();
   const [agentTab, setAgentTab] = useState<AgentTab>("validate");
-  const dragRef = useRef(false);
-  const startXRef = useRef(0);
-  const startWidthRef = useRef(0);
-  const rightPanelWidthRef = useRef(400);
 
   const formatFileSize = (sizeInBytes: number) => {
     if (sizeInBytes < 1024) return `${sizeInBytes} B`;
@@ -124,35 +120,6 @@ export const EditorPage = () => {
     return () => clearTimeout(saveTimerRef.current);
   }, [content, title, isLoaded, id, contentJson]);
 
-  // Drag-to-resize handler
-  const handleDragMouseDown = (e: React.MouseEvent) => {
-    e.preventDefault();
-    dragRef.current = true;
-    startXRef.current = e.clientX;
-    startWidthRef.current = rightPanelWidthRef.current;
-  };
-
-  useEffect(() => {
-    const onMouseMove = (e: MouseEvent) => {
-      if (!dragRef.current) return;
-      const delta = startXRef.current - e.clientX;
-      const newWidth = Math.min(
-        1400,
-        Math.max(220, startWidthRef.current + delta),
-      );
-      setRightPanelWidth(newWidth);
-      rightPanelWidthRef.current = newWidth;
-    };
-    const onMouseUp = () => {
-      dragRef.current = false;
-    };
-    window.addEventListener("mousemove", onMouseMove);
-    window.addEventListener("mouseup", onMouseUp);
-    return () => {
-      window.removeEventListener("mousemove", onMouseMove);
-      window.removeEventListener("mouseup", onMouseUp);
-    };
-  }, []);
 
   // const openPanel = (tab: AgentTab) => {
   //   setAgentTab(tab);
@@ -228,6 +195,19 @@ export const EditorPage = () => {
   };
 
   const rpToolbar = document.getElementById("rp-toolbar");
+  const [agentPanelRoot, setAgentPanelRoot] = useState<HTMLElement | null>(null);
+
+  useEffect(() => {
+    if (rightPanelOpen) {
+      // Wait for DOM to render the portal target
+      const frame = requestAnimationFrame(() => {
+        setAgentPanelRoot(document.getElementById("agent-panel-root"));
+      });
+      return () => cancelAnimationFrame(frame);
+    } else {
+      setAgentPanelRoot(null);
+    }
+  }, [rightPanelOpen]);
 
   return (
     <Box
@@ -239,31 +219,20 @@ export const EditorPage = () => {
         overflow: "hidden",
       }}
     >
-      {/* Portal: Agents toggle button in the AppBar toolbar */}
+      {/* Portal: Agent panel toggle button in the AppBar toolbar */}
       {rpToolbar &&
+        !rightPanelOpen &&
         createPortal(
-          <Tooltip
-            title={rightPanelOpen ? "Close agent panel" : "Open agent panel"}
+          <IconButton
+            size="small"
+            onClick={() => setRightPanelOpen(true)}
+            title="Open agent panel"
+            sx={{
+              color: "text.primary",
+            }}
           >
-            <span>
-              <Button
-                size="small"
-                variant={rightPanelOpen ? "contained" : "outlined"}
-                startIcon={<AgentPanelIcon fontSize="small" />}
-                onClick={() => setRightPanelOpen((v) => !v)}
-                sx={{
-                  height: 32,
-                  fontSize: "0.75rem",
-                  fontWeight: 600,
-                  textTransform: "none",
-                  borderRadius: "8px",
-                  px: 1.5,
-                }}
-              >
-                Agents
-              </Button>
-            </span>
-          </Tooltip>,
+            <BrainIcon />
+          </IconButton>,
           rpToolbar,
         )}
 
@@ -277,6 +246,7 @@ export const EditorPage = () => {
           minWidth: 0,
           minHeight: 0,
           overflow: "hidden",
+          p: 2,
         }}
       >
         {/* Toolbar: title + view toggle + action buttons */}
@@ -479,43 +449,10 @@ export const EditorPage = () => {
       </Box>
       {/* End editor column */}
 
-      {/* Drag handle */}
-      {rightPanelOpen && (
-        <Box
-          onMouseDown={handleDragMouseDown}
-          sx={{
-            width: 8,
-            flexShrink: 0,
-            cursor: "col-resize",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            userSelect: "none",
-            "&:hover > div": { bgcolor: "primary.main", opacity: 1 },
-          }}
-        >
-          <Box
-            sx={{
-              width: 2,
-              height: "100%",
-              bgcolor: "divider",
-              borderRadius: 999,
-              opacity: 0,
-              transition: "opacity 0.15s, background-color 0.15s",
-            }}
-          />
-        </Box>
-      )}
-
-      {/* Agent panel */}
-      {rightPanelOpen && (
-        <Box
-          sx={{
-            width: rightPanelWidth,
-            flexShrink: 0,
-            overflow: "hidden",
-          }}
-        >
+      {/* Portal: Agent panel into MainPage's right panel slot */}
+      {rightPanelOpen &&
+        agentPanelRoot &&
+        createPortal(
           <AgentPanel
             content={
               contentJson ? contentJsonToPlainText(contentJson) : content
@@ -525,9 +462,9 @@ export const EditorPage = () => {
             activeTab={agentTab}
             onTabChange={setAgentTab}
             onCollapse={() => setRightPanelOpen(false)}
-          />
-        </Box>
-      )}
+          />,
+          agentPanelRoot,
+        )}
     </Box>
   );
 };

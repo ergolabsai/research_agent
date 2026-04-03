@@ -1008,6 +1008,8 @@ function MathContent({
             border: 1,
             borderColor: "divider",
             bgcolor: "background.default",
+            maxHeight: 220,
+            overflow: "auto",
           }}
         >
           <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 0.75 }}>
@@ -1073,7 +1075,7 @@ function MathContent({
             display: "flex",
             flexDirection: "column",
             gap: 0.75,
-            maxHeight: 190,
+            maxHeight: 120,
             overflow: "auto",
             pr: 0.5,
           }}
@@ -2181,15 +2183,14 @@ export const AgentPanel = ({
         >
           Agents
         </Typography>
-        <Tooltip title="Close panel">
-          <IconButton
-            size="small"
-            onClick={onCollapse}
-            sx={{ color: "text.primary", mr: 1 }}
-          >
-            <ChevronRightIcon color="primary" />
-          </IconButton>
-        </Tooltip>
+        <IconButton
+          size="small"
+          onClick={onCollapse}
+          title="Close panel"
+          sx={{ color: "text.primary", mr: 1 }}
+        >
+          <ChevronRightIcon color="primary" />
+        </IconButton>
       </Stack>
 
       <Divider />
@@ -2201,6 +2202,7 @@ export const AgentPanel = ({
         sx={{
           flexShrink: 0,
           minHeight: 44,
+          background: `linear-gradient(135deg, ${theme.palette.primary.main}10 0%, ${theme.palette.secondary.main}10 100%)`,
           "& .MuiTab-root": {
             minHeight: 44,
             py: 0,
