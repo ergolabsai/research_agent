@@ -8,27 +8,32 @@ import {
   Typography,
   Tooltip,
 } from "@mui/material";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { documentsAPI } from "../api";
-import { Attachment } from "../types";
+import { Attachment, ContentJson } from "../types";
 import {
-  // Functions as MathIcon,
-  // Psychology as LogicIcon,
-  // LineStyle as FormatterIcon,
-  // LocalLibrary as LibrarianIcon,
-  // Insights as PlotsIcon,
   AttachFile as AttachFileIcon,
   Delete as DeleteIcon,
   VerticalSplit as AgentPanelIcon,
 } from "@mui/icons-material";
 import { AgentPanel, AgentTab } from "../components/AgentPanel";
+import { ViewModeToggle, ViewMode } from "../components/editor/ViewModeToggle";
+import { RichView } from "../components/editor/RichView";
+import { JsonView } from "../components/editor/JsonView";
+import { LatexView } from "../components/editor/LatexView";
+import {
+  parseContentJson,
+  contentJsonToPlainText,
+} from "../utils/contentJsonUtils";
 
 export const EditorPage = () => {
   const { id } = useParams();
   const theme = useTheme();
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
+  const [contentJson, setContentJson] = useState<ContentJson | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>("rich");
   const [hoveredIcon, setHoveredIcon] = useState<string | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -69,8 +74,18 @@ export const EditorPage = () => {
       if (!id) return;
       try {
         const response = await documentsAPI.get(Number(id));
-        setContent(response.data.content || "");
+        const raw = response.data.content || "";
         setTitle(response.data.title || "");
+
+        const parsed = parseContentJson(raw);
+        if (parsed) {
+          setContentJson(parsed);
+          setContent(raw);
+          setViewMode("rich");
+        } else {
+          setContentJson(null);
+          setContent(raw);
+        }
         setIsLoaded(true);
       } catch (err) {
         console.error("Failed to load document:", err);
@@ -85,18 +100,29 @@ export const EditorPage = () => {
     loadAttachments(Number(id));
   }, [id]);
 
+  // Sync contentJson changes back to content string
+  const handleContentJsonChange = useCallback((updated: ContentJson) => {
+    setContentJson(updated);
+    setContent(JSON.stringify(updated));
+  }, []);
+
+  // Auto-save (debounced for JSON editing)
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout>>();
   useEffect(() => {
-    if (!isLoaded) return;
-    const saveDocument = async () => {
-      if (!id) return;
-      try {
-        await documentsAPI.update(Number(id), title, content);
-      } catch (err) {
-        console.error("Failed to save document:", err);
-      }
-    };
-    saveDocument();
-  }, [content, title, isLoaded]);
+    if (!isLoaded || !id) return;
+    clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(
+      async () => {
+        try {
+          await documentsAPI.update(Number(id), title, content);
+        } catch (err) {
+          console.error("Failed to save document:", err);
+        }
+      },
+      contentJson ? 500 : 0,
+    );
+    return () => clearTimeout(saveTimerRef.current);
+  }, [content, title, isLoaded, id, contentJson]);
 
   // Drag-to-resize handler
   const handleDragMouseDown = (e: React.MouseEvent) => {
@@ -206,7 +232,7 @@ export const EditorPage = () => {
   return (
     <Box
       sx={{
-        height: "calc(100vh - 100px)",
+        height: "100%",
         display: "flex",
         flexDirection: "row",
         gap: 0,
@@ -249,10 +275,11 @@ export const EditorPage = () => {
           flexDirection: "column",
           gap: 2,
           minWidth: 0,
+          minHeight: 0,
           overflow: "hidden",
         }}
       >
-        {/* Toolbar: title + action buttons */}
+        {/* Toolbar: title + view toggle + action buttons */}
         <Stack direction="row" sx={{ gap: 2, alignItems: "center" }}>
           <Box
             sx={{
@@ -267,7 +294,7 @@ export const EditorPage = () => {
               fullWidth
               size="small"
               sx={{
-                height: "56px",
+                height: "50px",
                 display: "flex",
                 alignItems: "center",
                 "& .MuiInputBase-root": {
@@ -283,7 +310,13 @@ export const EditorPage = () => {
               onChange={(e) => setTitle(e.target.value)}
             />
           </Box>
-          <Stack direction="row" sx={{ gap: 1 }}>
+          {contentJson && (
+            <ViewModeToggle mode={viewMode} onChange={setViewMode} />
+          )}
+          <Stack
+            direction="row"
+            sx={{ gap: 1, display: buttons.length ? "flex" : "none" }}
+          >
             {buttons.map((btn: any) => {
               const IconComponent = btn.icon;
               return (
@@ -336,6 +369,7 @@ export const EditorPage = () => {
         <Box
           sx={{
             flex: 1,
+            minHeight: 0,
             backgroundColor: theme.palette.background.paper,
             borderRadius: "12px",
             p: 2,
@@ -343,16 +377,31 @@ export const EditorPage = () => {
             overflow: "auto",
           }}
         >
-          <TextField
-            placeholder="Start writing your document..."
-            variant="standard"
-            fullWidth
-            multiline
-            minRows={10}
-            value={content}
-            onChange={(e) => setContent(e.target.value)}
-            sx={{ mt: 0 }}
-          />
+          {contentJson ? (
+            // Structured document — render based on view mode
+            viewMode === "rich" ? (
+              <RichView contentJson={contentJson} />
+            ) : viewMode === "json" ? (
+              <JsonView
+                contentJson={contentJson}
+                onChange={handleContentJsonChange}
+              />
+            ) : (
+              <LatexView contentJson={contentJson} />
+            )
+          ) : (
+            // Legacy plain text editor
+            <TextField
+              placeholder="Start writing your document..."
+              variant="standard"
+              fullWidth
+              multiline
+              minRows={10}
+              value={content}
+              onChange={(e) => setContent(e.target.value)}
+              sx={{ mt: 0 }}
+            />
+          )}
 
           <Box
             sx={{
@@ -468,7 +517,9 @@ export const EditorPage = () => {
           }}
         >
           <AgentPanel
-            content={content}
+            content={
+              contentJson ? contentJsonToPlainText(contentJson) : content
+            }
             title={title}
             documentId={id ? Number(id) : undefined}
             activeTab={agentTab}

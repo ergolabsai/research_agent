@@ -498,15 +498,18 @@ function NodeDetailPanel({
         borderRadius: 1.5,
         borderLeft: 3,
         borderColor: nodeColors[nodeType] ?? "primary.main",
-        maxHeight: constrainHeight ? 320 : "none",
-        overflow: constrainHeight ? "auto" : "visible",
+        maxHeight: constrainHeight ? 270 : "none",
+        display: constrainHeight ? "flex" : "block",
+        flexDirection: "column",
+        overflow: "hidden",
       }}
     >
+      {/* Header — always visible */}
       <Stack
         direction="row"
         justifyContent="space-between"
         alignItems="center"
-        sx={{ mb: 0.5 }}
+        sx={{ mb: 0.5, flexShrink: 0 }}
       >
         <Stack direction="row" spacing={0.75} alignItems="center">
           <Chip
@@ -530,30 +533,46 @@ function NodeDetailPanel({
         ) : null}
       </Stack>
 
-      {details.slice(2).map((d, i) => (
-        <Box key={i} sx={{ mb: 0.25 }}>
-          <Typography variant="caption" fontWeight={700} color="text.secondary">
-            {d.label}:{" "}
-          </Typography>
-          <Typography variant="caption" color="text.primary">
-            {d.value}
-          </Typography>
-        </Box>
-      ))}
+      {/* Details — scrollable */}
+      <Box sx={{ overflow: "auto", flexShrink: 1, minHeight: 0 }}>
+        {details.slice(2).map((d, i) => (
+          <Box key={i} sx={{ mb: 0.25 }}>
+            <Typography
+              variant="caption"
+              fontWeight={700}
+              color="text.secondary"
+            >
+              {d.label}:{" "}
+            </Typography>
+            <Typography variant="caption" color="text.primary">
+              {d.value}
+            </Typography>
+          </Box>
+        ))}
+      </Box>
 
       {neighbors.length > 0 && (
         <>
-          <Divider sx={{ my: 0.75 }} />
+          <Divider sx={{ my: 0.75, flexShrink: 0 }} />
           <Typography
             variant="caption"
             fontWeight={700}
             color="text.secondary"
             display="block"
-            sx={{ mb: 0.5 }}
+            sx={{ mb: 0.0, flexShrink: 0 }}
           >
             Neighbors ({neighbors.length})
           </Typography>
-          <Stack spacing={0.25}>
+          {/* Neighbors — scrollable */}
+          <Stack
+            spacing={0.25}
+            sx={{
+              overflow: "auto",
+              flexShrink: 1,
+              minHeight: 28,
+              maxHeight: 100,
+            }}
+          >
             {neighbors.map((n, i) => (
               <Box
                 key={i}
@@ -566,6 +585,7 @@ function NodeDetailPanel({
                   py: 0.25,
                   borderRadius: 0.5,
                   cursor: "pointer",
+                  flexShrink: 0,
                   "&:hover": { bgcolor: "action.hover" },
                 }}
               >
