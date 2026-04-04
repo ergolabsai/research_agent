@@ -1042,6 +1042,7 @@ interface GraphContentProps {
 }
 
 export function GraphContent({ graph, job }: GraphContentProps) {
+  const theme = useTheme();
   const [viewMode, setViewMode] = useState<"list" | "graph">("list");
   const [selectedNodeTypes, setSelectedNodeTypes] = useState<
     Set<GraphNodeType>
@@ -1109,19 +1110,39 @@ export function GraphContent({ graph, job }: GraphContentProps) {
           onChange={(_, v) => v && setViewMode(v)}
           size="small"
           sx={{
-            "& .MuiToggleButton-root": { py: 0.25, px: 1, fontSize: "0.7rem" },
+            height: 32,
+            borderRadius: "12px",
+            border: "1px solid " + theme.palette.divider,
+            background: `linear-gradient(135deg, ${theme.palette.primary.main}10 0%, ${theme.palette.secondary.main}20 100%)`,
+            overflow: "hidden",
+            "& .MuiToggleButtonGroup-grouped": {
+              border: "none",
+              borderRadius: "0 !important",
+              "&:not(:last-of-type)": {
+                borderRight: "1px solid " + theme.palette.divider,
+              },
+            },
+            "& .MuiToggleButton-root": {
+              textTransform: "none",
+              fontSize: "0.8rem",
+              fontWeight: 600,
+              gap: 0.75,
+              px: 1.5,
+              color: theme.palette.text.secondary,
+              background: "transparent",
+              "&.Mui-selected": {
+                color: theme.palette.primary.main,
+                background: `${theme.palette.primary.main}18`,
+              },
+            },
           }}
         >
           <ToggleButton value="list">
-            <Tooltip title="List Mode">
-              <ListIcon sx={{ fontSize: 14, mr: 0.5 }} />
-            </Tooltip>
+            <ListIcon sx={{ fontSize: 14 }} />
             List
           </ToggleButton>
           <ToggleButton value="graph">
-            <Tooltip title="Graph Mode">
-              <GraphIcon sx={{ fontSize: 14, mr: 0.5 }} />
-            </Tooltip>
+            <GraphIcon sx={{ fontSize: 14 }} />
             Graph
           </ToggleButton>
         </ToggleButtonGroup>
