@@ -319,6 +319,7 @@ function buildMockFigureAssets(): PipelineFigureAssetRecord[] {
     // Try to import from mocks/figures/ — the user places real images there
     // matching the graph node's figure_name (e.g. excitation_scheme.jpg)
     let submittedUrl: string | undefined;
+    let predictedUrl: string | undefined;
     try {
       // Vite eager glob for mock figure images
       const figureModules = import.meta.glob<{ default: string }>(
@@ -328,6 +329,13 @@ function buildMockFigureAssets(): PipelineFigureAssetRecord[] {
       const key = `./figures/${figureName}`;
       if (figureModules[key]) {
         submittedUrl = figureModules[key].default;
+      }
+      // Look for _expected variant (e.g. excitation_scheme_expected.jpg)
+      const ext = figureName.lastIndexOf(".") >= 0 ? figureName.slice(figureName.lastIndexOf(".")) : "";
+      const base = figureName.lastIndexOf(".") >= 0 ? figureName.slice(0, figureName.lastIndexOf(".")) : figureName;
+      const expectedKey = `./figures/${base}_expected${ext}`;
+      if (figureModules[expectedKey]) {
+        predictedUrl = figureModules[expectedKey].default;
       }
     } catch {
       // Glob not available or file missing — fall through to SVG placeholder
@@ -343,7 +351,7 @@ function buildMockFigureAssets(): PipelineFigureAssetRecord[] {
       predicted: {
         filename: `${figureName}-predicted`,
         media_type: "image/png",
-        url: makeMockFigureDataUrl(figureName, idx + 1, "predicted"),
+        url: predictedUrl ?? makeMockFigureDataUrl(figureName, idx + 1, "predicted"),
       },
     };
   });
