@@ -32,6 +32,7 @@ import {
   NodeLinkGraph,
   PipelineJob,
 } from "../types";
+import { useTheme as useAppTheme } from "../theme";
 
 // --- Constants ---
 
@@ -808,6 +809,8 @@ function GraphMode({
   containerHeight: number;
 }) {
   const theme = useTheme();
+  const { layoutMode } = useAppTheme();
+  const isVertical = layoutMode === "vertical";
   const nodeColors = useNodeColors();
   const edgeColors = useEdgeColors();
   const [selectedNode, setSelectedNode] = useState<Record<
@@ -1008,9 +1011,10 @@ function GraphMode({
           sx={{
             position: "absolute",
             bottom: 8,
-            left: 8,
             right: 8,
-            maxHeight: "50%",
+            left: isVertical ? "auto" : 8,
+            width: isVertical ? "40%" : "auto",
+            maxHeight: isVertical ? "100%" : "50%",
             overflow: "auto",
             zIndex: 10,
           }}

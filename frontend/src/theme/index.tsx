@@ -10,6 +10,8 @@ import {
 } from "react";
 import { createAppTheme, ThemeName } from "./themes";
 
+export type LayoutMode = "horizontal" | "vertical";
+
 interface AppThemeProviderProps {
   children: ReactNode;
 }
@@ -17,6 +19,8 @@ interface AppThemeProviderProps {
 interface ThemeContextType {
   themeName: ThemeName;
   setThemeName: (name: ThemeName) => void;
+  layoutMode: LayoutMode;
+  setLayoutMode: (mode: LayoutMode) => void;
 }
 
 export const ThemeContext = createContext<ThemeContextType | undefined>(
@@ -37,9 +41,18 @@ export const AppThemeProvider = ({ children }: AppThemeProviderProps) => {
     return (saved as ThemeName) || "dark-default";
   });
 
+  const [layoutMode, setLayoutMode] = useState<LayoutMode>(() => {
+    const saved = localStorage.getItem("layoutMode");
+    return (saved as LayoutMode) || "horizontal";
+  });
+
   useEffect(() => {
     localStorage.setItem("theme", themeName);
   }, [themeName]);
+
+  useEffect(() => {
+    localStorage.setItem("layoutMode", layoutMode);
+  }, [layoutMode]);
 
   const theme = createAppTheme(themeName);
 
@@ -68,7 +81,7 @@ export const AppThemeProvider = ({ children }: AppThemeProviderProps) => {
         }}
       />
       <CssBaseline />
-      <ThemeContext.Provider value={{ themeName, setThemeName }}>
+      <ThemeContext.Provider value={{ themeName, setThemeName, layoutMode, setLayoutMode }}>
         {children}
       </ThemeContext.Provider>
     </ThemeProvider>

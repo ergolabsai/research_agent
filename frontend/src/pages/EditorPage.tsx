@@ -27,6 +27,7 @@ import {
   parseContentJson,
   contentJsonToPlainText,
 } from "../utils/contentJsonUtils";
+import { useTheme as useAppTheme } from "../theme";
 
 export const EditorPage = () => {
   const { id } = useParams();
@@ -43,7 +44,46 @@ export const EditorPage = () => {
 
   // Right agent panel state (layout managed by MainPage)
   const { rightPanelOpen, setRightPanelOpen } = useRightPanel();
+  const { layoutMode } = useAppTheme();
+  const isVertical = layoutMode === "vertical";
   const [agentTab, setAgentTab] = useState<AgentTab>("validate");
+
+  // Vertical mode: drag-to-resize agent panel height
+  const [agentPanelHeight, setAgentPanelHeight] = useState(300);
+  const dragRefVertical = useRef(false);
+  const startYRef = useRef(0);
+  const startHeightRef = useRef(300);
+  const agentPanelHeightRef = useRef(300);
+
+  const handleVerticalDragMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    dragRefVertical.current = true;
+    startYRef.current = e.clientY;
+    startHeightRef.current = agentPanelHeightRef.current;
+  };
+
+  useEffect(() => {
+    if (!isVertical) return;
+    const onMouseMove = (e: MouseEvent) => {
+      if (!dragRefVertical.current) return;
+      const delta = startYRef.current - e.clientY;
+      const newHeight = Math.min(
+        800,
+        Math.max(150, startHeightRef.current + delta),
+      );
+      setAgentPanelHeight(newHeight);
+      agentPanelHeightRef.current = newHeight;
+    };
+    const onMouseUp = () => {
+      dragRefVertical.current = false;
+    };
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+    return () => {
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    };
+  }, [isVertical]);
 
   const formatFileSize = (sizeInBytes: number) => {
     if (sizeInBytes < 1024) return `${sizeInBytes} B`;
@@ -120,7 +160,6 @@ export const EditorPage = () => {
     return () => clearTimeout(saveTimerRef.current);
   }, [content, title, isLoaded, id, contentJson]);
 
-
   // const openPanel = (tab: AgentTab) => {
   //   setAgentTab(tab);
   //   setRightPanelOpen(true);
@@ -195,7 +234,9 @@ export const EditorPage = () => {
   };
 
   const rpToolbar = document.getElementById("rp-toolbar");
-  const [agentPanelRoot, setAgentPanelRoot] = useState<HTMLElement | null>(null);
+  const [agentPanelRoot, setAgentPanelRoot] = useState<HTMLElement | null>(
+    null,
+  );
 
   useEffect(() => {
     if (rightPanelOpen) {
@@ -213,14 +254,16 @@ export const EditorPage = () => {
     <Box
       sx={{
         height: "100%",
+        minWidth: 0,
         display: "flex",
-        flexDirection: "row",
+        flexDirection: isVertical ? "column" : "row",
         gap: 0,
         overflow: "hidden",
       }}
     >
       {/* Portal: Agent panel toggle button in the AppBar toolbar */}
-      {rpToolbar &&
+      {!isVertical &&
+        rpToolbar &&
         !rightPanelOpen &&
         createPortal(
           <IconButton
@@ -449,8 +492,9 @@ export const EditorPage = () => {
       </Box>
       {/* End editor column */}
 
-      {/* Portal: Agent panel into MainPage's right panel slot */}
-      {rightPanelOpen &&
+      {/* Portal: Agent panel into MainPage's right panel slot (horizontal mode) */}
+      {!isVertical &&
+        rightPanelOpen &&
         agentPanelRoot &&
         createPortal(
           <AgentPanel
@@ -465,6 +509,59 @@ export const EditorPage = () => {
           />,
           agentPanelRoot,
         )}
+
+      {/* Vertical drag handle */}
+      {isVertical && (
+        <Box
+          onMouseDown={handleVerticalDragMouseDown}
+          sx={{
+            height: 8,
+            flexShrink: 0,
+            cursor: "row-resize",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            userSelect: "none",
+            "&:hover > div": { bgcolor: "primary.main", opacity: 1 },
+          }}
+        >
+          <Box
+            sx={{
+              height: 2,
+              width: "100%",
+              bgcolor: "divider",
+              borderRadius: 999,
+              opacity: 0,
+              transition: "opacity 0.15s, background-color 0.15s",
+            }}
+          />
+        </Box>
+      )}
+
+      {/* Inline agent panel (vertical mode) */}
+      {isVertical && (
+        <Box
+          sx={{
+            height: agentPanelHeight,
+            minHeight: 150,
+            minWidth: 0,
+            flexShrink: 0,
+            overflow: "hidden",
+            px: 2,
+            pb: 3,
+          }}
+        >
+          <AgentPanel
+            content={
+              contentJson ? contentJsonToPlainText(contentJson) : content
+            }
+            title={title}
+            documentId={id ? Number(id) : undefined}
+            activeTab={agentTab}
+            onTabChange={setAgentTab}
+          />
+        </Box>
+      )}
     </Box>
   );
 };

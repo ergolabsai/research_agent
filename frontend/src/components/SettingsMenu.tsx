@@ -16,6 +16,8 @@ import {
   PersonAdd as PersonAddIcon,
   DarkMode as DarkModeIcon,
   LightMode as LightModeIcon,
+  ViewColumn as ViewColumnIcon,
+  ViewAgenda as ViewAgendaIcon,
 } from "@mui/icons-material";
 import { ThemeName, themeGroups, themeColors } from "../theme/themes";
 import { useTheme as useAppTheme } from "../theme";
@@ -40,7 +42,7 @@ export const SettingsMenu = ({
   const theme = useTheme();
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { setThemeName } = useAppTheme();
+  const { setThemeName, layoutMode, setLayoutMode } = useAppTheme();
   const isDark = currentThemeName.startsWith("dark");
   const availableThemes = isDark ? themeGroups.dark : themeGroups.light;
   const isGuestUser = Boolean(
@@ -210,6 +212,64 @@ export const SettingsMenu = ({
               </Typography>
             </Box>
           ))}
+        </Stack>
+      </Box>
+
+      <Divider sx={{ my: 0.5 }} />
+
+      {/* Layout Mode Selection */}
+      <Box sx={{ px: 2, py: 1 }}>
+        <Stack
+          direction="row"
+          spacing={1}
+          sx={{ alignItems: "center", justifyContent: "space-between" }}
+        >
+          <Stack direction="row" spacing={1} sx={{ alignItems: "center" }}>
+            <ViewColumnIcon fontSize="small" sx={{ fontSize: "1rem" }} />
+            <Typography
+              variant="caption"
+              sx={{
+                fontWeight: 700,
+                color: "text.secondary",
+                fontSize: "0.75rem",
+              }}
+            >
+              LAYOUT
+            </Typography>
+          </Stack>
+
+          <ToggleButtonGroup
+            value={layoutMode}
+            exclusive
+            onChange={(_event, newMode: string | null) => {
+              if (newMode && (newMode === "horizontal" || newMode === "vertical")) {
+                setLayoutMode(newMode);
+              }
+            }}
+            size="small"
+            sx={{
+              "& .MuiToggleButton-root": {
+                border: "1px solid",
+                borderColor: theme.palette.divider,
+                padding: "4px 8px",
+                "&.Mui-selected": {
+                  backgroundColor: theme.palette.primary.main,
+                  color: theme.palette.primary.contrastText,
+                  borderColor: theme.palette.primary.main,
+                  "&:hover": {
+                    backgroundColor: theme.palette.primary.dark,
+                  },
+                },
+              },
+            }}
+          >
+            <ToggleButton value="horizontal" aria-label="horizontal layout">
+              <ViewColumnIcon sx={{ fontSize: "1rem" }} />
+            </ToggleButton>
+            <ToggleButton value="vertical" aria-label="vertical layout">
+              <ViewAgendaIcon sx={{ fontSize: "1rem" }} />
+            </ToggleButton>
+          </ToggleButtonGroup>
         </Stack>
       </Box>
 

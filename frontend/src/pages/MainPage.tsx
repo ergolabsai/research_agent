@@ -104,7 +104,7 @@ export const MainPage = ({ children }: MainPageProps) => {
   const navigate = useNavigate();
   const location = useLocation();
   const isEditorPage = location.pathname.startsWith("/app/editor");
-  const { themeName } = useAppTheme();
+  const { themeName, layoutMode } = useAppTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
 
   // Left sidebar drag state
@@ -448,13 +448,14 @@ export const MainPage = ({ children }: MainPageProps) => {
         <Box
           sx={{
             flex: 1,
+            minWidth: 0,
             display: "flex",
             flexDirection: "column",
             backgroundColor: theme.palette.background.default,
           }}
         >
-          {/* Top Navigation — hidden on editor when both panels are open */}
-          {!(isEditorPage && !sidebarCollapsed && sidebarOpen && rightPanelOpen) && (
+          {/* Top Navigation — hidden on editor when both panels are open, or in vertical layout */}
+          {!(isEditorPage && (layoutMode === "vertical" || (!sidebarCollapsed && sidebarOpen && rightPanelOpen))) && (
             <AppBar
               position="static"
               sx={{
@@ -557,7 +558,7 @@ export const MainPage = ({ children }: MainPageProps) => {
         </Box>
 
         {/* Right panel drag handle */}
-        {isEditorPage && rightPanelOpen && (
+        {layoutMode === "horizontal" && isEditorPage && rightPanelOpen && (
           <Box
             onMouseDown={handleRightDragMouseDown}
             sx={{
@@ -585,7 +586,7 @@ export const MainPage = ({ children }: MainPageProps) => {
         )}
 
         {/* Right agent panel */}
-        {isEditorPage && rightPanelOpen && (
+        {layoutMode === "horizontal" && isEditorPage && rightPanelOpen && (
           <Box
             sx={{
               width: rightPanelWidth,

@@ -47,6 +47,7 @@ import {
 import { GraphContent } from "./GraphContent";
 import { AccountTree as GraphTabIcon } from "@mui/icons-material";
 import { renderMathToHtml } from "../utils/katexRenderer";
+import { useTheme as useAppTheme } from "../theme";
 
 export type AgentTab = "validate" | "math" | "citations" | "figures" | "graph";
 
@@ -1316,8 +1317,10 @@ function CitationsContent({
 
   return (
     <Box
-      sx={{ display: "flex", flexDirection: "column", gap: 2, height: "100%" }}
+      sx={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}
     >
+      <Box sx={{ flex: 1, minHeight: 0, overflow: "auto" }}>
+      <Stack spacing={2}>
       {!hasData && (
         <Typography variant="body2" color="text.secondary">
           No related papers data available yet. Showing demo citation
@@ -1600,7 +1603,10 @@ function CitationsContent({
           );
         })()}
 
-      <Box sx={{ mt: "auto" }}>
+      </Stack>
+      </Box>
+
+      <Box sx={{ flexShrink: 0 }}>
         <Divider sx={{ mb: 1.5 }} />
 
         <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
@@ -2044,7 +2050,7 @@ interface AgentPanelProps {
   documentId?: number;
   activeTab: AgentTab;
   onTabChange: (tab: AgentTab) => void;
-  onCollapse: () => void;
+  onCollapse?: () => void;
 }
 
 export const AgentPanel = ({
@@ -2056,6 +2062,8 @@ export const AgentPanel = ({
   onCollapse,
 }: AgentPanelProps) => {
   const theme = useTheme();
+  const { layoutMode } = useAppTheme();
+  const isVertical = layoutMode === "vertical";
   const [job, setJob] = useState<PipelineJob | null>(null);
   const [result, setResult] = useState<ValidationResult | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -2155,6 +2163,7 @@ export const AgentPanel = ({
     <Stack
       sx={{
         height: "100%",
+        minWidth: 0,
         display: "flex",
         flexDirection: "column",
         borderWidth: 1,
@@ -2170,9 +2179,10 @@ export const AgentPanel = ({
       <Stack
         direction="row"
         sx={{
-          justifyContent: "space-between",
+          justifyContent: isVertical ? "center" : "space-between",
           alignItems: "center",
-          pl: 1.5,
+          pl: isVertical ? 0 : 1.5,
+          py: isVertical ? 1 : 0,
           flexShrink: 0,
         }}
       >
@@ -2183,14 +2193,16 @@ export const AgentPanel = ({
         >
           Agents
         </Typography>
-        <IconButton
-          size="small"
-          onClick={onCollapse}
-          title="Close panel"
-          sx={{ color: "text.primary", mr: 1 }}
-        >
-          <ChevronRightIcon color="primary" />
-        </IconButton>
+        {onCollapse && (
+          <IconButton
+            size="small"
+            onClick={onCollapse}
+            title="Close panel"
+            sx={{ color: "text.primary", mr: 1 }}
+          >
+            <ChevronRightIcon color="primary" />
+          </IconButton>
+        )}
       </Stack>
 
       <Divider />
@@ -2219,7 +2231,7 @@ export const AgentPanel = ({
         />
         <Tab
           value="math"
-          label="Math"
+          label="Equations"
           icon={<MathIcon sx={{ fontSize: "0.85rem" }} />}
           iconPosition="start"
           disabled={!isTabUnlocked("math")}
@@ -2249,7 +2261,7 @@ export const AgentPanel = ({
 
       <Divider />
 
-      <Box sx={{ flex: 1, minHeight: 0, overflow: "auto", p: 1.5 }}>
+      <Box sx={{ flex: 1, minHeight: 0, minWidth: 0, overflow: "auto", p: 1.5 }}>
         {safeTab === "validate" && (
           <ValidateContent
             content={content}
