@@ -5,7 +5,7 @@ import App from "./App";
 
 async function bootstrap() {
   // Dynamic import keeps axios-mock-adapter out of production bundles.
-  if (import.meta.env.VITE_MOCK_API === "true") {
+  if (import.meta.env.MODE === "mock" || import.meta.env.VITE_MOCK_API === "true") {
     const { setupMockApi } = await import("./mocks/mockApi");
     setupMockApi();
   }
