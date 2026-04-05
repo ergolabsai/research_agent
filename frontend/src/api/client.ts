@@ -8,6 +8,7 @@ import {
   GraphAnalysis,
   NodeLinkGraphRaw,
   Attachment,
+  AgentChatMessage,
 } from "../types";
 
 let currentAccessToken: string | null = null;
@@ -232,6 +233,8 @@ export const pipelineAPI = {
   graph: (jobId: string) => api.get<NodeLinkGraphRaw>(`/pipeline/graph/${jobId}`),
 
   analysis: (jobId: string) => api.get<GraphAnalysis>(`/pipeline/analysis/${jobId}`),
+
+  messages: (jobId: string) => api.get<AgentChatMessage[]>(`/pipeline/messages/${jobId}`),
 };
 
 export default api;

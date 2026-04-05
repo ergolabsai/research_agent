@@ -15,7 +15,6 @@ import {
   LinearProgress,
   Chip,
   Tooltip,
-  TextField,
 } from "@mui/material";
 import {
   ChevronRight as ChevronRightIcon,
@@ -26,21 +25,13 @@ import {
   CheckCircleOutline as CheckIcon,
   ErrorOutline as ErrorIcon,
   Science as ValidateIcon,
-  Send as SendIcon,
   CheckCircle as ValidIcon,
   Cancel as InvalidIcon,
   Close as CloseIcon,
   ZoomOutMap as ZoomIcon,
   ExpandMore as ExpandMoreIcon,
 } from "@mui/icons-material";
-import {
-  FormEvent,
-  ReactNode,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { pipelineAPI } from "../api";
 import {
   PipelineJob,
@@ -48,8 +39,10 @@ import {
   GraphAnalysis,
   NodeLinkGraph,
   normalizeGraph,
+  AgentChatMessage,
 } from "../types";
 import { GraphContent } from "./GraphContent";
+import { TabContentWithChat } from "./AgentChat";
 import { AccountTree as GraphTabIcon } from "@mui/icons-material";
 import { renderMathToHtml } from "../utils/katexRenderer";
 import { useTheme as useAppTheme } from "../theme";
@@ -67,11 +60,6 @@ const PIPELINE_STEPS = [
   { id: "score_papers", label: "Citations" },
   { id: "compile_results", label: "Compile" },
 ];
-
-interface ChatMessage {
-  role: "agent" | "user";
-  text: string;
-}
 
 interface EquationValidation {
   id?: string;
@@ -538,6 +526,7 @@ function ValidateContent({
   error,
   onRun,
   graphAnalysis,
+  chatMessages,
 }: {
   content: string;
   job: PipelineJob | null;
@@ -545,6 +534,7 @@ function ValidateContent({
   error: string | null;
   onRun: () => void;
   graphAnalysis: GraphAnalysis | null;
+  chatMessages: AgentChatMessage[];
 }) {
   const theme = useTheme();
   const isRunning = job?.status === "running" || job?.status === "pending";
@@ -723,7 +713,14 @@ function ValidateContent({
     const scoreColor =
       score >= 0.7 ? "success" : score >= 0.4 ? "warning" : "error";
     return (
-      <Box>
+      <TabContentWithChat
+        chatProps={{
+          allMessages: chatMessages,
+          category: "validation",
+          targetId: null,
+          placeholder: "Ask the agent about the validation results...",
+        }}
+      >
         <Stack
           direction="row"
           alignItems="center"
@@ -742,15 +739,34 @@ function ValidateContent({
         </Stack>
 
         {/* Validation Results accordion */}
-        <Accordion defaultExpanded disableGutters elevation={0} sx={{ border: 1, borderColor: "divider", borderRadius: 1, "&:before": { display: "none" }, mb: 1.5 }}>
-          <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ minHeight: 40, "& .MuiAccordionSummary-content": { my: 0.5 } }}>
+        <Accordion
+          defaultExpanded
+          disableGutters
+          elevation={0}
+          sx={{
+            border: 1,
+            borderColor: "divider",
+            borderRadius: 1,
+            "&:before": { display: "none" },
+            mb: 1.5,
+          }}
+        >
+          <AccordionSummary
+            expandIcon={<ExpandMoreIcon />}
+            sx={{
+              minHeight: 40,
+              "& .MuiAccordionSummary-content": { my: 0.5 },
+            }}
+          >
             <Typography variant="subtitle2" fontWeight={700}>
               Validation Results
             </Typography>
           </AccordionSummary>
           <AccordionDetails sx={{ pt: 0, px: 2, pb: 1.5 }}>
             {result.overall_assessment?.review ? (
-              <MarkdownRenderer>{result.overall_assessment.review}</MarkdownRenderer>
+              <MarkdownRenderer>
+                {result.overall_assessment.review}
+              </MarkdownRenderer>
             ) : (
               <Typography variant="body2" color="text.secondary">
                 No review available.
@@ -760,8 +776,24 @@ function ValidateContent({
         </Accordion>
 
         {/* Graph Analysis accordion */}
-        <Accordion disableGutters elevation={0} sx={{ border: 1, borderColor: "divider", borderRadius: 1, "&:before": { display: "none" }, mb: 1.5 }}>
-          <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ minHeight: 40, "& .MuiAccordionSummary-content": { my: 0.5 } }}>
+        <Accordion
+          disableGutters
+          elevation={0}
+          sx={{
+            border: 1,
+            borderColor: "divider",
+            borderRadius: 1,
+            "&:before": { display: "none" },
+            mb: 1.5,
+          }}
+        >
+          <AccordionSummary
+            expandIcon={<ExpandMoreIcon />}
+            sx={{
+              minHeight: 40,
+              "& .MuiAccordionSummary-content": { my: 0.5 },
+            }}
+          >
             <Typography variant="subtitle2" fontWeight={700}>
               Graph Analysis
             </Typography>
@@ -770,22 +802,57 @@ function ValidateContent({
             {graphAnalysis ? (
               <Box>
                 {/* Node counts */}
-                <Stack direction="row" flexWrap="wrap" gap={0.75} sx={{ mb: 1.5 }}>
-                  <Chip label={`${graphAnalysis.node_counts.steps} steps`} size="small" variant="outlined" />
-                  <Chip label={`${graphAnalysis.node_counts.evidence} evidence`} size="small" variant="outlined" />
-                  <Chip label={`${graphAnalysis.node_counts.figures} figures`} size="small" variant="outlined" />
-                  <Chip label={`${graphAnalysis.node_counts.math} math`} size="small" variant="outlined" />
-                  <Chip label={`${graphAnalysis.node_counts.related_papers} citations`} size="small" variant="outlined" />
+                <Stack
+                  direction="row"
+                  flexWrap="wrap"
+                  gap={0.75}
+                  sx={{ mb: 1.5 }}
+                >
+                  <Chip
+                    label={`${graphAnalysis.node_counts.steps} steps`}
+                    size="small"
+                    variant="outlined"
+                  />
+                  <Chip
+                    label={`${graphAnalysis.node_counts.evidence} evidence`}
+                    size="small"
+                    variant="outlined"
+                  />
+                  <Chip
+                    label={`${graphAnalysis.node_counts.figures} figures`}
+                    size="small"
+                    variant="outlined"
+                  />
+                  <Chip
+                    label={`${graphAnalysis.node_counts.math} math`}
+                    size="small"
+                    variant="outlined"
+                  />
+                  <Chip
+                    label={`${graphAnalysis.node_counts.related_papers} citations`}
+                    size="small"
+                    variant="outlined"
+                  />
                 </Stack>
 
                 {/* Steps with no evaluations */}
                 {graphAnalysis.steps_without_evaluation.length > 0 && (
                   <Box sx={{ mb: 1.5 }}>
-                    <Typography variant="caption" fontWeight={700} sx={{ mb: 0.5, display: "block" }}>
-                      Steps with no evaluations ({graphAnalysis.steps_without_evaluation.length})
+                    <Typography
+                      variant="caption"
+                      fontWeight={700}
+                      sx={{ mb: 0.5, display: "block" }}
+                    >
+                      Steps with no evaluations (
+                      {graphAnalysis.steps_without_evaluation.length})
                     </Typography>
                     {graphAnalysis.steps_without_evaluation.map((s) => (
-                      <Typography key={s.step_number} variant="body2" color="text.secondary" sx={{ mb: 0.25 }}>
+                      <Typography
+                        key={s.step_number}
+                        variant="body2"
+                        color="text.secondary"
+                        sx={{ mb: 0.25 }}
+                      >
                         Step {s.step_number}: {s.description}
                       </Typography>
                     ))}
@@ -795,8 +862,13 @@ function ValidateContent({
                 {/* Contradicted steps */}
                 {graphAnalysis.contradicted_steps.length > 0 && (
                   <Box>
-                    <Typography variant="caption" fontWeight={700} sx={{ mb: 0.5, display: "block" }}>
-                      Contradicted steps ({graphAnalysis.contradicted_steps.length})
+                    <Typography
+                      variant="caption"
+                      fontWeight={700}
+                      sx={{ mb: 0.5, display: "block" }}
+                    >
+                      Contradicted steps (
+                      {graphAnalysis.contradicted_steps.length})
                     </Typography>
                     {graphAnalysis.contradicted_steps.map((cs, idx) => (
                       <Accordion
@@ -812,8 +884,14 @@ function ValidateContent({
                         }}
                       >
                         <AccordionSummary
-                          expandIcon={<ExpandMoreIcon sx={{ fontSize: "1rem" }} />}
-                          sx={{ minHeight: 32, py: 0, "& .MuiAccordionSummary-content": { my: 0.25 } }}
+                          expandIcon={
+                            <ExpandMoreIcon sx={{ fontSize: "1rem" }} />
+                          }
+                          sx={{
+                            minHeight: 32,
+                            py: 0,
+                            "& .MuiAccordionSummary-content": { my: 0.25 },
+                          }}
                         >
                           <Typography variant="caption" color="text.secondary">
                             Step {cs.step_number} ({cs.figure})
@@ -822,7 +900,13 @@ function ValidateContent({
                         <AccordionDetails sx={{ pt: 0, px: 1.5, pb: 1 }}>
                           <Box component="ul" sx={{ pl: 2, m: 0 }}>
                             {cs.contradictions.map((c, ci) => (
-                              <Typography key={ci} component="li" variant="caption" color="text.secondary" sx={{ mb: 0.5, lineHeight: 1.5 }}>
+                              <Typography
+                                key={ci}
+                                component="li"
+                                variant="caption"
+                                color="text.secondary"
+                                sx={{ mb: 0.5, lineHeight: 1.5 }}
+                              >
                                 {c}
                               </Typography>
                             ))}
@@ -851,7 +935,7 @@ function ValidateContent({
         >
           Run Again
         </Button>
-      </Box>
+      </TabContentWithChat>
     );
   }
 
@@ -898,23 +982,14 @@ function ScaledKatex({ latex }: { latex: string }) {
 function MathContent({
   result,
   graph,
+  chatMessages,
 }: {
   result: ValidationResult | null;
   graph: NodeLinkGraph | null;
+  chatMessages: AgentChatMessage[];
 }) {
   const theme = useTheme();
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      role: "agent",
-      text: "I've traced the equations in this paper. Select one to inspect details and add context.",
-    },
-  ]);
-  const [draft, setDraft] = useState("");
   const [selectedEq, setSelectedEq] = useState<string | null>(null);
-  const [equationNotes, setEquationNotes] = useState<Record<string, string>>(
-    {},
-  );
-  const chatListRef = useRef<HTMLDivElement>(null);
 
   // Prefer graph math nodes; fall back to result step_validations
   const graphMath: EquationValidation[] = useMemo(() => {
@@ -961,271 +1036,175 @@ function MathContent({
     }
   }, [displayedMath, selectedEq]);
 
-  useEffect(() => {
-    const container = chatListRef.current;
-    if (!container) return;
-    container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
-  }, [messages]);
-
   const handleSelectEquation = (eq: EquationValidation) => {
-    const key = eqKey(eq);
-    setSelectedEq(key);
-    setMessages((prev) => [
-      ...prev,
-      {
-        role: "agent",
-        text: `Selected ${eq.equation_reference}: ${eq.calculation_valid ? "validation passed" : "validation failed"}. ${eq.details}`,
-      },
-    ]);
-  };
-
-  const handleSend = (e: FormEvent) => {
-    e.preventDefault();
-    if (!draft.trim()) return;
-    const userMessage = draft.trim();
-    const currentNote = selectedEq ? equationNotes[selectedEq]?.trim() : "";
-    setMessages((prev) => [
-      ...prev,
-      { role: "user", text: userMessage },
-      {
-        role: "agent",
-        text: `Noted. For ${selectedEquation?.equation_reference ?? "the selected equation"}, the context has been recorded${currentNote ? ` (${currentNote})` : ""}. Re-run the pipeline with updated assumptions to recompute confidence.`,
-      },
-    ]);
-    setDraft("");
+    setSelectedEq(eqKey(eq));
   };
 
   return (
-    <Box
-      sx={{ display: "flex", flexDirection: "column", gap: 2, height: "100%" }}
+    <TabContentWithChat
+      chatProps={{
+        allMessages: chatMessages,
+        category: "equations",
+        targetId: selectedEq,
+        placeholder: "Ask the agent about an equation...",
+      }}
     >
-      {/* Equation Hero Display */}
-      {!!selectedEquation && (
-        <Box
-          sx={{
-            px: 2,
-            py: 1.5,
-            borderRadius: 1.5,
-            border: 1,
-            borderColor: "divider",
-            background: `linear-gradient(135deg, ${theme.palette.primary.main}10 0%, ${theme.palette.secondary.main}20 100%)`,
-            textAlign: "center",
-          }}
-        >
-          <Typography
-            variant="caption"
+      <Stack spacing={2}>
+        {/* Equation Hero Display */}
+        {!!selectedEquation && (
+          <Box
             sx={{
-              display: "block",
-              fontWeight: 700,
-              letterSpacing: "0.08em",
-              mb: 0.75,
-              color: "text.secondary",
+              px: 2,
+              py: 1.5,
+              borderRadius: 1.5,
+              border: 1,
+              borderColor: "divider",
+              background: `linear-gradient(135deg, ${theme.palette.primary.main}10 0%, ${theme.palette.secondary.main}20 100%)`,
+              textAlign: "center",
             }}
           >
-            {selectedEquation.equation_reference}
-          </Typography>
-          {selectedEquation.equation_latex ? (
-            <ScaledKatex latex={selectedEquation.equation_latex} />
-          ) : (
             <Typography
+              variant="caption"
               sx={{
-                fontFamily: "'IBM Plex Serif', serif",
-                fontSize: { xs: "1.15rem", sm: "1.35rem" },
-                lineHeight: 1.25,
-                color: "text.primary",
+                display: "block",
+                fontWeight: 700,
+                letterSpacing: "0.08em",
+                mb: 0.75,
+                color: "text.secondary",
               }}
             >
-              {selectedEquation.equation_text ??
-                selectedEquation.equation_reference}
+              {selectedEquation.equation_reference}
             </Typography>
-          )}
-        </Box>
-      )}
+            {selectedEquation.equation_latex ? (
+              <ScaledKatex latex={selectedEquation.equation_latex} />
+            ) : (
+              <Typography
+                sx={{
+                  fontFamily: "'IBM Plex Serif', serif",
+                  fontSize: { xs: "1.15rem", sm: "1.35rem" },
+                  lineHeight: 1.25,
+                  color: "text.primary",
+                }}
+              >
+                {selectedEquation.equation_text ??
+                  selectedEquation.equation_reference}
+              </Typography>
+            )}
+          </Box>
+        )}
 
-      {allMath.length === 0 && (
-        <Typography variant="body2" color="text.secondary">
-          No math validation data available yet. Showing demo equation
-          placeholders.
-        </Typography>
-      )}
+        {allMath.length === 0 && (
+          <Typography variant="body2" color="text.secondary">
+            No math validation data available yet. Showing demo equation
+            placeholders.
+          </Typography>
+        )}
 
-      {/* Equation List */}
-      <Stack spacing={1} sx={{ overflow: "auto", flexShrink: 1, minHeight: 0 }}>
-        {displayedMath.map((eq, idx) => (
+        {/* Equation List */}
+        <Stack spacing={1}>
+          {displayedMath.map((eq, idx) => (
+            <Box
+              key={`${eqKey(eq)}-${idx}`}
+              onClick={() => handleSelectEquation(eq)}
+              sx={{
+                p: 1.25,
+                borderRadius: 1,
+                border: 1,
+                borderColor:
+                  selectedEq === eqKey(eq) ? "primary.main" : "divider",
+                cursor: "pointer",
+                bgcolor:
+                  selectedEq === eqKey(eq) ? "action.selected" : "transparent",
+                "&:hover": { bgcolor: "action.hover" },
+              }}
+            >
+              <Stack
+                direction="row"
+                justifyContent="space-between"
+                sx={{ mb: 0.5 }}
+              >
+                <Typography variant="body2" fontWeight={700}>
+                  {eq.equation_reference}
+                </Typography>
+                <Chip
+                  label={eq.calculation_valid ? "Valid" : "Invalid"}
+                  size="small"
+                  color={eq.calculation_valid ? "success" : "error"}
+                  icon={
+                    eq.calculation_valid ? (
+                      <ValidIcon fontSize="small" />
+                    ) : (
+                      <InvalidIcon fontSize="small" />
+                    )
+                  }
+                />
+              </Stack>
+              {eq.formula_used && (
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  display="block"
+                  noWrap
+                >
+                  {eq.formula_used}
+                </Typography>
+              )}
+            </Box>
+          ))}
+        </Stack>
+
+        {/* Detail Panel */}
+        {!!selectedEquation && (
           <Box
-            key={`${eqKey(eq)}-${idx}`}
-            onClick={() => handleSelectEquation(eq)}
             sx={{
               p: 1.25,
               borderRadius: 1,
               border: 1,
-              borderColor:
-                selectedEq === eqKey(eq) ? "primary.main" : "divider",
-              cursor: "pointer",
-              bgcolor:
-                selectedEq === eqKey(eq) ? "action.selected" : "transparent",
-              "&:hover": { bgcolor: "action.hover" },
+              borderColor: "divider",
+              bgcolor: "background.default",
+              maxHeight: 220,
+              overflow: "auto",
             }}
           >
+            <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 0.75 }}>
+              Selected Equation Details
+            </Typography>
             <Stack
               direction="row"
-              justifyContent="space-between"
+              spacing={1}
+              alignItems="center"
               sx={{ mb: 0.5 }}
             >
               <Typography variant="body2" fontWeight={700}>
-                {eq.equation_reference}
+                {selectedEquation.equation_reference}
               </Typography>
               <Chip
-                label={eq.calculation_valid ? "Valid" : "Invalid"}
+                label={selectedEquation.calculation_valid ? "Valid" : "Invalid"}
                 size="small"
-                color={eq.calculation_valid ? "success" : "error"}
-                icon={
-                  eq.calculation_valid ? (
-                    <ValidIcon fontSize="small" />
-                  ) : (
-                    <InvalidIcon fontSize="small" />
-                  )
-                }
+                color={selectedEquation.calculation_valid ? "success" : "error"}
               />
             </Stack>
-            {eq.formula_used && (
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                display="block"
-                noWrap
-              >
-                {eq.formula_used}
-              </Typography>
-            )}
-          </Box>
-        ))}
-      </Stack>
-
-      {/* Detail Panel */}
-      {!!selectedEquation && (
-        <Box
-          sx={{
-            p: 1.25,
-            borderRadius: 1,
-            border: 1,
-            borderColor: "divider",
-            bgcolor: "background.default",
-            maxHeight: 220,
-            overflow: "auto",
-          }}
-        >
-          <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 0.75 }}>
-            Selected Equation Details
-          </Typography>
-          <Stack
-            direction="row"
-            spacing={1}
-            alignItems="center"
-            sx={{ mb: 0.5 }}
-          >
-            <Typography variant="body2" fontWeight={700}>
-              {selectedEquation.equation_reference}
-            </Typography>
-            <Chip
-              label={selectedEquation.calculation_valid ? "Valid" : "Invalid"}
-              size="small"
-              color={selectedEquation.calculation_valid ? "success" : "error"}
-            />
-          </Stack>
-          <Typography variant="caption" color="text.secondary" display="block">
-            {selectedEquation.details}
-          </Typography>
-          {selectedEquation.formula_used && (
             <Typography
               variant="caption"
               color="text.secondary"
               display="block"
-              sx={{ mt: 0.5 }}
             >
-              <strong>Formula:</strong> {selectedEquation.formula_used}
+              {selectedEquation.details}
             </Typography>
-          )}
-          <TextField
-            sx={{ mt: 1 }}
-            size="small"
-            fullWidth
-            multiline
-            minRows={3}
-            value={selectedEq ? (equationNotes[selectedEq] ?? "") : ""}
-            onChange={(e) => {
-              if (!selectedEq) return;
-              setEquationNotes((prev) => ({
-                ...prev,
-                [selectedEq]: e.target.value,
-              }));
-            }}
-            placeholder="Add context to guide the math agent..."
-          />
-        </Box>
-      )}
-
-      {/* Agent Chat */}
-      <Box sx={{ mt: "auto" }}>
-        <Divider sx={{ mb: 1.5 }} />
-
-        <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
-          Agent Chat
-        </Typography>
-        <Box
-          ref={chatListRef}
-          sx={{
-            display: "flex",
-            flexDirection: "column",
-            gap: 0.75,
-            maxHeight: 120,
-            overflow: "auto",
-            pr: 0.5,
-          }}
-        >
-          {messages.map((m, i) => (
-            <Box
-              key={`${m.role}-${i}`}
-              sx={{
-                alignSelf: m.role === "user" ? "flex-end" : "flex-start",
-                maxWidth: "88%",
-                p: 1,
-                borderRadius: 2,
-                bgcolor: m.role === "user" ? "primary.main" : "action.selected",
-                color:
-                  m.role === "user" ? "primary.contrastText" : "text.primary",
-              }}
-            >
-              <Typography variant="caption" fontWeight={700} display="block">
-                {m.role === "agent" ? "Agent" : "You"}
+            {selectedEquation.formula_used && (
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                display="block"
+                sx={{ mt: 0.5 }}
+              >
+                <strong>Formula:</strong> {selectedEquation.formula_used}
               </Typography>
-              <Typography variant="body2">{m.text}</Typography>
-            </Box>
-          ))}
-        </Box>
-        <Box
-          component="form"
-          onSubmit={handleSend}
-          sx={{ display: "flex", gap: 1, mt: 1 }}
-        >
-          <TextField
-            size="small"
-            fullWidth
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            placeholder="Ask the agent about an equation..."
-          />
-          <IconButton
-            type="submit"
-            size="small"
-            color="primary"
-            disabled={!draft.trim()}
-          >
-            <SendIcon />
-          </IconButton>
-        </Box>
-      </Box>
-    </Box>
+            )}
+          </Box>
+        )}
+      </Stack>
+    </TabContentWithChat>
   );
 }
 
@@ -1267,19 +1246,13 @@ function ScoreChip({
 function CitationsContent({
   result,
   graph,
+  chatMessages,
 }: {
   result: ValidationResult | null;
   graph: NodeLinkGraph | null;
+  chatMessages: AgentChatMessage[];
 }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      role: "agent",
-      text: "Citation scoring is ready. Select a paper or citation and ask for convergence interpretation.",
-    },
-  ]);
-  const [draft, setDraft] = useState("");
-  const chatListRef = useRef<HTMLDivElement>(null);
 
   // Build related papers from graph nodes (preferred) or fall back to result
   const relatedPapers: CitationPaperItem[] = useMemo(() => {
@@ -1373,12 +1346,6 @@ function CitationsContent({
     }
   }, [allItems, selectedId]);
 
-  useEffect(() => {
-    const container = chatListRef.current;
-    if (!container) return;
-    container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
-  }, [messages]);
-
   const selectedItem = useMemo(
     () =>
       selectedId
@@ -1387,109 +1354,24 @@ function CitationsContent({
     [allItems, selectedId],
   );
 
-  const handleSend = (e: FormEvent) => {
-    e.preventDefault();
-    if (!draft.trim()) return;
-
-    const userMessage = draft.trim();
-    let agentText: string;
-
-    if (selectedItem?.kind === "paper") {
-      const paper = selectedItem.data;
-      const relevancy = paper.relevancy_score ?? paper.relevancy ?? 0;
-      const convergence = paper.convergence_score ?? paper.convergence ?? 0;
-      agentText = `For ${paper.title ?? "the selected paper"}, relevancy is ${relevancy.toFixed(2)} and convergence is ${convergence.toFixed(2)}. ${convergence >= 0 ? "This supports your manuscript direction." : "This introduces tension with your manuscript direction."}`;
-    } else if (selectedItem?.kind === "citation") {
-      const cit = selectedItem.data;
-      const hasScores = cit.relevancy_score != null;
-      agentText = hasScores
-        ? `Citation at ${cit.location ?? "unknown location"} has relevancy ${cit.relevancy_score!.toFixed(2)} and convergence ${cit.convergence_score?.toFixed(2) ?? "N/A"}.`
-        : `Citation at ${cit.location ?? "unknown location"} supports step ${cit.supports_step ?? "?"}: ${cit.description}. Scores have not been calculated yet.`;
-    } else {
-      agentText = "Select a paper or citation to discuss.";
-    }
-
-    setMessages((prev) => [
-      ...prev,
-      { role: "user", text: userMessage },
-      { role: "agent", text: agentText },
-    ]);
-    setDraft("");
-  };
-
   return (
-    <Box
-      sx={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}
+    <TabContentWithChat
+      chatProps={{
+        allMessages: chatMessages,
+        category: "citations",
+        targetId: selectedId,
+        placeholder: "Ask the agent about citation convergence...",
+      }}
     >
-      <Box sx={{ flex: 1, minHeight: 0, overflow: "auto" }}>
       <Stack spacing={2}>
-      {!hasData && (
-        <Typography variant="body2" color="text.secondary">
-          No related papers data available yet. Showing demo citation
-          placeholders.
-        </Typography>
-      )}
+        {!hasData && (
+          <Typography variant="body2" color="text.secondary">
+            No related papers data available yet. Showing demo citation
+            placeholders.
+          </Typography>
+        )}
 
-      {/* Related Papers section */}
-      <Box>
-        <Typography
-          variant="caption"
-          fontWeight={700}
-          color="text.secondary"
-          sx={{ mb: 0.5, display: "block" }}
-        >
-          Related Papers ({displayedPapers.length})
-        </Typography>
-        <Stack spacing={1}>
-          {displayedPapers.map((paper) => (
-            <Box
-              key={paper.paper_id}
-              onClick={() => setSelectedId(paper.paper_id)}
-              sx={{
-                p: 1.25,
-                borderRadius: 1,
-                border: 1,
-                borderColor:
-                  selectedId === paper.paper_id ? "primary.main" : "divider",
-                cursor: "pointer",
-                bgcolor:
-                  selectedId === paper.paper_id
-                    ? "action.selected"
-                    : "transparent",
-                "&:hover": { bgcolor: "action.hover" },
-              }}
-            >
-              <Typography variant="body2" fontWeight={700}>
-                {paper.title}
-              </Typography>
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                display="block"
-              >
-                {[paper.authors, paper.source || paper.venue, paper.year]
-                  .filter(Boolean)
-                  .join(" | ")}
-              </Typography>
-              <Stack direction="row" spacing={0.5} sx={{ mt: 0.75 }}>
-                <ScoreChip
-                  label="Rel"
-                  value={paper.relevancy_score ?? paper.relevancy}
-                  mode="relevancy"
-                />
-                <ScoreChip
-                  label="Conv"
-                  value={paper.convergence_score ?? paper.convergence}
-                  mode="convergence"
-                />
-              </Stack>
-            </Box>
-          ))}
-        </Stack>
-      </Box>
-
-      {/* Citations section */}
-      {citations.length > 0 && (
+        {/* Related Papers section */}
         <Box>
           <Typography
             variant="caption"
@@ -1497,26 +1379,219 @@ function CitationsContent({
             color="text.secondary"
             sx={{ mb: 0.5, display: "block" }}
           >
-            Citations ({citations.length})
+            Related Papers ({displayedPapers.length})
           </Typography>
           <Stack spacing={1}>
-            {citations.map((cit) => (
+            {displayedPapers.map((paper) => (
               <Box
-                key={cit.id}
-                onClick={() => setSelectedId(cit.id)}
+                key={paper.paper_id}
+                onClick={() => setSelectedId(paper.paper_id)}
                 sx={{
                   p: 1.25,
                   borderRadius: 1,
                   border: 1,
                   borderColor:
-                    selectedId === cit.id ? "primary.main" : "divider",
+                    selectedId === paper.paper_id ? "primary.main" : "divider",
                   cursor: "pointer",
                   bgcolor:
-                    selectedId === cit.id ? "action.selected" : "transparent",
+                    selectedId === paper.paper_id
+                      ? "action.selected"
+                      : "transparent",
                   "&:hover": { bgcolor: "action.hover" },
                 }}
               >
-                <Typography variant="body2" fontWeight={700} noWrap>
+                <Typography variant="body2" fontWeight={700}>
+                  {paper.title}
+                </Typography>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  display="block"
+                >
+                  {[paper.authors, paper.source || paper.venue, paper.year]
+                    .filter(Boolean)
+                    .join(" | ")}
+                </Typography>
+                <Stack direction="row" spacing={0.5} sx={{ mt: 0.75 }}>
+                  <ScoreChip
+                    label="Rel"
+                    value={paper.relevancy_score ?? paper.relevancy}
+                    mode="relevancy"
+                  />
+                  <ScoreChip
+                    label="Conv"
+                    value={paper.convergence_score ?? paper.convergence}
+                    mode="convergence"
+                  />
+                </Stack>
+              </Box>
+            ))}
+          </Stack>
+        </Box>
+
+        {/* Citations section */}
+        {citations.length > 0 && (
+          <Box>
+            <Typography
+              variant="caption"
+              fontWeight={700}
+              color="text.secondary"
+              sx={{ mb: 0.5, display: "block" }}
+            >
+              Citations ({citations.length})
+            </Typography>
+            <Stack spacing={1}>
+              {citations.map((cit) => (
+                <Box
+                  key={cit.id}
+                  onClick={() => setSelectedId(cit.id)}
+                  sx={{
+                    p: 1.25,
+                    borderRadius: 1,
+                    border: 1,
+                    borderColor:
+                      selectedId === cit.id ? "primary.main" : "divider",
+                    cursor: "pointer",
+                    bgcolor:
+                      selectedId === cit.id ? "action.selected" : "transparent",
+                    "&:hover": { bgcolor: "action.hover" },
+                  }}
+                >
+                  <Typography variant="body2" fontWeight={700} noWrap>
+                    {cit.description}
+                  </Typography>
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    display="block"
+                  >
+                    {[
+                      cit.location,
+                      cit.supports_step != null
+                        ? `Step ${cit.supports_step}`
+                        : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" | ")}
+                  </Typography>
+                  <Stack direction="row" spacing={0.5} sx={{ mt: 0.75 }}>
+                    <ScoreChip
+                      label="Rel"
+                      value={cit.relevancy_score}
+                      mode="relevancy"
+                    />
+                    <ScoreChip
+                      label="Conv"
+                      value={cit.convergence_score}
+                      mode="convergence"
+                    />
+                  </Stack>
+                </Box>
+              ))}
+            </Stack>
+          </Box>
+        )}
+
+        {/* Detail panel */}
+        {selectedItem?.kind === "paper" &&
+          (() => {
+            const paper = selectedItem.data;
+            return (
+              <Box
+                sx={{
+                  p: 1.25,
+                  borderRadius: 1,
+                  border: 1,
+                  borderColor: "divider",
+                  bgcolor: "background.default",
+                }}
+              >
+                <Typography
+                  variant="subtitle2"
+                  fontWeight={700}
+                  sx={{ mb: 0.5 }}
+                >
+                  Selected Paper Details
+                </Typography>
+                <Typography variant="body1" fontWeight={700} sx={{ mb: 0.25 }}>
+                  {paper.title}
+                </Typography>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  display="block"
+                >
+                  {[paper.authors, paper.source || paper.venue, paper.year]
+                    .filter(Boolean)
+                    .join(" | ")}
+                </Typography>
+                {paper.abstract && (
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    display="block"
+                    sx={{ mt: 0.75 }}
+                  >
+                    {paper.abstract}
+                  </Typography>
+                )}
+                <Stack direction="row" spacing={0.5} sx={{ mt: 1 }}>
+                  <ScoreChip
+                    label="Rel"
+                    value={paper.relevancy_score ?? paper.relevancy}
+                    mode="relevancy"
+                  />
+                  <ScoreChip
+                    label="Conv"
+                    value={paper.convergence_score ?? paper.convergence}
+                    mode="convergence"
+                  />
+                </Stack>
+                {paper.relevancy_reasoning && (
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    display="block"
+                    sx={{ mt: 0.75 }}
+                  >
+                    <strong>Relevancy:</strong> {paper.relevancy_reasoning}
+                  </Typography>
+                )}
+                {paper.convergence_reasoning && (
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    display="block"
+                    sx={{ mt: 0.5 }}
+                  >
+                    <strong>Convergence:</strong> {paper.convergence_reasoning}
+                  </Typography>
+                )}
+              </Box>
+            );
+          })()}
+
+        {selectedItem?.kind === "citation" &&
+          (() => {
+            const cit = selectedItem.data;
+            return (
+              <Box
+                sx={{
+                  p: 1.25,
+                  borderRadius: 1,
+                  border: 1,
+                  borderColor: "divider",
+                  bgcolor: "background.default",
+                }}
+              >
+                <Typography
+                  variant="subtitle2"
+                  fontWeight={700}
+                  sx={{ mb: 0.5 }}
+                >
+                  Selected Citation Details
+                </Typography>
+                <Typography variant="body2" fontWeight={700} sx={{ mb: 0.25 }}>
                   {cit.description}
                 </Typography>
                 <Typography
@@ -1533,7 +1608,17 @@ function CitationsContent({
                     .filter(Boolean)
                     .join(" | ")}
                 </Typography>
-                <Stack direction="row" spacing={0.5} sx={{ mt: 0.75 }}>
+                {cit.excerpt && (
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    display="block"
+                    sx={{ mt: 0.75, fontStyle: "italic" }}
+                  >
+                    "{cit.excerpt}"
+                  </Typography>
+                )}
+                <Stack direction="row" spacing={0.5} sx={{ mt: 1 }}>
                   <ScoreChip
                     label="Rel"
                     value={cit.relevancy_score}
@@ -1545,229 +1630,31 @@ function CitationsContent({
                     mode="convergence"
                   />
                 </Stack>
+                {cit.relevancy_reasoning && (
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    display="block"
+                    sx={{ mt: 0.75 }}
+                  >
+                    <strong>Relevancy:</strong> {cit.relevancy_reasoning}
+                  </Typography>
+                )}
+                {cit.convergence_reasoning && (
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    display="block"
+                    sx={{ mt: 0.5 }}
+                  >
+                    <strong>Convergence:</strong> {cit.convergence_reasoning}
+                  </Typography>
+                )}
               </Box>
-            ))}
-          </Stack>
-        </Box>
-      )}
-
-      {/* Detail panel */}
-      {selectedItem?.kind === "paper" &&
-        (() => {
-          const paper = selectedItem.data;
-          return (
-            <Box
-              sx={{
-                p: 1.25,
-                borderRadius: 1,
-                border: 1,
-                borderColor: "divider",
-                bgcolor: "background.default",
-              }}
-            >
-              <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 0.5 }}>
-                Selected Paper Details
-              </Typography>
-              <Typography variant="body2" fontWeight={700} sx={{ mb: 0.25 }}>
-                {paper.title}
-              </Typography>
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                display="block"
-              >
-                {[paper.authors, paper.source || paper.venue, paper.year]
-                  .filter(Boolean)
-                  .join(" | ")}
-              </Typography>
-              {paper.abstract && (
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  display="block"
-                  sx={{ mt: 0.75 }}
-                >
-                  {paper.abstract}
-                </Typography>
-              )}
-              <Stack direction="row" spacing={0.5} sx={{ mt: 1 }}>
-                <ScoreChip
-                  label="Rel"
-                  value={paper.relevancy_score ?? paper.relevancy}
-                  mode="relevancy"
-                />
-                <ScoreChip
-                  label="Conv"
-                  value={paper.convergence_score ?? paper.convergence}
-                  mode="convergence"
-                />
-              </Stack>
-              {paper.relevancy_reasoning && (
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  display="block"
-                  sx={{ mt: 0.75 }}
-                >
-                  <strong>Relevancy:</strong> {paper.relevancy_reasoning}
-                </Typography>
-              )}
-              {paper.convergence_reasoning && (
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  display="block"
-                  sx={{ mt: 0.5 }}
-                >
-                  <strong>Convergence:</strong> {paper.convergence_reasoning}
-                </Typography>
-              )}
-            </Box>
-          );
-        })()}
-
-      {selectedItem?.kind === "citation" &&
-        (() => {
-          const cit = selectedItem.data;
-          return (
-            <Box
-              sx={{
-                p: 1.25,
-                borderRadius: 1,
-                border: 1,
-                borderColor: "divider",
-                bgcolor: "background.default",
-              }}
-            >
-              <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 0.5 }}>
-                Selected Citation Details
-              </Typography>
-              <Typography variant="body2" fontWeight={700} sx={{ mb: 0.25 }}>
-                {cit.description}
-              </Typography>
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                display="block"
-              >
-                {[
-                  cit.location,
-                  cit.supports_step != null
-                    ? `Step ${cit.supports_step}`
-                    : null,
-                ]
-                  .filter(Boolean)
-                  .join(" | ")}
-              </Typography>
-              {cit.excerpt && (
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  display="block"
-                  sx={{ mt: 0.75, fontStyle: "italic" }}
-                >
-                  "{cit.excerpt}"
-                </Typography>
-              )}
-              <Stack direction="row" spacing={0.5} sx={{ mt: 1 }}>
-                <ScoreChip
-                  label="Rel"
-                  value={cit.relevancy_score}
-                  mode="relevancy"
-                />
-                <ScoreChip
-                  label="Conv"
-                  value={cit.convergence_score}
-                  mode="convergence"
-                />
-              </Stack>
-              {cit.relevancy_reasoning && (
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  display="block"
-                  sx={{ mt: 0.75 }}
-                >
-                  <strong>Relevancy:</strong> {cit.relevancy_reasoning}
-                </Typography>
-              )}
-              {cit.convergence_reasoning && (
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  display="block"
-                  sx={{ mt: 0.5 }}
-                >
-                  <strong>Convergence:</strong> {cit.convergence_reasoning}
-                </Typography>
-              )}
-            </Box>
-          );
-        })()}
-
+            );
+          })()}
       </Stack>
-      </Box>
-
-      <Box sx={{ flexShrink: 0 }}>
-        <Divider sx={{ mb: 1.5 }} />
-
-        <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
-          Agent Chat
-        </Typography>
-        <Box
-          ref={chatListRef}
-          sx={{
-            display: "flex",
-            flexDirection: "column",
-            gap: 0.75,
-            maxHeight: 190,
-            overflow: "auto",
-            pr: 0.5,
-          }}
-        >
-          {messages.map((m, i) => (
-            <Box
-              key={`${m.role}-${i}`}
-              sx={{
-                alignSelf: m.role === "user" ? "flex-end" : "flex-start",
-                maxWidth: "88%",
-                p: 1,
-                borderRadius: 2,
-                bgcolor: m.role === "user" ? "primary.main" : "action.selected",
-                color:
-                  m.role === "user" ? "primary.contrastText" : "text.primary",
-              }}
-            >
-              <Typography variant="caption" fontWeight={700} display="block">
-                {m.role === "agent" ? "Agent" : "You"}
-              </Typography>
-              <Typography variant="body2">{m.text}</Typography>
-            </Box>
-          ))}
-        </Box>
-        <Box
-          component="form"
-          onSubmit={handleSend}
-          sx={{ display: "flex", gap: 1, mt: 1 }}
-        >
-          <TextField
-            size="small"
-            fullWidth
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            placeholder="Ask the agent about citation convergence..."
-          />
-          <IconButton
-            type="submit"
-            size="small"
-            color="primary"
-            disabled={!draft.trim()}
-          >
-            <SendIcon />
-          </IconButton>
-        </Box>
-      </Box>
-    </Box>
+    </TabContentWithChat>
   );
 }
 
@@ -1775,22 +1662,16 @@ function FiguresContent({
   result,
   jobId,
   graph,
+  chatMessages,
 }: {
   result: ValidationResult | null;
   jobId: string | null;
   graph: NodeLinkGraph | null;
+  chatMessages: AgentChatMessage[];
 }) {
   const theme = useTheme();
   const [selectedFigure, setSelectedFigure] = useState<string | null>(null);
   const [figureAssets, setFigureAssets] = useState<FigureAsset[]>([]);
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      role: "agent",
-      text: "Figure checks are loaded. Select a figure and ask for discrepancy analysis.",
-    },
-  ]);
-  const [draft, setDraft] = useState("");
-  const chatListRef = useRef<HTMLDivElement>(null);
 
   // Prefer graph figure nodes; fall back to result step_validations
   const graphFigures: FigureValidation[] = useMemo(() => {
@@ -1843,12 +1724,6 @@ function FiguresContent({
     }
   }, [displayedFigures, selectedFigure]);
 
-  useEffect(() => {
-    const container = chatListRef.current;
-    if (!container) return;
-    container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
-  }, [messages]);
-
   const selectedFigureData = useMemo(
     () =>
       selectedFigure
@@ -1896,25 +1771,6 @@ function FiguresContent({
   const getMismatches = (fig: FigureValidation) =>
     fig.differences ?? fig.validity?.contradictions ?? [];
 
-  const handleSend = (e: FormEvent) => {
-    e.preventDefault();
-    if (!draft.trim()) return;
-
-    const userMessage = draft.trim();
-    const matches = getMatches(selectedFigureData!).length;
-    const mismatches = getMismatches(selectedFigureData!).length;
-
-    setMessages((prev) => [
-      ...prev,
-      { role: "user", text: userMessage },
-      {
-        role: "agent",
-        text: `For ${selectedFigureData?.figure_name ?? "the current figure"}, I see ${matches} similarities and ${mismatches} differences. If this discrepancy matters for your claim, prioritize evidence around the inflection region.`,
-      },
-    ]);
-    setDraft("");
-  };
-
   const submittedPlaceholder = (
     <svg viewBox="0 0 180 72" style={{ width: "100%", height: "100%" }}>
       <polyline
@@ -1940,18 +1796,67 @@ function FiguresContent({
   );
 
   return (
-    <Box
-      sx={{ display: "flex", flexDirection: "column", gap: 2, height: "100%" }}
+    <TabContentWithChat
+      chatProps={{
+        allMessages: chatMessages,
+        category: "figures",
+        targetId: selectedFigure,
+        placeholder: "Ask the agent about figure discrepancies...",
+      }}
     >
-      {allFigures.length === 0 && (
-        <Typography variant="body2" color="text.secondary">
-          No figure validation data available yet. Showing demo placeholder
-          figures.
-        </Typography>
-      )}
+      <Stack spacing={2}>
+        {allFigures.length === 0 && (
+          <Typography variant="body2" color="text.secondary">
+            No figure validation data available yet. Showing demo placeholder
+            figures.
+          </Typography>
+        )}
 
-      {/* Selected Figure Display */}
-      {!!selectedFigureData && (
+        {/* Selected Figure Display */}
+        {!!selectedFigureData && (
+          <Box
+            sx={{
+              p: 1.25,
+              borderRadius: 1,
+              border: 1,
+              borderColor: "divider",
+              bgcolor: "background.default",
+            }}
+          >
+            <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 0.5 }}>
+              Selected Figure
+            </Typography>
+            <Typography variant="body2" fontWeight={700} sx={{ mb: 1 }}>
+              {selectedFigureData.figure_name}
+            </Typography>
+            <Box sx={{ mb: 1 }}>
+              <Stack direction={{ xs: "column", md: "row" }} spacing={1}>
+                <ZoomableFigureCard
+                  title="Observed"
+                  // subtitle={
+                  //   selectedFigureAsset?.submitted?.filename ??
+                  //   "Placeholder figure"
+                  // }
+                  imageUrl={selectedFigureAsset?.submitted?.url}
+                  alt={`${selectedFigureData.figure_name} submitted`}
+                  placeholder={submittedPlaceholder}
+                />
+                <ZoomableFigureCard
+                  title="Predicted"
+                  // subtitle={
+                  //   selectedFigureAsset?.predicted?.filename ??
+                  //   "Placeholder figure"
+                  // }
+                  imageUrl={selectedFigureAsset?.predicted?.url}
+                  alt={`${selectedFigureData.figure_name} predicted`}
+                  placeholder={predictedPlaceholder}
+                />
+              </Stack>
+            </Box>
+          </Box>
+        )}
+
+        {/* Figure Selection */}
         <Box
           sx={{
             p: 1.25,
@@ -1961,188 +1866,85 @@ function FiguresContent({
             bgcolor: "background.default",
           }}
         >
-          <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 0.5 }}>
-            Selected Figure
+          <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
+            Figure Selection
           </Typography>
-          <Typography variant="body2" fontWeight={700} sx={{ mb: 1 }}>
-            {selectedFigureData.figure_name}
-          </Typography>
-          <Box sx={{ mb: 1 }}>
-            <Stack direction={{ xs: "column", md: "row" }} spacing={1}>
-              <ZoomableFigureCard
-                title="Observed"
-                // subtitle={
-                //   selectedFigureAsset?.submitted?.filename ??
-                //   "Placeholder figure"
-                // }
-                imageUrl={selectedFigureAsset?.submitted?.url}
-                alt={`${selectedFigureData.figure_name} submitted`}
-                placeholder={submittedPlaceholder}
-              />
-              <ZoomableFigureCard
-                title="Predicted"
-                // subtitle={
-                //   selectedFigureAsset?.predicted?.filename ??
-                //   "Placeholder figure"
-                // }
-                imageUrl={selectedFigureAsset?.predicted?.url}
-                alt={`${selectedFigureData.figure_name} predicted`}
-                placeholder={predictedPlaceholder}
-              />
-            </Stack>
-          </Box>
+          <Stack
+            spacing={1.25}
+            sx={{ maxHeight: 220, overflow: "auto", pr: 0.5 }}
+          >
+            {displayedFigures.map((fig, i) => (
+              <Box
+                key={`${figKey(fig)}-${i}`}
+                onClick={() => setSelectedFigure(figKey(fig))}
+                sx={{
+                  p: 1.25,
+                  borderRadius: 1,
+                  border: 1,
+                  borderColor:
+                    selectedFigure === figKey(fig) ? "primary.main" : "divider",
+                  cursor: "pointer",
+                  bgcolor:
+                    selectedFigure === figKey(fig)
+                      ? "action.selected"
+                      : "transparent",
+                  "&:hover": { bgcolor: "action.hover" },
+                }}
+              >
+                <Typography variant="body2" fontWeight={700} sx={{ mb: 0.5 }}>
+                  {fig.figure_name}
+                </Typography>
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  display="block"
+                >
+                  Similarities: {getMatches(fig).length} | Differences:{" "}
+                  {getMismatches(fig).length}
+                </Typography>
+              </Box>
+            ))}
+          </Stack>
         </Box>
-      )}
 
-      {/* Figure Selection */}
-      <Box
-        sx={{
-          p: 1.25,
-          borderRadius: 1,
-          border: 1,
-          borderColor: "divider",
-          bgcolor: "background.default",
-        }}
-      >
-        <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
-          Figure Selection
-        </Typography>
-        <Stack
-          spacing={1.25}
-          sx={{ maxHeight: 220, overflow: "auto", pr: 0.5 }}
-        >
-          {displayedFigures.map((fig, i) => (
-            <Box
-              key={`${figKey(fig)}-${i}`}
-              onClick={() => setSelectedFigure(figKey(fig))}
-              sx={{
-                p: 1.25,
-                borderRadius: 1,
-                border: 1,
-                borderColor:
-                  selectedFigure === figKey(fig) ? "primary.main" : "divider",
-                cursor: "pointer",
-                bgcolor:
-                  selectedFigure === figKey(fig)
-                    ? "action.selected"
-                    : "transparent",
-                "&:hover": { bgcolor: "action.hover" },
-              }}
-            >
-              <Typography variant="body2" fontWeight={700} sx={{ mb: 0.5 }}>
-                {fig.figure_name}
-              </Typography>
+        {/* Comparison Notes */}
+        {!!selectedFigureData && (
+          <Box
+            sx={{
+              p: 1.25,
+              borderRadius: 1,
+              border: 1,
+              borderColor: "divider",
+              bgcolor: "background.default",
+            }}
+          >
+            <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 0.75 }}>
+              Comparison Notes
+            </Typography>
+            {getMatches(selectedFigureData).map((c, i) => (
               <Typography
+                key={`s-${i}`}
                 variant="caption"
                 color="text.secondary"
                 display="block"
               >
-                Similarities: {getMatches(fig).length} | Differences:{" "}
-                {getMismatches(fig).length}
+                + {c}
               </Typography>
-            </Box>
-          ))}
-        </Stack>
-      </Box>
-
-      {/* Comparison Notes */}
-      {!!selectedFigureData && (
-        <Box
-          sx={{
-            p: 1.25,
-            borderRadius: 1,
-            border: 1,
-            borderColor: "divider",
-            bgcolor: "background.default",
-          }}
-        >
-          <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 0.75 }}>
-            Comparison Notes
-          </Typography>
-          {getMatches(selectedFigureData).map((c, i) => (
-            <Typography
-              key={`s-${i}`}
-              variant="caption"
-              color="text.secondary"
-              display="block"
-            >
-              + {c}
-            </Typography>
-          ))}
-          {getMismatches(selectedFigureData).map((c, i) => (
-            <Typography
-              key={`d-${i}`}
-              variant="caption"
-              color="text.secondary"
-              display="block"
-            >
-              - {c}
-            </Typography>
-          ))}
-        </Box>
-      )}
-
-      {/* Agent Chat */}
-      <Box sx={{ mt: "auto" }}>
-        <Divider sx={{ mb: 1.5 }} />
-
-        <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
-          Agent Chat
-        </Typography>
-        <Box
-          ref={chatListRef}
-          sx={{
-            display: "flex",
-            flexDirection: "column",
-            gap: 0.75,
-            maxHeight: 190,
-            overflow: "auto",
-            pr: 0.5,
-          }}
-        >
-          {messages.map((m, i) => (
-            <Box
-              key={`${m.role}-${i}`}
-              sx={{
-                alignSelf: m.role === "user" ? "flex-end" : "flex-start",
-                maxWidth: "88%",
-                p: 1,
-                borderRadius: 2,
-                bgcolor: m.role === "user" ? "primary.main" : "action.selected",
-                color:
-                  m.role === "user" ? "primary.contrastText" : "text.primary",
-              }}
-            >
-              <Typography variant="caption" fontWeight={700} display="block">
-                {m.role === "agent" ? "Agent" : "You"}
+            ))}
+            {getMismatches(selectedFigureData).map((c, i) => (
+              <Typography
+                key={`d-${i}`}
+                variant="caption"
+                color="text.secondary"
+                display="block"
+              >
+                - {c}
               </Typography>
-              <Typography variant="body2">{m.text}</Typography>
-            </Box>
-          ))}
-        </Box>
-        <Box
-          component="form"
-          onSubmit={handleSend}
-          sx={{ display: "flex", gap: 1, mt: 1 }}
-        >
-          <TextField
-            size="small"
-            fullWidth
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            placeholder="Ask the agent about figure discrepancies..."
-          />
-          <IconButton
-            type="submit"
-            size="small"
-            color="primary"
-            disabled={!draft.trim()}
-          >
-            <SendIcon />
-          </IconButton>
-        </Box>
-      </Box>
-    </Box>
+            ))}
+          </Box>
+        )}
+      </Stack>
+    </TabContentWithChat>
   );
 }
 
@@ -2170,7 +1972,10 @@ export const AgentPanel = ({
   const [result, setResult] = useState<ValidationResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [graphData, setGraphData] = useState<NodeLinkGraph | null>(null);
-  const [graphAnalysis, setGraphAnalysis] = useState<GraphAnalysis | null>(null);
+  const [graphAnalysis, setGraphAnalysis] = useState<GraphAnalysis | null>(
+    null,
+  );
+  const [chatMessages, setChatMessages] = useState<AgentChatMessage[]>([]);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -2220,6 +2025,7 @@ export const AgentPanel = ({
     setResult(null);
     setGraphData(null);
     setGraphAnalysis(null);
+    setChatMessages([]);
 
     try {
       const response = await pipelineAPI.validate({
@@ -2254,6 +2060,12 @@ export const AgentPanel = ({
                 setGraphAnalysis(analysisRes.data);
               } catch {
                 // Graph analysis is optional
+              }
+              try {
+                const messagesRes = await pipelineAPI.messages(newJobId);
+                setChatMessages(messagesRes.data);
+              } catch {
+                // Chat messages are optional
               }
             }
           }
@@ -2335,7 +2147,7 @@ export const AgentPanel = ({
       >
         <Tab
           value="validate"
-          label="Validate"
+          label="Validation"
           icon={<ValidateIcon sx={{ fontSize: "0.85rem" }} />}
           iconPosition="start"
         />
@@ -2371,7 +2183,9 @@ export const AgentPanel = ({
 
       <Divider />
 
-      <Box sx={{ flex: 1, minHeight: 0, minWidth: 0, overflow: "auto", p: 1.5 }}>
+      <Box
+        sx={{ flex: 1, minHeight: 0, minWidth: 0, overflow: "auto", p: 1.5 }}
+      >
         {safeTab === "validate" && (
           <ValidateContent
             content={content}
@@ -2380,19 +2194,29 @@ export const AgentPanel = ({
             error={error}
             onRun={handleRun}
             graphAnalysis={graphAnalysis}
+            chatMessages={chatMessages}
           />
         )}
         {safeTab === "math" && (
-          <MathContent result={result} graph={graphData} />
+          <MathContent
+            result={result}
+            graph={graphData}
+            chatMessages={chatMessages}
+          />
         )}
         {safeTab === "citations" && (
-          <CitationsContent result={result} graph={graphData} />
+          <CitationsContent
+            result={result}
+            graph={graphData}
+            chatMessages={chatMessages}
+          />
         )}
         {safeTab === "figures" && (
           <FiguresContent
             result={result}
             jobId={job?.job_id ?? null}
             graph={graphData}
+            chatMessages={chatMessages}
           />
         )}
         {safeTab === "graph" && <GraphContent graph={graphData} job={job} />}

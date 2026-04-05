@@ -172,6 +172,18 @@ export interface GraphAnalysis {
   }>;
 }
 
+// Agent chat message types
+export type AgentChatCategory = "validation" | "equations" | "citations" | "figures";
+
+export interface AgentChatMessage {
+  id: string;
+  category: AgentChatCategory;
+  target_id: string;
+  role: "user" | "agent";
+  text: string;
+  created_at: string;
+}
+
 // Paper graph types (from NetworkX node_link_data format)
 export type GraphNodeType =
   | "paper"

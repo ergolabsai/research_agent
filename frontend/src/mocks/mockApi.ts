@@ -82,6 +82,34 @@ interface PipelineFigureAssetRecord {
   };
 }
 
+interface AgentChatMessageRecord {
+  id: string;
+  category: "validation" | "equations" | "citations" | "figures";
+  target_id: string;
+  role: "user" | "agent";
+  text: string;
+  created_at: string;
+}
+
+const MOCK_CHAT_MESSAGES: AgentChatMessageRecord[] = [
+  {
+    id: "msg-1",
+    category: "equations",
+    target_id: "math:Discussion section, paragraph discussing Franck-Condon overlaps",
+    role: "user",
+    text: "What kind of simulation or analysis would you propose that we run to assess the validity of this section?",
+    created_at: "2026-04-05T10:32:00Z",
+  },
+  {
+    id: "msg-2",
+    category: "equations",
+    target_id: "math:Discussion section, paragraph discussing Franck-Condon overlaps",
+    role: "agent",
+    text: "AGENT RESPONSE HERE",
+    created_at: "2026-04-05T10:32:05Z",
+  },
+];
+
 const STEP_NAMES = [
   "make_context",
   "gather_papers",
@@ -755,6 +783,16 @@ export function setupMockApi(): void {
         return [200, structuredClone(graphAnalysisResult)];
       }
       return [404, { detail: "Analysis not found" }];
+    });
+
+  apiMock
+    .onGet(/\/pipeline\/messages\/.+$/)
+    .reply((config: AxiosRequestConfig) => {
+      const jobId = config.url?.split("/").pop() ?? "";
+      if (pipelineResults.has(jobId)) {
+        return [200, MOCK_CHAT_MESSAGES];
+      }
+      return [200, []];
     });
 
   apiMock.onGet("/pipeline/jobs").reply(() => {
