@@ -1,4 +1,7 @@
 import {
+  Accordion,
+  AccordionDetails,
+  AccordionSummary,
   Box,
   Stack,
   Typography,
@@ -28,6 +31,7 @@ import {
   Cancel as InvalidIcon,
   Close as CloseIcon,
   ZoomOutMap as ZoomIcon,
+  ExpandMore as ExpandMoreIcon,
 } from "@mui/icons-material";
 import {
   FormEvent,
@@ -41,6 +45,7 @@ import { pipelineAPI } from "../api";
 import {
   PipelineJob,
   ValidationResult,
+  GraphAnalysis,
   NodeLinkGraph,
   normalizeGraph,
 } from "../types";
@@ -48,6 +53,7 @@ import { GraphContent } from "./GraphContent";
 import { AccountTree as GraphTabIcon } from "@mui/icons-material";
 import { renderMathToHtml } from "../utils/katexRenderer";
 import { useTheme as useAppTheme } from "../theme";
+import { MarkdownRenderer } from "./MarkdownRenderer";
 
 export type AgentTab = "validate" | "math" | "citations" | "figures" | "graph";
 
@@ -531,12 +537,14 @@ function ValidateContent({
   result,
   error,
   onRun,
+  graphAnalysis,
 }: {
   content: string;
   job: PipelineJob | null;
   result: ValidationResult | null;
   error: string | null;
   onRun: () => void;
+  graphAnalysis: GraphAnalysis | null;
 }) {
   const theme = useTheme();
   const isRunning = job?.status === "running" || job?.status === "pending";
@@ -732,18 +740,112 @@ function ValidateContent({
             color={scoreColor as "success" | "warning" | "error"}
           />
         </Stack>
-        <Typography
-          variant="body2"
-          color="text.secondary"
-          sx={{ mb: 2, lineHeight: 1.6 }}
-        >
-          {result.overall_assessment?.review}
-        </Typography>
+
+        {/* Validation Results accordion */}
+        <Accordion defaultExpanded disableGutters elevation={0} sx={{ border: 1, borderColor: "divider", borderRadius: 1, "&:before": { display: "none" }, mb: 1.5 }}>
+          <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ minHeight: 40, "& .MuiAccordionSummary-content": { my: 0.5 } }}>
+            <Typography variant="subtitle2" fontWeight={700}>
+              Validation Results
+            </Typography>
+          </AccordionSummary>
+          <AccordionDetails sx={{ pt: 0, px: 2, pb: 1.5 }}>
+            {result.overall_assessment?.review ? (
+              <MarkdownRenderer>{result.overall_assessment.review}</MarkdownRenderer>
+            ) : (
+              <Typography variant="body2" color="text.secondary">
+                No review available.
+              </Typography>
+            )}
+          </AccordionDetails>
+        </Accordion>
+
+        {/* Graph Analysis accordion */}
+        <Accordion disableGutters elevation={0} sx={{ border: 1, borderColor: "divider", borderRadius: 1, "&:before": { display: "none" }, mb: 1.5 }}>
+          <AccordionSummary expandIcon={<ExpandMoreIcon />} sx={{ minHeight: 40, "& .MuiAccordionSummary-content": { my: 0.5 } }}>
+            <Typography variant="subtitle2" fontWeight={700}>
+              Graph Analysis
+            </Typography>
+          </AccordionSummary>
+          <AccordionDetails sx={{ pt: 0, px: 2, pb: 1.5 }}>
+            {graphAnalysis ? (
+              <Box>
+                {/* Node counts */}
+                <Stack direction="row" flexWrap="wrap" gap={0.75} sx={{ mb: 1.5 }}>
+                  <Chip label={`${graphAnalysis.node_counts.steps} steps`} size="small" variant="outlined" />
+                  <Chip label={`${graphAnalysis.node_counts.evidence} evidence`} size="small" variant="outlined" />
+                  <Chip label={`${graphAnalysis.node_counts.figures} figures`} size="small" variant="outlined" />
+                  <Chip label={`${graphAnalysis.node_counts.math} math`} size="small" variant="outlined" />
+                  <Chip label={`${graphAnalysis.node_counts.related_papers} citations`} size="small" variant="outlined" />
+                </Stack>
+
+                {/* Steps with no evaluations */}
+                {graphAnalysis.steps_without_evaluation.length > 0 && (
+                  <Box sx={{ mb: 1.5 }}>
+                    <Typography variant="caption" fontWeight={700} sx={{ mb: 0.5, display: "block" }}>
+                      Steps with no evaluations ({graphAnalysis.steps_without_evaluation.length})
+                    </Typography>
+                    {graphAnalysis.steps_without_evaluation.map((s) => (
+                      <Typography key={s.step_number} variant="body2" color="text.secondary" sx={{ mb: 0.25 }}>
+                        Step {s.step_number}: {s.description}
+                      </Typography>
+                    ))}
+                  </Box>
+                )}
+
+                {/* Contradicted steps */}
+                {graphAnalysis.contradicted_steps.length > 0 && (
+                  <Box>
+                    <Typography variant="caption" fontWeight={700} sx={{ mb: 0.5, display: "block" }}>
+                      Contradicted steps ({graphAnalysis.contradicted_steps.length})
+                    </Typography>
+                    {graphAnalysis.contradicted_steps.map((cs, idx) => (
+                      <Accordion
+                        key={`${cs.step_number}-${cs.figure}-${idx}`}
+                        disableGutters
+                        elevation={0}
+                        sx={{
+                          border: 1,
+                          borderColor: "divider",
+                          borderRadius: 1,
+                          "&:before": { display: "none" },
+                          mb: 0.5,
+                        }}
+                      >
+                        <AccordionSummary
+                          expandIcon={<ExpandMoreIcon sx={{ fontSize: "1rem" }} />}
+                          sx={{ minHeight: 32, py: 0, "& .MuiAccordionSummary-content": { my: 0.25 } }}
+                        >
+                          <Typography variant="caption" color="text.secondary">
+                            Step {cs.step_number} ({cs.figure})
+                          </Typography>
+                        </AccordionSummary>
+                        <AccordionDetails sx={{ pt: 0, px: 1.5, pb: 1 }}>
+                          <Box component="ul" sx={{ pl: 2, m: 0 }}>
+                            {cs.contradictions.map((c, ci) => (
+                              <Typography key={ci} component="li" variant="caption" color="text.secondary" sx={{ mb: 0.5, lineHeight: 1.5 }}>
+                                {c}
+                              </Typography>
+                            ))}
+                          </Box>
+                        </AccordionDetails>
+                      </Accordion>
+                    ))}
+                  </Box>
+                )}
+              </Box>
+            ) : (
+              <Typography variant="body2" color="text.secondary">
+                No graph analysis available.
+              </Typography>
+            )}
+          </AccordionDetails>
+        </Accordion>
+
         <Button
           variant="outlined"
           size="small"
           fullWidth
-          sx={{ mt: 1 }}
+          sx={{ mt: 0.5 }}
           onClick={onRun}
           startIcon={<RunIcon />}
         >
@@ -2068,6 +2170,7 @@ export const AgentPanel = ({
   const [result, setResult] = useState<ValidationResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [graphData, setGraphData] = useState<NodeLinkGraph | null>(null);
+  const [graphAnalysis, setGraphAnalysis] = useState<GraphAnalysis | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -2116,6 +2219,7 @@ export const AgentPanel = ({
     setError(null);
     setResult(null);
     setGraphData(null);
+    setGraphAnalysis(null);
 
     try {
       const response = await pipelineAPI.validate({
@@ -2144,6 +2248,12 @@ export const AgentPanel = ({
                 setGraphData(normalizeGraph(graphRes.data));
               } catch {
                 // Graph data is optional — don't block on failure
+              }
+              try {
+                const analysisRes = await pipelineAPI.analysis(newJobId);
+                setGraphAnalysis(analysisRes.data);
+              } catch {
+                // Graph analysis is optional
               }
             }
           }
@@ -2269,6 +2379,7 @@ export const AgentPanel = ({
             result={result}
             error={error}
             onRun={handleRun}
+            graphAnalysis={graphAnalysis}
           />
         )}
         {safeTab === "math" && (

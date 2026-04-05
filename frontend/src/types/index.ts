@@ -153,6 +153,25 @@ export interface ValidationResult {
   related_papers?: RelatedPaper[];
 }
 
+export interface GraphAnalysis {
+  node_counts: {
+    steps: number;
+    evidence: number;
+    figures: number;
+    math: number;
+    related_papers: number;
+  };
+  steps_without_evaluation: Array<{
+    step_number: number;
+    description: string;
+  }>;
+  contradicted_steps: Array<{
+    step_number: number;
+    figure: string;
+    contradictions: string[];
+  }>;
+}
+
 // Paper graph types (from NetworkX node_link_data format)
 export type GraphNodeType =
   | "paper"

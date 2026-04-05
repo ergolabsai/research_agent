@@ -14,6 +14,7 @@ import axios, { type AxiosRequestConfig } from "axios";
 import api from "../api/client";
 import { MOCK_AGENTS } from "./agentConfig";
 import { validationResult } from "./fixtures";
+import { graphAnalysisResult } from "./graphAnalysisFixture";
 import paperGraph from "./paper_graph.json";
 import { demoPaperContentString, demoPaperTitle } from "./demoPaperContent";
 
@@ -744,6 +745,16 @@ export function setupMockApi(): void {
       const jobId = config.url?.split("/").pop() ?? "";
       const figures = pipelineFigureAssets.get(jobId) ?? [];
       return [200, { job_id: jobId, figures }];
+    });
+
+  apiMock
+    .onGet(/\/pipeline\/analysis\/.+$/)
+    .reply((config: AxiosRequestConfig) => {
+      const jobId = config.url?.split("/").pop() ?? "";
+      if (pipelineResults.has(jobId)) {
+        return [200, structuredClone(graphAnalysisResult)];
+      }
+      return [404, { detail: "Analysis not found" }];
     });
 
   apiMock.onGet("/pipeline/jobs").reply(() => {
