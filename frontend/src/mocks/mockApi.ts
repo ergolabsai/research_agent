@@ -95,17 +95,19 @@ const MOCK_CHAT_MESSAGES: AgentChatMessageRecord[] = [
   {
     id: "msg-1",
     category: "equations",
-    target_id: "math:Discussion section, paragraph discussing Franck-Condon overlaps",
+    target_id:
+      "math:Discussion section, paragraph discussing Franck-Condon overlaps",
     role: "user",
-    text: "What kind of simulation or analysis would you propose that we run to assess the validity of this section?",
+    text: "What kind of simulation or analysis would you propose that we run to improve the validity of this section?",
     created_at: "2026-04-05T10:32:00Z",
   },
   {
     id: "msg-2",
     category: "equations",
-    target_id: "math:Discussion section, paragraph discussing Franck-Condon overlaps",
+    target_id:
+      "math:Discussion section, paragraph discussing Franck-Condon overlaps",
     role: "agent",
-    text: "AGENT RESPONSE HERE",
+    text: "The validation flagged this section as incomplete because the paper argues qualitatively that Franck-Condon overlaps between the neutral and dication are \"distorted\" by core-hole dynamics, but never quantifies the effect. Here are three computational approaches that would close that gap, in order of increasing ambition:\n\n**1. Time-dependent wavepacket propagation on the core-ionized cation surface**\n\nThe paper already computed the bending potential for the \u00b2\u03a3\u1d64\u207b core-excited cation (Fig. 3i) and showed qualitative wavepacket broadening over ~6 fs. A proper simulation would:\n- Start from the neutral ground-state vibrational wavefunction (on the double-well \u00b9\u03a3g\u207a surface)\n- Propagate it on the core-ionized cation PES for a distribution of Auger lifetimes (exponential decay, \u03c4 \u2248 6 fs)\n- At each Auger decay time, project the evolved wavepacket onto the dication \u00b9\u03a3g\u207a surface via Franck-Condon overlaps\n- Compare the resulting kinetic energy distribution against the 2.3 eV isomerization barrier\n\nThis directly tests the paper's central claim: does the geometry change + acquired momentum during the core-hole lifetime provide enough extra kinetic energy to explain the 12 fs onset?\n\n**2. Classical trajectory Monte Carlo on the dication surface**\n\nAs an alternative to full quantum dynamics:\n- Sample initial positions and momenta from the wavepacket at the moment of Auger decay (from simulation #1)\n- Run classical trajectories on the dication \u00b9\u03a3g\u207a PES along the isomerization coordinate\n- Compare isomerization yields and timescales for two cases: (a) standard Franck-Condon initial conditions (vertical projection from neutral equilibrium) vs. (b) core-hole-modified initial conditions\n- This would quantify exactly how much the core-hole evolution accelerates isomerization\n\n**3. Coulomb explosion momentum imaging simulation**\n\nThe paper's observable (CCD angle \u03b8 from fragment momenta) is only an approximate proxy for molecular geometry. A simulation that maps actual molecular geometries through the tetracation Coulomb explosion to final fragment momenta would:\n- Validate whether the measured \u03b8 distributions reliably reflect the bending angle\n- Quantify the systematic uncertainty from fragment rotation effects (the caveat in Step 8)\n- Allow direct comparison of simulated momentum distributions with experimental panels Fig. 3b\u2013f\n\nThe most impactful would be approach #1, since it directly addresses the validation gap: the paper claims the Franck-Condon picture is distorted but doesn't compute by how much. Even a 1D wavepacket propagation along the bending coordinate using the potentials already shown in Fig. 3i would significantly strengthen the argument.",
     created_at: "2026-04-05T10:32:05Z",
   },
 ];
@@ -340,9 +342,13 @@ function buildMockFigureAssets(): PipelineFigureAssetRecord[] {
   const graphFigureNames = paperGraph.nodes
     .filter((n: { node_type: string }) => n.node_type === "figure")
     .map((n: { figure_name?: string }) => String(n.figure_name ?? ""));
-  const resultFigureNames = Object.values(validationResult.step_validations)
-    .flatMap((step) => (step.figure_validations ?? []).map((f) => f.figure_name));
-  const names = graphFigureNames.length > 0 ? graphFigureNames : resultFigureNames;
+  const resultFigureNames = Object.values(
+    validationResult.step_validations,
+  ).flatMap((step) =>
+    (step.figure_validations ?? []).map((f) => f.figure_name),
+  );
+  const names =
+    graphFigureNames.length > 0 ? graphFigureNames : resultFigureNames;
 
   return names.map((figureName, idx) => {
     // Try to import from mocks/figures/ — the user places real images there
@@ -360,8 +366,14 @@ function buildMockFigureAssets(): PipelineFigureAssetRecord[] {
         submittedUrl = figureModules[key].default;
       }
       // Look for _expected variant (e.g. excitation_scheme_expected.jpg)
-      const ext = figureName.lastIndexOf(".") >= 0 ? figureName.slice(figureName.lastIndexOf(".")) : "";
-      const base = figureName.lastIndexOf(".") >= 0 ? figureName.slice(0, figureName.lastIndexOf(".")) : figureName;
+      const ext =
+        figureName.lastIndexOf(".") >= 0
+          ? figureName.slice(figureName.lastIndexOf("."))
+          : "";
+      const base =
+        figureName.lastIndexOf(".") >= 0
+          ? figureName.slice(0, figureName.lastIndexOf("."))
+          : figureName;
       const expectedKey = `./figures/${base}_expected${ext}`;
       if (figureModules[expectedKey]) {
         predictedUrl = figureModules[expectedKey].default;
@@ -375,12 +387,16 @@ function buildMockFigureAssets(): PipelineFigureAssetRecord[] {
       submitted: {
         filename: figureName,
         media_type: "image/jpeg",
-        url: submittedUrl ?? makeMockFigureDataUrl(figureName, idx + 1, "submitted"),
+        url:
+          submittedUrl ??
+          makeMockFigureDataUrl(figureName, idx + 1, "submitted"),
       },
       predicted: {
         filename: `${figureName}-predicted`,
         media_type: "image/png",
-        url: predictedUrl ?? makeMockFigureDataUrl(figureName, idx + 1, "predicted"),
+        url:
+          predictedUrl ??
+          makeMockFigureDataUrl(figureName, idx + 1, "predicted"),
       },
     };
   });

@@ -47,6 +47,7 @@ import { AccountTree as GraphTabIcon } from "@mui/icons-material";
 import { renderMathToHtml } from "../utils/katexRenderer";
 import { useTheme as useAppTheme } from "../theme";
 import { MarkdownRenderer } from "./MarkdownRenderer";
+import { formatMathDetails } from "../utils/formatMathDetails";
 
 export type AgentTab = "validate" | "math" | "citations" | "figures" | "graph";
 
@@ -1049,161 +1050,166 @@ function MathContent({
         placeholder: "Ask the agent about an equation...",
       }}
     >
-      <Stack spacing={2}>
-        {/* Equation Hero Display */}
-        {!!selectedEquation && (
-          <Box
-            sx={{
-              px: 2,
-              py: 1.5,
-              borderRadius: 1.5,
-              border: 1,
-              borderColor: "divider",
-              background: `linear-gradient(135deg, ${theme.palette.primary.main}10 0%, ${theme.palette.secondary.main}20 100%)`,
-              textAlign: "center",
-            }}
-          >
-            <Typography
-              variant="caption"
-              sx={{
-                display: "block",
-                fontWeight: 700,
-                letterSpacing: "0.08em",
-                mb: 0.75,
-                color: "text.secondary",
-              }}
-            >
-              {selectedEquation.equation_reference}
-            </Typography>
-            {selectedEquation.equation_latex ? (
-              <ScaledKatex latex={selectedEquation.equation_latex} />
-            ) : (
-              <Typography
+      <Box sx={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
+        {/* Pinned: Hero + Details (do not scroll with list) */}
+        <Box sx={{ flexShrink: 0 }}>
+          <Stack spacing={2}>
+            {/* Equation Hero Display */}
+            {!!selectedEquation && (
+              <Box
                 sx={{
-                  fontFamily: "'IBM Plex Serif', serif",
-                  fontSize: { xs: "1.15rem", sm: "1.35rem" },
-                  lineHeight: 1.25,
-                  color: "text.primary",
+                  px: 2,
+                  py: 1.5,
+                  borderRadius: 1.5,
+                  border: 1,
+                  borderColor: "divider",
+                  background: `linear-gradient(135deg, ${theme.palette.primary.main}10 0%, ${theme.palette.secondary.main}20 100%)`,
+                  textAlign: "center",
                 }}
               >
-                {selectedEquation.equation_text ??
-                  selectedEquation.equation_reference}
-              </Typography>
+                <Typography
+                  variant="caption"
+                  sx={{
+                    display: "block",
+                    fontWeight: 700,
+                    letterSpacing: "0.08em",
+                    mb: 0.75,
+                    color: "text.secondary",
+                  }}
+                >
+                  {selectedEquation.equation_reference}
+                </Typography>
+                {selectedEquation.equation_latex ? (
+                  <ScaledKatex latex={selectedEquation.equation_latex} />
+                ) : (
+                  <Typography
+                    sx={{
+                      fontFamily: "'IBM Plex Serif', serif",
+                      fontSize: { xs: "1.15rem", sm: "1.35rem" },
+                      lineHeight: 1.25,
+                      color: "text.primary",
+                    }}
+                  >
+                    {selectedEquation.equation_text ??
+                      selectedEquation.equation_reference}
+                  </Typography>
+                )}
+              </Box>
             )}
-          </Box>
-        )}
+
+            {/* Detail Panel */}
+            {!!selectedEquation && (
+              <Box
+                sx={{
+                  p: 1.25,
+                  borderRadius: 1,
+                  border: 1,
+                  borderColor: "divider",
+                  bgcolor: "background.default",
+                  maxHeight: 220,
+                  overflow: "auto",
+                }}
+              >
+                <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 0.75 }}>
+                  Selected Equation Details
+                </Typography>
+                <Stack
+                  direction="row"
+                  spacing={1}
+                  alignItems="center"
+                  sx={{ mb: 0.5 }}
+                >
+                  <Typography variant="body2" fontWeight={700}>
+                    {selectedEquation.equation_reference}
+                  </Typography>
+                  <Chip
+                    label={selectedEquation.calculation_valid ? "Valid" : "Invalid"}
+                    size="small"
+                    color={selectedEquation.calculation_valid ? "success" : "error"}
+                  />
+                </Stack>
+                <Box sx={{ fontSize: "0.75rem", "& h3": { fontSize: "0.8rem", mt: 1.5, mb: 0.25 }, "& p": { fontSize: "0.75rem", mb: 0.5 }, "& li": { fontSize: "0.75rem" }, "& ul": { pl: 1.5 } }}>
+                  <MarkdownRenderer>
+                    {formatMathDetails(selectedEquation.details)}
+                  </MarkdownRenderer>
+                </Box>
+                {selectedEquation.formula_used && (
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    display="block"
+                    sx={{ mt: 0.5 }}
+                  >
+                    <strong>Formula:</strong> {selectedEquation.formula_used}
+                  </Typography>
+                )}
+              </Box>
+            )}
+          </Stack>
+        </Box>
 
         {allMath.length === 0 && (
-          <Typography variant="body2" color="text.secondary">
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
             No math validation data available yet. Showing demo equation
             placeholders.
           </Typography>
         )}
 
-        {/* Equation List */}
-        <Stack spacing={1}>
-          {displayedMath.map((eq, idx) => (
-            <Box
-              key={`${eqKey(eq)}-${idx}`}
-              onClick={() => handleSelectEquation(eq)}
-              sx={{
-                p: 1.25,
-                borderRadius: 1,
-                border: 1,
-                borderColor:
-                  selectedEq === eqKey(eq) ? "primary.main" : "divider",
-                cursor: "pointer",
-                bgcolor:
-                  selectedEq === eqKey(eq) ? "action.selected" : "transparent",
-                "&:hover": { bgcolor: "action.hover" },
-              }}
-            >
-              <Stack
-                direction="row"
-                justifyContent="space-between"
-                sx={{ mb: 0.5 }}
+        {/* Equation List — scrolls independently */}
+        <Box sx={{ flex: 1, minHeight: 0, overflow: "auto", mt: 2 }}>
+          <Stack spacing={1}>
+            {displayedMath.map((eq, idx) => (
+              <Box
+                key={`${eqKey(eq)}-${idx}`}
+                onClick={() => handleSelectEquation(eq)}
+                sx={{
+                  p: 1.25,
+                  borderRadius: 1,
+                  border: 1,
+                  borderColor:
+                    selectedEq === eqKey(eq) ? "primary.main" : "divider",
+                  cursor: "pointer",
+                  bgcolor:
+                    selectedEq === eqKey(eq) ? "action.selected" : "transparent",
+                  "&:hover": { bgcolor: "action.hover" },
+                }}
               >
-                <Typography variant="body2" fontWeight={700}>
-                  {eq.equation_reference}
-                </Typography>
-                <Chip
-                  label={eq.calculation_valid ? "Valid" : "Invalid"}
-                  size="small"
-                  color={eq.calculation_valid ? "success" : "error"}
-                  icon={
-                    eq.calculation_valid ? (
-                      <ValidIcon fontSize="small" />
-                    ) : (
-                      <InvalidIcon fontSize="small" />
-                    )
-                  }
-                />
-              </Stack>
-              {eq.formula_used && (
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  display="block"
-                  noWrap
+                <Stack
+                  direction="row"
+                  justifyContent="space-between"
+                  sx={{ mb: 0.5 }}
                 >
-                  {eq.formula_used}
-                </Typography>
-              )}
-            </Box>
-          ))}
-        </Stack>
-
-        {/* Detail Panel */}
-        {!!selectedEquation && (
-          <Box
-            sx={{
-              p: 1.25,
-              borderRadius: 1,
-              border: 1,
-              borderColor: "divider",
-              bgcolor: "background.default",
-              maxHeight: 220,
-              overflow: "auto",
-            }}
-          >
-            <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 0.75 }}>
-              Selected Equation Details
-            </Typography>
-            <Stack
-              direction="row"
-              spacing={1}
-              alignItems="center"
-              sx={{ mb: 0.5 }}
-            >
-              <Typography variant="body2" fontWeight={700}>
-                {selectedEquation.equation_reference}
-              </Typography>
-              <Chip
-                label={selectedEquation.calculation_valid ? "Valid" : "Invalid"}
-                size="small"
-                color={selectedEquation.calculation_valid ? "success" : "error"}
-              />
-            </Stack>
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              display="block"
-            >
-              {selectedEquation.details}
-            </Typography>
-            {selectedEquation.formula_used && (
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                display="block"
-                sx={{ mt: 0.5 }}
-              >
-                <strong>Formula:</strong> {selectedEquation.formula_used}
-              </Typography>
-            )}
-          </Box>
-        )}
-      </Stack>
+                  <Typography variant="body2" fontWeight={700}>
+                    {eq.equation_reference}
+                  </Typography>
+                  <Chip
+                    label={eq.calculation_valid ? "Valid" : "Invalid"}
+                    size="small"
+                    color={eq.calculation_valid ? "success" : "error"}
+                    icon={
+                      eq.calculation_valid ? (
+                        <ValidIcon fontSize="small" />
+                      ) : (
+                        <InvalidIcon fontSize="small" />
+                      )
+                    }
+                  />
+                </Stack>
+                {eq.formula_used && (
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    display="block"
+                    noWrap
+                  >
+                    {eq.formula_used}
+                  </Typography>
+                )}
+              </Box>
+            ))}
+          </Stack>
+        </Box>
+      </Box>
     </TabContentWithChat>
   );
 }

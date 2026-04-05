@@ -8,6 +8,7 @@ import {
 import { Send as SendIcon } from "@mui/icons-material";
 import { FormEvent, ReactNode, useCallback, useEffect, useRef, useState } from "react";
 import type { AgentChatCategory, AgentChatMessage } from "../types";
+import { MarkdownRenderer } from "./MarkdownRenderer";
 
 interface ChatBubble {
   role: "user" | "agent";
@@ -185,7 +186,13 @@ export function AgentChat({
             <Typography variant="caption" fontWeight={700} display="block">
               {m.role === "agent" ? "Agent" : "You"}
             </Typography>
-            <Typography variant="body2">{m.text}</Typography>
+            {m.role === "agent" ? (
+              <Box sx={{ fontSize: "0.875rem", "& h3": { fontSize: "0.9rem", mt: 1.5, mb: 0.25 }, "& p": { fontSize: "0.875rem", mb: 0.5 }, "& li": { fontSize: "0.875rem" }, "& ul": { pl: 1.5 } }}>
+                <MarkdownRenderer>{m.text}</MarkdownRenderer>
+              </Box>
+            ) : (
+              <Typography variant="body2">{m.text}</Typography>
+            )}
           </Box>
         ))}
       </Box>

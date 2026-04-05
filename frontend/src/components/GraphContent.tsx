@@ -24,6 +24,8 @@ import {
   ExpandMore as ExpandMoreIcon,
   ChevronRight as ChevronRightIcon,
 } from "@mui/icons-material";
+import { MarkdownRenderer } from "./MarkdownRenderer";
+import { formatMathDetails } from "../utils/formatMathDetails";
 import ForceGraph2D from "react-force-graph-2d";
 import type { LinkObject, NodeObject } from "react-force-graph-2d";
 import {
@@ -194,15 +196,11 @@ function getNodeLabelParts(node: Record<string, unknown>): {
       };
     }
     case "math": {
-      const eqRef = (node.equation_reference as string) ?? "";
-      const colonIdx = eqRef.indexOf(":");
-      if (colonIdx !== -1) {
-        return {
-          prefix: eqRef.slice(0, colonIdx + 1),
-          suffix: eqRef.slice(colonIdx + 1),
-        };
-      }
-      return { prefix: eqRef, suffix: "" };
+      const eqRef = ((node.equation_reference as string) ?? "").trim();
+      return {
+        prefix: "Math:",
+        suffix: eqRef ? ` ${eqRef}` : "",
+      };
     }
     case "related_paper":
       return {
@@ -312,8 +310,6 @@ function getNodeDetails(
           label: "Valid",
           value: node.calculation_valid ? "Yes" : "No",
         });
-      if (node.details)
-        out.push({ label: "Details", value: String(node.details) });
       if (node.formula_used)
         out.push({ label: "Formula", value: String(node.formula_used) });
       break;
@@ -550,6 +546,14 @@ function NodeDetailPanel({
             </Typography>
           </Box>
         ))}
+        {nodeType === "math" && node.details && (
+          <Box sx={{ mt: 0.5, fontSize: "0.75rem", "& h3": { fontSize: "0.8rem", mt: 1.5, mb: 0.25 }, "& p": { fontSize: "0.75rem", mb: 0.5 }, "& li": { fontSize: "0.75rem" }, "& ul": { pl: 1.5 } }}>
+            <Divider sx={{ mb: 0.75 }} />
+            <MarkdownRenderer>
+              {formatMathDetails(String(node.details))}
+            </MarkdownRenderer>
+          </Box>
+        )}
       </Box>
 
       {neighbors.length > 0 && (
@@ -881,14 +885,27 @@ function GraphMode({
       const y = node.y ?? 0;
       const r = nodeType === "paper" ? 8 : nodeType === "step" ? 6 : 4;
 
+      const isInvalid = nodeType === "math" && n.calculation_valid === false;
+
       // Node circle
       ctx.beginPath();
       ctx.arc(x, y, r, 0, 2 * Math.PI);
       ctx.fillStyle = color;
       ctx.fill();
 
+      // Red ring for invalid math nodes
+      if (isInvalid) {
+        ctx.beginPath();
+        ctx.arc(x, y, r + 1.5, 0, 2 * Math.PI);
+        ctx.strokeStyle = theme.palette.error.main;
+        ctx.lineWidth = 3.5 / globalScale;
+        ctx.stroke();
+      }
+
       // Highlight selected
       if (selectedNode && String(n.id) === String(selectedNode.id)) {
+        ctx.beginPath();
+        ctx.arc(x, y, r + (isInvalid ? 4 : 2), 0, 2 * Math.PI);
         ctx.strokeStyle = theme.palette.mode === "dark" ? "#fff" : "#000";
         ctx.lineWidth = 2 / globalScale;
         ctx.stroke();
@@ -998,7 +1015,12 @@ function GraphMode({
         linkDirectionalArrowColor={linkColor}
         linkDirectionalArrowLength={4}
         linkDirectionalArrowRelPos={1}
-        linkWidth={1}
+        linkLineDash={(link: Record<string, unknown>) =>
+          link.calculation_valid === false ? [4, 2] : null
+        }
+        linkWidth={(link: Record<string, unknown>) =>
+          link.calculation_valid === false ? 2.5 : 1.5
+        }
         onNodeClick={handleNodeClick}
         onBackgroundClick={handleBgClick}
         enableNodeDrag
@@ -1184,7 +1206,7 @@ export function GraphContent({ graph, job }: GraphContentProps) {
                 fontWeight={700}
                 color="text.secondary"
               >
-                Show
+                Edge Label
               </Typography>
             }
           />
