@@ -54,6 +54,7 @@ import { renderMathToHtml } from "../utils/katexRenderer";
 import { useTheme as useAppTheme } from "../theme";
 import { MarkdownRenderer } from "./MarkdownRenderer";
 import { formatMathDetails } from "../utils/formatMathDetails";
+import { darkModeImgSx } from "../utils/darkModeImageFilter";
 
 export type AgentTab = "validate" | "math" | "citations" | "figures" | "graph";
 
@@ -270,6 +271,7 @@ function ZoomableFigureCard({
   alt: string;
   placeholder: ReactNode;
 }) {
+  const theme = useTheme();
   const [isOpen, setIsOpen] = useState(false);
   const [scale, setScale] = useState(1);
   const [offset, setOffset] = useState({ x: 0, y: 0 });
@@ -367,6 +369,7 @@ function ZoomableFigureCard({
       transformOrigin: "center center",
       transition: dragRef.current ? "none" : "transform 160ms ease",
       pointerEvents: "none" as const,
+      ...darkModeImgSx(theme.palette.mode),
     };
 
     if (imageUrl) {

@@ -2,6 +2,7 @@ import { Box, Typography, Divider, useTheme } from "@mui/material";
 import type { ContentJson, Block } from "../../types/contentJson";
 import type { Attachment } from "../../types";
 import { renderMathToHtml, renderInlineMath } from "../../utils/katexRenderer";
+import { darkModeImgSx } from "../../utils/darkModeImageFilter";
 
 interface RichViewProps {
   contentJson: ContentJson;
@@ -152,6 +153,7 @@ const BlockRenderer = ({ block, figureUrls }: { block: Block; figureUrls: Map<st
                 height: "auto",
                 mb: 1.5,
                 borderRadius: 1,
+                ...darkModeImgSx(theme.palette.mode),
               }}
             />
           ) : block.src ? (
