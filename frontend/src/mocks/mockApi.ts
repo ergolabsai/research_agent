@@ -56,6 +56,7 @@ interface AttachmentRecord {
   content_type: string;
   size: number;
   created_at: string;
+  url?: string;
 }
 
 interface PipelineJobRecord {
@@ -245,6 +246,26 @@ const workspaceMembers = new Map<
   [2, [{ user_id: 1, role: "owner" }]],
 ]);
 
+// Build mock image attachments for the demo paper (document 6)
+const figureImageModules = import.meta.glob<{ default: string }>(
+  "./figures/*",
+  { eager: true },
+);
+const demoFigureAttachments: AttachmentRecord[] = Object.entries(figureImageModules)
+  .filter(([key]) => !key.includes("_expected"))
+  .map(([key, mod], idx) => {
+    const filename = key.replace("./figures/", "");
+    return {
+      id: 100 + idx,
+      filename,
+      object_key: `attachments/6/${filename}`,
+      content_type: "image/jpeg",
+      size: 150000,
+      created_at: nowIso(),
+      url: mod.default,
+    };
+  });
+
 const attachmentsByDocument = new Map<number, AttachmentRecord[]>([
   [
     1,
@@ -259,6 +280,7 @@ const attachmentsByDocument = new Map<number, AttachmentRecord[]>([
       },
     ],
   ],
+  [6, demoFigureAttachments],
 ]);
 
 const pipelineJobs = new Map<string, PipelineJobRecord>();

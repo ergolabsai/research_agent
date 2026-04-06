@@ -1,14 +1,34 @@
 import { Box, Typography, Divider, useTheme } from "@mui/material";
 import type { ContentJson, Block } from "../../types/contentJson";
+import type { Attachment } from "../../types";
 import { renderMathToHtml, renderInlineMath } from "../../utils/katexRenderer";
 
 interface RichViewProps {
   contentJson: ContentJson;
+  attachments?: Attachment[];
 }
 
-export const RichView = ({ contentJson }: RichViewProps) => {
+/**
+ * Build a map from figure `src` (e.g. "excitation_scheme") to the
+ * attachment URL whose filename starts with that value.
+ */
+function buildFigureUrlMap(attachments: Attachment[]): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const att of attachments) {
+    if (!att.url || !att.content_type?.startsWith("image/")) continue;
+    // Strip extension to get the base name (e.g. "excitation_scheme.jpg" → "excitation_scheme")
+    const base = att.filename.replace(/\.[^.]+$/, "");
+    map.set(base, att.url);
+    // Also map full filename in case src includes extension
+    map.set(att.filename, att.url);
+  }
+  return map;
+}
+
+export const RichView = ({ contentJson, attachments = [] }: RichViewProps) => {
   const theme = useTheme();
   const { metadata, sections } = contentJson;
+  const figureUrls = buildFigureUrlMap(attachments);
 
   return (
     <Box sx={{ width: "100%", py: 2 }}>
@@ -50,7 +70,7 @@ export const RichView = ({ contentJson }: RichViewProps) => {
           )}
 
           {section.content.map((block, i) => (
-            <BlockRenderer key={`${section.id}-${i}`} block={block} />
+            <BlockRenderer key={`${section.id}-${i}`} block={block} figureUrls={figureUrls} />
           ))}
         </Box>
       ))}
@@ -60,7 +80,7 @@ export const RichView = ({ contentJson }: RichViewProps) => {
 
 // ---------------------------------------------------------------------------
 
-const BlockRenderer = ({ block }: { block: Block }) => {
+const BlockRenderer = ({ block, figureUrls }: { block: Block; figureUrls: Map<string, string> }) => {
   const theme = useTheme();
 
   switch (block.type) {
@@ -109,7 +129,8 @@ const BlockRenderer = ({ block }: { block: Block }) => {
         </Box>
       );
 
-    case "figure":
+    case "figure": {
+      const imageUrl = block.src ? figureUrls.get(block.src) : undefined;
       return (
         <Box
           sx={{
@@ -121,7 +142,19 @@ const BlockRenderer = ({ block }: { block: Block }) => {
             backgroundColor: theme.palette.background.default,
           }}
         >
-          {block.src && (
+          {imageUrl ? (
+            <Box
+              component="img"
+              src={imageUrl}
+              alt={block.alt || block.label || "Figure"}
+              sx={{
+                maxWidth: "100%",
+                height: "auto",
+                mb: 1.5,
+                borderRadius: 1,
+              }}
+            />
+          ) : block.src ? (
             <Box
               sx={{
                 mb: 1.5,
@@ -131,7 +164,7 @@ const BlockRenderer = ({ block }: { block: Block }) => {
             >
               [{block.label || "Figure"}: {block.src}]
             </Box>
-          )}
+          ) : null}
           <Typography
             variant="body2"
             color="text.secondary"
@@ -142,6 +175,7 @@ const BlockRenderer = ({ block }: { block: Block }) => {
           />
         </Box>
       );
+    }
 
     case "list":
       return (

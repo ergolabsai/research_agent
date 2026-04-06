@@ -393,7 +393,7 @@ export const EditorPage = () => {
           {contentJson ? (
             // Structured document — render based on view mode
             viewMode === "rich" ? (
-              <RichView contentJson={contentJson} />
+              <RichView contentJson={contentJson} attachments={attachments} />
             ) : viewMode === "json" ? (
               <JsonView
                 contentJson={contentJson}
