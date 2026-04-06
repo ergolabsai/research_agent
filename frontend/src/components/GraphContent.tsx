@@ -11,7 +11,6 @@ import {
   Stack,
   ToggleButton,
   ToggleButtonGroup,
-  Tooltip,
   Typography,
   useTheme,
 } from "@mui/material";
@@ -548,7 +547,16 @@ function NodeDetailPanel({
           </Box>
         ))}
         {nodeType === "math" && !!node.details && (
-          <Box sx={{ mt: 0.5, fontSize: "0.75rem", "& h3": { fontSize: "0.8rem", mt: 1.5, mb: 0.25 }, "& p": { fontSize: "0.75rem", mb: 0.5 }, "& li": { fontSize: "0.75rem" }, "& ul": { pl: 1.5 } }}>
+          <Box
+            sx={{
+              mt: 0.5,
+              fontSize: "0.75rem",
+              "& h3": { fontSize: "0.8rem", mt: 1.5, mb: 0.25 },
+              "& p": { fontSize: "0.75rem", mb: 0.5 },
+              "& li": { fontSize: "0.75rem" },
+              "& ul": { pl: 1.5 },
+            }}
+          >
             <Divider sx={{ mb: 0.75 }} />
             <MarkdownRenderer>
               {formatMathDetails(String(node.details))}
@@ -682,9 +690,16 @@ function ListMode({
 
       // Highlight evidence excerpt in RichView
       const node = graph.nodes.find((n) => n.id === nodeId);
-      console.log("[GraphList] selected node:", { nodeId, type: node?.node_type, hasExcerpt: !!node?.excerpt });
+      console.log("[GraphList] selected node:", {
+        nodeId,
+        type: node?.node_type,
+        hasExcerpt: !!node?.excerpt,
+      });
       if (node?.node_type === "evidence" && node.excerpt) {
-        console.log("[GraphList] setting highlight:", (node.excerpt as string).substring(0, 60));
+        console.log(
+          "[GraphList] setting highlight:",
+          (node.excerpt as string).substring(0, 60),
+        );
         setHighlight({ excerpt: node.excerpt as string, nodeId });
       } else {
         clearHighlight();
@@ -876,13 +891,25 @@ function GraphMode({
     [selectedNode, graph],
   );
 
-  const handleNodeClick = useCallback((node: NodeObject) => {
-    setSelectedNode(node as Record<string, unknown>);
-  }, []);
+  const { setHighlight, clearHighlight } = useHighlight();
+
+  const handleNodeClick = useCallback(
+    (node: NodeObject) => {
+      const n = node as Record<string, unknown>;
+      setSelectedNode(n);
+      if (n.node_type === "evidence" && n.excerpt) {
+        setHighlight({ excerpt: n.excerpt as string, nodeId: String(n.id) });
+      } else {
+        clearHighlight();
+      }
+    },
+    [setHighlight, clearHighlight],
+  );
 
   const handleBgClick = useCallback(() => {
     setSelectedNode(null);
-  }, []);
+    clearHighlight();
+  }, [clearHighlight]);
 
   const nodeLabel = useCallback(
     (node: NodeObject) => getNodeLabel(node as Record<string, unknown>),
