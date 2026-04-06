@@ -546,7 +546,7 @@ function NodeDetailPanel({
             </Typography>
           </Box>
         ))}
-        {nodeType === "math" && node.details && (
+        {nodeType === "math" && !!node.details && (
           <Box sx={{ mt: 0.5, fontSize: "0.75rem", "& h3": { fontSize: "0.8rem", mt: 1.5, mb: 0.25 }, "& p": { fontSize: "0.75rem", mb: 0.5 }, "& li": { fontSize: "0.75rem" }, "& ul": { pl: 1.5 } }}>
             <Divider sx={{ mb: 0.75 }} />
             <MarkdownRenderer>

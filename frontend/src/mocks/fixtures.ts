@@ -7,6 +7,8 @@
  * mock math_validations can correctly reference real formula_ids.
  */
 
+import type { StepValidation } from "../types";
+
 // ---------------------------------------------------------------------------
 // Formula table fixtures (mirrors backend `formula` rows, ml_validation cat)
 // ---------------------------------------------------------------------------
@@ -273,7 +275,7 @@ export const validationResult = {
   step_validations: Object.fromEntries(
     Array.from({ length: 20 }, (_, i) => [
       String(i + 1),
-      { evidence_count: Math.ceil(97 / 20) + (i < 17 ? 1 : 0), figure_validations: [], math_validations: [] },
+      { evidence_count: Math.ceil(97 / 20) + (i < 17 ? 1 : 0), figure_validations: [] as StepValidation["figure_validations"], math_validations: [] as StepValidation["math_validations"] },
     ]),
   ),
   related_papers: [] as Array<{
