@@ -28,10 +28,16 @@ import {
   CheckCircle as ValidIcon,
   Cancel as InvalidIcon,
   Close as CloseIcon,
-  ZoomOutMap as ZoomIcon,
   ExpandMore as ExpandMoreIcon,
 } from "@mui/icons-material";
-import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { pipelineAPI } from "../api";
 import {
   PipelineJob,
@@ -252,12 +258,14 @@ const FALLBACK_PAPERS: CitationPaperItem[] = [
 function ZoomableFigureCard({
   title,
   subtitle,
+  titleColor,
   imageUrl,
   alt,
   placeholder,
 }: {
   title: string;
   subtitle?: string;
+  titleColor?: string;
   imageUrl?: string | null;
   alt: string;
   placeholder: ReactNode;
@@ -388,41 +396,7 @@ function ZoomableFigureCard({
 
   return (
     <>
-      <Box
-        sx={{
-          flex: 1,
-          p: 1,
-          borderRadius: 1,
-          border: 1,
-          borderColor: "divider",
-          bgcolor: "background.paper",
-        }}
-      >
-        <Stack
-          direction="row"
-          justifyContent="space-between"
-          alignItems="center"
-          sx={{ mb: 0.5 }}
-        >
-          <Box>
-            <Typography variant="caption" color="text.secondary">
-              {title}
-            </Typography>
-            <Typography
-              variant="caption"
-              color="text.secondary"
-              display="block"
-            >
-              {subtitle}
-            </Typography>
-          </Box>
-          <Tooltip title="Click to zoom">
-            <IconButton size="small" onClick={openViewer}>
-              <ZoomIcon fontSize="small" />
-            </IconButton>
-          </Tooltip>
-        </Stack>
-
+      <Box sx={{ flex: 1 }}>
         <Box
           onClick={openViewer}
           sx={{
@@ -439,6 +413,12 @@ function ZoomableFigureCard({
         >
           {renderMedia(false)}
         </Box>
+        <Typography
+          variant="caption"
+          sx={{ display: "block", textAlign: "center", mt: 0.5, color: titleColor ?? "text.secondary", fontWeight: titleColor ? 700 : 400 }}
+        >
+          {title}
+        </Typography>
       </Box>
 
       <Modal open={isOpen} onClose={closeViewer}>
@@ -1012,6 +992,90 @@ function DragHandle({
   );
 }
 
+/**
+ * Render figure comparison notes grouped by Similarities and Differences.
+ * Within differences, inline-colorize "Observed" (primary) and "Predicted" (secondary).
+ */
+function ComparisonNotes({
+  matches,
+  mismatches,
+}: {
+  matches: string[];
+  mismatches: string[];
+}) {
+  const theme = useTheme();
+
+  /** Replace ACTUAL/EXPECTED with colored Observed/Predicted spans. */
+  const colorizeDiff = (text: string) => {
+    const parts = text.split(/(ACTUAL|EXPECTED)/gi);
+    return parts.map((part, i) => {
+      const upper = part.toUpperCase();
+      if (upper === "ACTUAL")
+        return (
+          <Box key={i} component="span" sx={{ color: theme.palette.primary.main, fontWeight: 700 }}>
+            Observed
+          </Box>
+        );
+      if (upper === "EXPECTED")
+        return (
+          <Box key={i} component="span" sx={{ color: theme.palette.secondary.main, fontWeight: 700 }}>
+            Predicted
+          </Box>
+        );
+      return <span key={i}>{part}</span>;
+    });
+  };
+
+  return (
+    <Stack spacing={1.5}>
+      {matches.length > 0 && (
+        <Box>
+          <Typography
+            variant="caption"
+            fontWeight={700}
+            sx={{ color: theme.palette.success.main, display: "block", mb: 0.25 }}
+          >
+            Similarities
+          </Typography>
+          {matches.map((item, i) => (
+            <Typography
+              key={i}
+              variant="caption"
+              color="text.secondary"
+              component="li"
+              sx={{ ml: 2, mb: 0.25 }}
+            >
+              {item}
+            </Typography>
+          ))}
+        </Box>
+      )}
+      {mismatches.length > 0 && (
+        <Box>
+          <Typography
+            variant="caption"
+            fontWeight={700}
+            sx={{ color: theme.palette.warning.main, display: "block", mb: 0.25 }}
+          >
+            Differences
+          </Typography>
+          {mismatches.map((item, i) => (
+            <Typography
+              key={i}
+              variant="caption"
+              color="text.secondary"
+              component="li"
+              sx={{ ml: 2, mb: 0.25 }}
+            >
+              {colorizeDiff(item)}
+            </Typography>
+          ))}
+        </Box>
+      )}
+    </Stack>
+  );
+}
+
 function ScaledKatex({ latex }: { latex: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -1121,7 +1185,14 @@ function MathContent({
         placeholder: "Ask the agent about an equation...",
       }}
     >
-      <Box sx={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
+      <Box
+        sx={{
+          display: "flex",
+          flexDirection: "column",
+          height: "100%",
+          minHeight: 0,
+        }}
+      >
         {/* Pinned: Hero + Details (do not scroll with list) */}
         <Box sx={{ flexShrink: 0 }}>
           <Stack spacing={2}>
@@ -1184,7 +1255,11 @@ function MathContent({
                     overflow: "auto",
                   }}
                 >
-                  <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 0.75 }}>
+                  <Typography
+                    variant="subtitle2"
+                    fontWeight={700}
+                    sx={{ mb: 0.75 }}
+                  >
                     Selected Equation Details
                   </Typography>
                   <Stack
@@ -1197,12 +1272,24 @@ function MathContent({
                       {selectedEquation.equation_reference}
                     </Typography>
                     <Chip
-                      label={selectedEquation.calculation_valid ? "Valid" : "Invalid"}
+                      label={
+                        selectedEquation.calculation_valid ? "Valid" : "Invalid"
+                      }
                       size="small"
-                      color={selectedEquation.calculation_valid ? "success" : "error"}
+                      color={
+                        selectedEquation.calculation_valid ? "success" : "error"
+                      }
                     />
                   </Stack>
-                  <Box sx={{ fontSize: "0.75rem", "& h3": { fontSize: "0.8rem", mt: 1.5, mb: 0.25 }, "& p": { fontSize: "0.75rem", mb: 0.5 }, "& li": { fontSize: "0.75rem" }, "& ul": { pl: 1.5 } }}>
+                  <Box
+                    sx={{
+                      fontSize: "0.75rem",
+                      "& h3": { fontSize: "0.8rem", mt: 1.5, mb: 0.25 },
+                      "& p": { fontSize: "0.75rem", mb: 0.5 },
+                      "& li": { fontSize: "0.75rem" },
+                      "& ul": { pl: 1.5 },
+                    }}
+                  >
                     <MarkdownRenderer>
                       {formatMathDetails(selectedEquation.details)}
                     </MarkdownRenderer>
@@ -1230,7 +1317,11 @@ function MathContent({
           </Typography>
         )}
 
-        <DragHandle onStart={detailsResize.onStart} onMove={detailsResize.onMove} onEnd={detailsResize.onEnd} />
+        <DragHandle
+          onStart={detailsResize.onStart}
+          onMove={detailsResize.onMove}
+          onEnd={detailsResize.onEnd}
+        />
 
         {/* Equation List — scrolls independently */}
         <Box sx={{ flex: 1, minHeight: 0, overflow: "auto" }}>
@@ -1247,7 +1338,9 @@ function MathContent({
                     selectedEq === eqKey(eq) ? "primary.main" : "divider",
                   cursor: "pointer",
                   bgcolor:
-                    selectedEq === eqKey(eq) ? "action.selected" : "transparent",
+                    selectedEq === eqKey(eq)
+                      ? "action.selected"
+                      : "transparent",
                   "&:hover": { bgcolor: "action.hover" },
                 }}
               >
@@ -1448,7 +1541,14 @@ function CitationsContent({
         placeholder: "Ask the agent about citation convergence...",
       }}
     >
-      <Box sx={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
+      <Box
+        sx={{
+          display: "flex",
+          flexDirection: "column",
+          height: "100%",
+          minHeight: 0,
+        }}
+      >
         {/* Pinned: Detail panel */}
         <Box sx={{ flexShrink: 0 }}>
           {!hasData && (
@@ -1481,7 +1581,11 @@ function CitationsContent({
                   >
                     Selected Paper Details
                   </Typography>
-                  <Typography variant="body1" fontWeight={700} sx={{ mb: 0.25 }}>
+                  <Typography
+                    variant="body1"
+                    fontWeight={700}
+                    sx={{ mb: 0.25 }}
+                  >
                     {paper.title}
                   </Typography>
                   <Typography
@@ -1532,7 +1636,8 @@ function CitationsContent({
                       display="block"
                       sx={{ mt: 0.5 }}
                     >
-                      <strong>Convergence:</strong> {paper.convergence_reasoning}
+                      <strong>Convergence:</strong>{" "}
+                      {paper.convergence_reasoning}
                     </Typography>
                   )}
                 </Box>
@@ -1562,7 +1667,11 @@ function CitationsContent({
                   >
                     Selected Citation Details
                   </Typography>
-                  <Typography variant="body2" fontWeight={700} sx={{ mb: 0.25 }}>
+                  <Typography
+                    variant="body2"
+                    fontWeight={700}
+                    sx={{ mb: 0.25 }}
+                  >
                     {cit.description}
                   </Typography>
                   <Typography
@@ -1626,7 +1735,11 @@ function CitationsContent({
             })()}
         </Box>
 
-        <DragHandle onStart={detailsResize.onStart} onMove={detailsResize.onMove} onEnd={detailsResize.onEnd} />
+        <DragHandle
+          onStart={detailsResize.onStart}
+          onMove={detailsResize.onMove}
+          onEnd={detailsResize.onEnd}
+        />
 
         {/* Scrollable list */}
         <Box sx={{ flex: 1, minHeight: 0, overflow: "auto" }}>
@@ -1650,7 +1763,9 @@ function CitationsContent({
                     borderRadius: 1,
                     border: 1,
                     borderColor:
-                      selectedId === paper.paper_id ? "primary.main" : "divider",
+                      selectedId === paper.paper_id
+                        ? "primary.main"
+                        : "divider",
                     cursor: "pointer",
                     bgcolor:
                       selectedId === paper.paper_id
@@ -1712,7 +1827,9 @@ function CitationsContent({
                         selectedId === cit.id ? "primary.main" : "divider",
                       cursor: "pointer",
                       bgcolor:
-                        selectedId === cit.id ? "action.selected" : "transparent",
+                        selectedId === cit.id
+                          ? "action.selected"
+                          : "transparent",
                       "&:hover": { bgcolor: "action.hover" },
                     }}
                   >
@@ -1904,7 +2021,14 @@ function FiguresContent({
         placeholder: "Ask the agent about figure discrepancies...",
       }}
     >
-      <Box sx={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
+      <Box
+        sx={{
+          display: "flex",
+          flexDirection: "column",
+          height: "100%",
+          minHeight: 0,
+        }}
+      >
         {/* Pinned: Figure display + Comparison Notes */}
         <Box sx={{ flexShrink: 0 }}>
           {allFigures.length === 0 && (
@@ -1925,7 +2049,11 @@ function FiguresContent({
             >
               {/* Figure images */}
               <Box sx={{ p: 1.25, bgcolor: "background.default" }}>
-                <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 0.5 }}>
+                <Typography
+                  variant="subtitle2"
+                  fontWeight={700}
+                  sx={{ mb: 0.5 }}
+                >
                   Selected Figure
                 </Typography>
                 <Typography variant="body2" fontWeight={700} sx={{ mb: 1 }}>
@@ -1934,12 +2062,14 @@ function FiguresContent({
                 <Stack direction={{ xs: "column", md: "row" }} spacing={1}>
                   <ZoomableFigureCard
                     title="Observed"
+                    titleColor={theme.palette.primary.main}
                     imageUrl={selectedFigureAsset?.submitted?.url}
                     alt={`${selectedFigureData.figure_name} submitted`}
                     placeholder={submittedPlaceholder}
                   />
                   <ZoomableFigureCard
                     title="Predicted"
+                    titleColor={theme.palette.secondary.main}
                     imageUrl={selectedFigureAsset?.predicted?.url}
                     alt={`${selectedFigureData.figure_name} predicted`}
                     placeholder={predictedPlaceholder}
@@ -1958,35 +2088,27 @@ function FiguresContent({
                   overflow: "auto",
                 }}
               >
-                <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 0.75 }}>
+                <Typography
+                  variant="subtitle2"
+                  fontWeight={700}
+                  sx={{ mb: 0.75 }}
+                >
                   Comparison Notes
                 </Typography>
-                {getMatches(selectedFigureData).map((c, i) => (
-                  <Typography
-                    key={`s-${i}`}
-                    variant="caption"
-                    color="text.secondary"
-                    display="block"
-                  >
-                    + {c}
-                  </Typography>
-                ))}
-                {getMismatches(selectedFigureData).map((c, i) => (
-                  <Typography
-                    key={`d-${i}`}
-                    variant="caption"
-                    color="text.secondary"
-                    display="block"
-                  >
-                    - {c}
-                  </Typography>
-                ))}
+                <ComparisonNotes
+                  matches={getMatches(selectedFigureData)}
+                  mismatches={getMismatches(selectedFigureData)}
+                />
               </Box>
             </Box>
           )}
         </Box>
 
-        <DragHandle onStart={detailsResize.onStart} onMove={detailsResize.onMove} onEnd={detailsResize.onEnd} />
+        <DragHandle
+          onStart={detailsResize.onStart}
+          onMove={detailsResize.onMove}
+          onEnd={detailsResize.onEnd}
+        />
 
         {/* Figure list — scrolls independently */}
         <Box sx={{ flex: 1, minHeight: 0, overflow: "auto" }}>
