@@ -26,6 +26,7 @@ import {
 } from "@mui/icons-material";
 import { MarkdownRenderer } from "./MarkdownRenderer";
 import { formatMathDetails } from "../utils/formatMathDetails";
+import { useHighlight } from "../contexts/HighlightContext";
 import ForceGraph2D from "react-force-graph-2d";
 import type { LinkObject, NodeObject } from "react-force-graph-2d";
 import {
@@ -645,6 +646,7 @@ function ListMode({
   selectedNodeTypes: Set<GraphNodeType>;
 }) {
   const nodeColors = useNodeColors();
+  const { setHighlight, clearHighlight } = useHighlight();
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
@@ -662,26 +664,39 @@ function ListMode({
     if (selectedNodeId && !filteredNodes.some((n) => n.id === selectedNodeId)) {
       setSelectedNodeId(null);
       setExpandedId(null);
+      clearHighlight();
     }
-  }, [filteredNodes, selectedNodeId]);
+  }, [filteredNodes, selectedNodeId, clearHighlight]);
 
   const handleSelect = useCallback(
     (nodeId: string) => {
       if (expandedId === nodeId) {
         setExpandedId(null);
         setSelectedNodeId(null);
+        clearHighlight();
         return;
       }
 
       setSelectedNodeId(nodeId);
       setExpandedId(nodeId);
+
+      // Highlight evidence excerpt in RichView
+      const node = graph.nodes.find((n) => n.id === nodeId);
+      console.log("[GraphList] selected node:", { nodeId, type: node?.node_type, hasExcerpt: !!node?.excerpt });
+      if (node?.node_type === "evidence" && node.excerpt) {
+        console.log("[GraphList] setting highlight:", (node.excerpt as string).substring(0, 60));
+        setHighlight({ excerpt: node.excerpt as string, nodeId });
+      } else {
+        clearHighlight();
+      }
+
       // Scroll to node
       requestAnimationFrame(() => {
         const el = document.getElementById(`graph-list-node-${nodeId}`);
         el?.scrollIntoView({ behavior: "smooth", block: "nearest" });
       });
     },
-    [expandedId],
+    [expandedId, graph.nodes, setHighlight, clearHighlight],
   );
 
   const neighbors = useMemo(

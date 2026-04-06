@@ -28,6 +28,7 @@ import {
   contentJsonToPlainText,
 } from "../utils/contentJsonUtils";
 import { useTheme as useAppTheme } from "../theme";
+import { HighlightProvider } from "../contexts/HighlightContext";
 
 export const EditorPage = () => {
   const { id } = useParams();
@@ -251,6 +252,7 @@ export const EditorPage = () => {
   }, [rightPanelOpen]);
 
   return (
+    <HighlightProvider>
     <Box
       sx={{
         height: "100%",
@@ -563,5 +565,6 @@ export const EditorPage = () => {
         </Box>
       )}
     </Box>
+    </HighlightProvider>
   );
 };
