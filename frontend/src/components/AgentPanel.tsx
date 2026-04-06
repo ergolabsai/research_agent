@@ -31,7 +31,7 @@ import {
   ZoomOutMap as ZoomIcon,
   ExpandMore as ExpandMoreIcon,
 } from "@mui/icons-material";
-import { ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { pipelineAPI } from "../api";
 import {
   PipelineJob,
@@ -943,6 +943,75 @@ function ValidateContent({
   return null;
 }
 
+/* ── Shared drag-to-resize hook + handle ────────────────────────── */
+
+function useResizableHeight(initial: number, min: number, max: number) {
+  const [height, setHeight] = useState(initial);
+  const drag = useRef<{ startY: number; startH: number } | null>(null);
+
+  const onStart = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      drag.current = { startY: e.clientY, startH: height };
+      e.currentTarget.setPointerCapture(e.pointerId);
+    },
+    [height],
+  );
+
+  const onMove = useCallback(
+    (e: React.PointerEvent<HTMLDivElement>) => {
+      if (!drag.current) return;
+      const delta = e.clientY - drag.current.startY;
+      setHeight(Math.min(max, Math.max(min, drag.current.startH + delta)));
+    },
+    [min, max],
+  );
+
+  const onEnd = useCallback(() => {
+    drag.current = null;
+  }, []);
+
+  return { height, onStart, onMove, onEnd };
+}
+
+function DragHandle({
+  onStart,
+  onMove,
+  onEnd,
+}: {
+  onStart: (e: React.PointerEvent<HTMLDivElement>) => void;
+  onMove: (e: React.PointerEvent<HTMLDivElement>) => void;
+  onEnd: () => void;
+}) {
+  return (
+    <Box
+      onPointerDown={onStart}
+      onPointerMove={onMove}
+      onPointerUp={onEnd}
+      onPointerCancel={onEnd}
+      sx={{
+        height: 14,
+        cursor: "ns-resize",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        flexShrink: 0,
+        "&:hover > div": { bgcolor: "primary.main" },
+        touchAction: "none",
+      }}
+    >
+      <Box
+        sx={{
+          width: 40,
+          height: 3,
+          borderRadius: 1.5,
+          bgcolor: "divider",
+          transition: "background-color 150ms",
+        }}
+      />
+    </Box>
+  );
+}
+
 function ScaledKatex({ latex }: { latex: string }) {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -1041,6 +1110,8 @@ function MathContent({
     setSelectedEq(eqKey(eq));
   };
 
+  const detailsResize = useResizableHeight(180, 80, 400);
+
   return (
     <TabContentWithChat
       chatProps={{
@@ -1054,95 +1125,99 @@ function MathContent({
         {/* Pinned: Hero + Details (do not scroll with list) */}
         <Box sx={{ flexShrink: 0 }}>
           <Stack spacing={2}>
-            {/* Equation Hero Display */}
+            {/* Equation Hero + Details */}
             {!!selectedEquation && (
               <Box
                 sx={{
-                  px: 2,
-                  py: 1.5,
                   borderRadius: 1.5,
                   border: 1,
                   borderColor: "divider",
-                  background: `linear-gradient(135deg, ${theme.palette.primary.main}10 0%, ${theme.palette.secondary.main}20 100%)`,
-                  textAlign: "center",
+                  overflow: "hidden",
                 }}
               >
-                <Typography
-                  variant="caption"
+                {/* Hero Display */}
+                <Box
                   sx={{
-                    display: "block",
-                    fontWeight: 700,
-                    letterSpacing: "0.08em",
-                    mb: 0.75,
-                    color: "text.secondary",
+                    px: 2,
+                    py: 1.5,
+                    background: `linear-gradient(135deg, ${theme.palette.primary.main}10 0%, ${theme.palette.secondary.main}20 100%)`,
+                    textAlign: "center",
                   }}
                 >
-                  {selectedEquation.equation_reference}
-                </Typography>
-                {selectedEquation.equation_latex ? (
-                  <ScaledKatex latex={selectedEquation.equation_latex} />
-                ) : (
-                  <Typography
-                    sx={{
-                      fontFamily: "'IBM Plex Serif', serif",
-                      fontSize: { xs: "1.15rem", sm: "1.35rem" },
-                      lineHeight: 1.25,
-                      color: "text.primary",
-                    }}
-                  >
-                    {selectedEquation.equation_text ??
-                      selectedEquation.equation_reference}
-                  </Typography>
-                )}
-              </Box>
-            )}
-
-            {/* Detail Panel */}
-            {!!selectedEquation && (
-              <Box
-                sx={{
-                  p: 1.25,
-                  borderRadius: 1,
-                  border: 1,
-                  borderColor: "divider",
-                  bgcolor: "background.default",
-                  maxHeight: 220,
-                  overflow: "auto",
-                }}
-              >
-                <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 0.75 }}>
-                  Selected Equation Details
-                </Typography>
-                <Stack
-                  direction="row"
-                  spacing={1}
-                  alignItems="center"
-                  sx={{ mb: 0.5 }}
-                >
-                  <Typography variant="body2" fontWeight={700}>
-                    {selectedEquation.equation_reference}
-                  </Typography>
-                  <Chip
-                    label={selectedEquation.calculation_valid ? "Valid" : "Invalid"}
-                    size="small"
-                    color={selectedEquation.calculation_valid ? "success" : "error"}
-                  />
-                </Stack>
-                <Box sx={{ fontSize: "0.75rem", "& h3": { fontSize: "0.8rem", mt: 1.5, mb: 0.25 }, "& p": { fontSize: "0.75rem", mb: 0.5 }, "& li": { fontSize: "0.75rem" }, "& ul": { pl: 1.5 } }}>
-                  <MarkdownRenderer>
-                    {formatMathDetails(selectedEquation.details)}
-                  </MarkdownRenderer>
-                </Box>
-                {selectedEquation.formula_used && (
                   <Typography
                     variant="caption"
-                    color="text.secondary"
-                    display="block"
-                    sx={{ mt: 0.5 }}
+                    sx={{
+                      display: "block",
+                      fontWeight: 700,
+                      letterSpacing: "0.08em",
+                      mb: 0.75,
+                      color: "text.secondary",
+                    }}
                   >
-                    <strong>Formula:</strong> {selectedEquation.formula_used}
+                    {selectedEquation.equation_reference}
                   </Typography>
-                )}
+                  {selectedEquation.equation_latex ? (
+                    <ScaledKatex latex={selectedEquation.equation_latex} />
+                  ) : (
+                    <Typography
+                      sx={{
+                        fontFamily: "'IBM Plex Serif', serif",
+                        fontSize: { xs: "1.15rem", sm: "1.35rem" },
+                        lineHeight: 1.25,
+                        color: "text.primary",
+                      }}
+                    >
+                      {selectedEquation.equation_text ??
+                        selectedEquation.equation_reference}
+                    </Typography>
+                  )}
+                </Box>
+
+                <Divider />
+
+                {/* Detail Panel */}
+                <Box
+                  sx={{
+                    p: 1.25,
+                    bgcolor: "background.default",
+                    height: detailsResize.height,
+                    overflow: "auto",
+                  }}
+                >
+                  <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 0.75 }}>
+                    Selected Equation Details
+                  </Typography>
+                  <Stack
+                    direction="row"
+                    spacing={1}
+                    alignItems="center"
+                    sx={{ mb: 0.5 }}
+                  >
+                    <Typography variant="body2" fontWeight={700}>
+                      {selectedEquation.equation_reference}
+                    </Typography>
+                    <Chip
+                      label={selectedEquation.calculation_valid ? "Valid" : "Invalid"}
+                      size="small"
+                      color={selectedEquation.calculation_valid ? "success" : "error"}
+                    />
+                  </Stack>
+                  <Box sx={{ fontSize: "0.75rem", "& h3": { fontSize: "0.8rem", mt: 1.5, mb: 0.25 }, "& p": { fontSize: "0.75rem", mb: 0.5 }, "& li": { fontSize: "0.75rem" }, "& ul": { pl: 1.5 } }}>
+                    <MarkdownRenderer>
+                      {formatMathDetails(selectedEquation.details)}
+                    </MarkdownRenderer>
+                  </Box>
+                  {selectedEquation.formula_used && (
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      display="block"
+                      sx={{ mt: 0.5 }}
+                    >
+                      <strong>Formula:</strong> {selectedEquation.formula_used}
+                    </Typography>
+                  )}
+                </Box>
               </Box>
             )}
           </Stack>
@@ -1155,8 +1230,10 @@ function MathContent({
           </Typography>
         )}
 
+        <DragHandle onStart={detailsResize.onStart} onMove={detailsResize.onMove} onEnd={detailsResize.onEnd} />
+
         {/* Equation List — scrolls independently */}
-        <Box sx={{ flex: 1, minHeight: 0, overflow: "auto", mt: 2 }}>
+        <Box sx={{ flex: 1, minHeight: 0, overflow: "auto" }}>
           <Stack spacing={1}>
             {displayedMath.map((eq, idx) => (
               <Box
@@ -1360,6 +1437,8 @@ function CitationsContent({
     [allItems, selectedId],
   );
 
+  const detailsResize = useResizableHeight(180, 80, 400);
+
   return (
     <TabContentWithChat
       chatProps={{
@@ -1369,101 +1448,121 @@ function CitationsContent({
         placeholder: "Ask the agent about citation convergence...",
       }}
     >
-      <Stack spacing={2}>
-        {!hasData && (
-          <Typography variant="body2" color="text.secondary">
-            No related papers data available yet. Showing demo citation
-            placeholders.
-          </Typography>
-        )}
-
-        {/* Related Papers section */}
-        <Box>
-          <Typography
-            variant="caption"
-            fontWeight={700}
-            color="text.secondary"
-            sx={{ mb: 0.5, display: "block" }}
-          >
-            Related Papers ({displayedPapers.length})
-          </Typography>
-          <Stack spacing={1}>
-            {displayedPapers.map((paper) => (
-              <Box
-                key={paper.paper_id}
-                onClick={() => setSelectedId(paper.paper_id)}
-                sx={{
-                  p: 1.25,
-                  borderRadius: 1,
-                  border: 1,
-                  borderColor:
-                    selectedId === paper.paper_id ? "primary.main" : "divider",
-                  cursor: "pointer",
-                  bgcolor:
-                    selectedId === paper.paper_id
-                      ? "action.selected"
-                      : "transparent",
-                  "&:hover": { bgcolor: "action.hover" },
-                }}
-              >
-                <Typography variant="body2" fontWeight={700}>
-                  {paper.title}
-                </Typography>
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  display="block"
-                >
-                  {[paper.authors, paper.source || paper.venue, paper.year]
-                    .filter(Boolean)
-                    .join(" | ")}
-                </Typography>
-                <Stack direction="row" spacing={0.5} sx={{ mt: 0.75 }}>
-                  <ScoreChip
-                    label="Rel"
-                    value={paper.relevancy_score ?? paper.relevancy}
-                    mode="relevancy"
-                  />
-                  <ScoreChip
-                    label="Conv"
-                    value={paper.convergence_score ?? paper.convergence}
-                    mode="convergence"
-                  />
-                </Stack>
-              </Box>
-            ))}
-          </Stack>
-        </Box>
-
-        {/* Citations section */}
-        {citations.length > 0 && (
-          <Box>
-            <Typography
-              variant="caption"
-              fontWeight={700}
-              color="text.secondary"
-              sx={{ mb: 0.5, display: "block" }}
-            >
-              Citations ({citations.length})
+      <Box sx={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
+        {/* Pinned: Detail panel */}
+        <Box sx={{ flexShrink: 0 }}>
+          {!hasData && (
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+              No related papers data available yet. Showing demo citation
+              placeholders.
             </Typography>
-            <Stack spacing={1}>
-              {citations.map((cit) => (
+          )}
+
+          {/* Detail panel — paper */}
+          {selectedItem?.kind === "paper" &&
+            (() => {
+              const paper = selectedItem.data;
+              return (
                 <Box
-                  key={cit.id}
-                  onClick={() => setSelectedId(cit.id)}
                   sx={{
                     p: 1.25,
                     borderRadius: 1,
                     border: 1,
-                    borderColor:
-                      selectedId === cit.id ? "primary.main" : "divider",
-                    cursor: "pointer",
-                    bgcolor:
-                      selectedId === cit.id ? "action.selected" : "transparent",
-                    "&:hover": { bgcolor: "action.hover" },
+                    borderColor: "divider",
+                    bgcolor: "background.default",
+                    height: detailsResize.height,
+                    overflow: "auto",
                   }}
                 >
-                  <Typography variant="body2" fontWeight={700} noWrap>
+                  <Typography
+                    variant="subtitle2"
+                    fontWeight={700}
+                    sx={{ mb: 0.5 }}
+                  >
+                    Selected Paper Details
+                  </Typography>
+                  <Typography variant="body1" fontWeight={700} sx={{ mb: 0.25 }}>
+                    {paper.title}
+                  </Typography>
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    display="block"
+                  >
+                    {[paper.authors, paper.source || paper.venue, paper.year]
+                      .filter(Boolean)
+                      .join(" | ")}
+                  </Typography>
+                  {paper.abstract && (
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      display="block"
+                      sx={{ mt: 0.75 }}
+                    >
+                      {paper.abstract}
+                    </Typography>
+                  )}
+                  <Stack direction="row" spacing={0.5} sx={{ mt: 1 }}>
+                    <ScoreChip
+                      label="Rel"
+                      value={paper.relevancy_score ?? paper.relevancy}
+                      mode="relevancy"
+                    />
+                    <ScoreChip
+                      label="Conv"
+                      value={paper.convergence_score ?? paper.convergence}
+                      mode="convergence"
+                    />
+                  </Stack>
+                  {paper.relevancy_reasoning && (
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      display="block"
+                      sx={{ mt: 0.75 }}
+                    >
+                      <strong>Relevancy:</strong> {paper.relevancy_reasoning}
+                    </Typography>
+                  )}
+                  {paper.convergence_reasoning && (
+                    <Typography
+                      variant="body2"
+                      color="text.secondary"
+                      display="block"
+                      sx={{ mt: 0.5 }}
+                    >
+                      <strong>Convergence:</strong> {paper.convergence_reasoning}
+                    </Typography>
+                  )}
+                </Box>
+              );
+            })()}
+
+          {/* Detail panel — citation */}
+          {selectedItem?.kind === "citation" &&
+            (() => {
+              const cit = selectedItem.data;
+              return (
+                <Box
+                  sx={{
+                    p: 1.25,
+                    borderRadius: 1,
+                    border: 1,
+                    borderColor: "divider",
+                    bgcolor: "background.default",
+                    height: detailsResize.height,
+                    overflow: "auto",
+                  }}
+                >
+                  <Typography
+                    variant="subtitle2"
+                    fontWeight={700}
+                    sx={{ mb: 0.5 }}
+                  >
+                    Selected Citation Details
+                  </Typography>
+                  <Typography variant="body2" fontWeight={700} sx={{ mb: 0.25 }}>
                     {cit.description}
                   </Typography>
                   <Typography
@@ -1480,7 +1579,17 @@ function CitationsContent({
                       .filter(Boolean)
                       .join(" | ")}
                   </Typography>
-                  <Stack direction="row" spacing={0.5} sx={{ mt: 0.75 }}>
+                  {cit.excerpt && (
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      display="block"
+                      sx={{ mt: 0.75, fontStyle: "italic" }}
+                    >
+                      "{cit.excerpt}"
+                    </Typography>
+                  )}
+                  <Stack direction="row" spacing={0.5} sx={{ mt: 1 }}>
                     <ScoreChip
                       label="Rel"
                       value={cit.relevancy_score}
@@ -1492,174 +1601,157 @@ function CitationsContent({
                       mode="convergence"
                     />
                   </Stack>
+                  {cit.relevancy_reasoning && (
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      display="block"
+                      sx={{ mt: 0.75 }}
+                    >
+                      <strong>Relevancy:</strong> {cit.relevancy_reasoning}
+                    </Typography>
+                  )}
+                  {cit.convergence_reasoning && (
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      display="block"
+                      sx={{ mt: 0.5 }}
+                    >
+                      <strong>Convergence:</strong> {cit.convergence_reasoning}
+                    </Typography>
+                  )}
+                </Box>
+              );
+            })()}
+        </Box>
+
+        <DragHandle onStart={detailsResize.onStart} onMove={detailsResize.onMove} onEnd={detailsResize.onEnd} />
+
+        {/* Scrollable list */}
+        <Box sx={{ flex: 1, minHeight: 0, overflow: "auto" }}>
+          {/* Related Papers section */}
+          <Box sx={{ mb: 2 }}>
+            <Typography
+              variant="caption"
+              fontWeight={700}
+              color="text.secondary"
+              sx={{ mb: 0.5, display: "block" }}
+            >
+              Related Papers ({displayedPapers.length})
+            </Typography>
+            <Stack spacing={1}>
+              {displayedPapers.map((paper) => (
+                <Box
+                  key={paper.paper_id}
+                  onClick={() => setSelectedId(paper.paper_id)}
+                  sx={{
+                    p: 1.25,
+                    borderRadius: 1,
+                    border: 1,
+                    borderColor:
+                      selectedId === paper.paper_id ? "primary.main" : "divider",
+                    cursor: "pointer",
+                    bgcolor:
+                      selectedId === paper.paper_id
+                        ? "action.selected"
+                        : "transparent",
+                    "&:hover": { bgcolor: "action.hover" },
+                  }}
+                >
+                  <Typography variant="body2" fontWeight={700}>
+                    {paper.title}
+                  </Typography>
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    display="block"
+                  >
+                    {[paper.authors, paper.source || paper.venue, paper.year]
+                      .filter(Boolean)
+                      .join(" | ")}
+                  </Typography>
+                  <Stack direction="row" spacing={0.5} sx={{ mt: 0.75 }}>
+                    <ScoreChip
+                      label="Rel"
+                      value={paper.relevancy_score ?? paper.relevancy}
+                      mode="relevancy"
+                    />
+                    <ScoreChip
+                      label="Conv"
+                      value={paper.convergence_score ?? paper.convergence}
+                      mode="convergence"
+                    />
+                  </Stack>
                 </Box>
               ))}
             </Stack>
           </Box>
-        )}
 
-        {/* Detail panel */}
-        {selectedItem?.kind === "paper" &&
-          (() => {
-            const paper = selectedItem.data;
-            return (
-              <Box
-                sx={{
-                  p: 1.25,
-                  borderRadius: 1,
-                  border: 1,
-                  borderColor: "divider",
-                  bgcolor: "background.default",
-                }}
+          {/* Citations section */}
+          {citations.length > 0 && (
+            <Box>
+              <Typography
+                variant="caption"
+                fontWeight={700}
+                color="text.secondary"
+                sx={{ mb: 0.5, display: "block" }}
               >
-                <Typography
-                  variant="subtitle2"
-                  fontWeight={700}
-                  sx={{ mb: 0.5 }}
-                >
-                  Selected Paper Details
-                </Typography>
-                <Typography variant="body1" fontWeight={700} sx={{ mb: 0.25 }}>
-                  {paper.title}
-                </Typography>
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  display="block"
-                >
-                  {[paper.authors, paper.source || paper.venue, paper.year]
-                    .filter(Boolean)
-                    .join(" | ")}
-                </Typography>
-                {paper.abstract && (
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    display="block"
-                    sx={{ mt: 0.75 }}
+                Citations ({citations.length})
+              </Typography>
+              <Stack spacing={1}>
+                {citations.map((cit) => (
+                  <Box
+                    key={cit.id}
+                    onClick={() => setSelectedId(cit.id)}
+                    sx={{
+                      p: 1.25,
+                      borderRadius: 1,
+                      border: 1,
+                      borderColor:
+                        selectedId === cit.id ? "primary.main" : "divider",
+                      cursor: "pointer",
+                      bgcolor:
+                        selectedId === cit.id ? "action.selected" : "transparent",
+                      "&:hover": { bgcolor: "action.hover" },
+                    }}
                   >
-                    {paper.abstract}
-                  </Typography>
-                )}
-                <Stack direction="row" spacing={0.5} sx={{ mt: 1 }}>
-                  <ScoreChip
-                    label="Rel"
-                    value={paper.relevancy_score ?? paper.relevancy}
-                    mode="relevancy"
-                  />
-                  <ScoreChip
-                    label="Conv"
-                    value={paper.convergence_score ?? paper.convergence}
-                    mode="convergence"
-                  />
-                </Stack>
-                {paper.relevancy_reasoning && (
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    display="block"
-                    sx={{ mt: 0.75 }}
-                  >
-                    <strong>Relevancy:</strong> {paper.relevancy_reasoning}
-                  </Typography>
-                )}
-                {paper.convergence_reasoning && (
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    display="block"
-                    sx={{ mt: 0.5 }}
-                  >
-                    <strong>Convergence:</strong> {paper.convergence_reasoning}
-                  </Typography>
-                )}
-              </Box>
-            );
-          })()}
-
-        {selectedItem?.kind === "citation" &&
-          (() => {
-            const cit = selectedItem.data;
-            return (
-              <Box
-                sx={{
-                  p: 1.25,
-                  borderRadius: 1,
-                  border: 1,
-                  borderColor: "divider",
-                  bgcolor: "background.default",
-                }}
-              >
-                <Typography
-                  variant="subtitle2"
-                  fontWeight={700}
-                  sx={{ mb: 0.5 }}
-                >
-                  Selected Citation Details
-                </Typography>
-                <Typography variant="body2" fontWeight={700} sx={{ mb: 0.25 }}>
-                  {cit.description}
-                </Typography>
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  display="block"
-                >
-                  {[
-                    cit.location,
-                    cit.supports_step != null
-                      ? `Step ${cit.supports_step}`
-                      : null,
-                  ]
-                    .filter(Boolean)
-                    .join(" | ")}
-                </Typography>
-                {cit.excerpt && (
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    display="block"
-                    sx={{ mt: 0.75, fontStyle: "italic" }}
-                  >
-                    "{cit.excerpt}"
-                  </Typography>
-                )}
-                <Stack direction="row" spacing={0.5} sx={{ mt: 1 }}>
-                  <ScoreChip
-                    label="Rel"
-                    value={cit.relevancy_score}
-                    mode="relevancy"
-                  />
-                  <ScoreChip
-                    label="Conv"
-                    value={cit.convergence_score}
-                    mode="convergence"
-                  />
-                </Stack>
-                {cit.relevancy_reasoning && (
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    display="block"
-                    sx={{ mt: 0.75 }}
-                  >
-                    <strong>Relevancy:</strong> {cit.relevancy_reasoning}
-                  </Typography>
-                )}
-                {cit.convergence_reasoning && (
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    display="block"
-                    sx={{ mt: 0.5 }}
-                  >
-                    <strong>Convergence:</strong> {cit.convergence_reasoning}
-                  </Typography>
-                )}
-              </Box>
-            );
-          })()}
-      </Stack>
+                    <Typography variant="body2" fontWeight={700} noWrap>
+                      {cit.description}
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      display="block"
+                    >
+                      {[
+                        cit.location,
+                        cit.supports_step != null
+                          ? `Step ${cit.supports_step}`
+                          : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" | ")}
+                    </Typography>
+                    <Stack direction="row" spacing={0.5} sx={{ mt: 0.75 }}>
+                      <ScoreChip
+                        label="Rel"
+                        value={cit.relevancy_score}
+                        mode="relevancy"
+                      />
+                      <ScoreChip
+                        label="Conv"
+                        value={cit.convergence_score}
+                        mode="convergence"
+                      />
+                    </Stack>
+                  </Box>
+                ))}
+              </Stack>
+            </Box>
+          )}
+        </Box>
+      </Box>
     </TabContentWithChat>
   );
 }
@@ -1801,6 +1893,8 @@ function FiguresContent({
     </svg>
   );
 
+  const detailsResize = useResizableHeight(220, 100, 500);
+
   return (
     <TabContentWithChat
       chatProps={{
@@ -1810,75 +1904,93 @@ function FiguresContent({
         placeholder: "Ask the agent about figure discrepancies...",
       }}
     >
-      <Stack spacing={2}>
-        {allFigures.length === 0 && (
-          <Typography variant="body2" color="text.secondary">
-            No figure validation data available yet. Showing demo placeholder
-            figures.
-          </Typography>
-        )}
+      <Box sx={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
+        {/* Pinned: Figure display + Comparison Notes */}
+        <Box sx={{ flexShrink: 0 }}>
+          {allFigures.length === 0 && (
+            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+              No figure validation data available yet. Showing demo placeholder
+              figures.
+            </Typography>
+          )}
 
-        {/* Selected Figure Display */}
-        {!!selectedFigureData && (
-          <Box
-            sx={{
-              p: 1.25,
-              borderRadius: 1,
-              border: 1,
-              borderColor: "divider",
-              bgcolor: "background.default",
-            }}
-          >
-            <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 0.5 }}>
-              Selected Figure
-            </Typography>
-            <Typography variant="body2" fontWeight={700} sx={{ mb: 1 }}>
-              {selectedFigureData.figure_name}
-            </Typography>
-            <Box sx={{ mb: 1 }}>
-              <Stack direction={{ xs: "column", md: "row" }} spacing={1}>
-                <ZoomableFigureCard
-                  title="Observed"
-                  // subtitle={
-                  //   selectedFigureAsset?.submitted?.filename ??
-                  //   "Placeholder figure"
-                  // }
-                  imageUrl={selectedFigureAsset?.submitted?.url}
-                  alt={`${selectedFigureData.figure_name} submitted`}
-                  placeholder={submittedPlaceholder}
-                />
-                <ZoomableFigureCard
-                  title="Predicted"
-                  // subtitle={
-                  //   selectedFigureAsset?.predicted?.filename ??
-                  //   "Placeholder figure"
-                  // }
-                  imageUrl={selectedFigureAsset?.predicted?.url}
-                  alt={`${selectedFigureData.figure_name} predicted`}
-                  placeholder={predictedPlaceholder}
-                />
-              </Stack>
+          {!!selectedFigureData && (
+            <Box
+              sx={{
+                borderRadius: 1.5,
+                border: 1,
+                borderColor: "divider",
+                overflow: "hidden",
+              }}
+            >
+              {/* Figure images */}
+              <Box sx={{ p: 1.25, bgcolor: "background.default" }}>
+                <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 0.5 }}>
+                  Selected Figure
+                </Typography>
+                <Typography variant="body2" fontWeight={700} sx={{ mb: 1 }}>
+                  {selectedFigureData.figure_name}
+                </Typography>
+                <Stack direction={{ xs: "column", md: "row" }} spacing={1}>
+                  <ZoomableFigureCard
+                    title="Observed"
+                    imageUrl={selectedFigureAsset?.submitted?.url}
+                    alt={`${selectedFigureData.figure_name} submitted`}
+                    placeholder={submittedPlaceholder}
+                  />
+                  <ZoomableFigureCard
+                    title="Predicted"
+                    imageUrl={selectedFigureAsset?.predicted?.url}
+                    alt={`${selectedFigureData.figure_name} predicted`}
+                    placeholder={predictedPlaceholder}
+                  />
+                </Stack>
+              </Box>
+
+              <Divider />
+
+              {/* Comparison Notes */}
+              <Box
+                sx={{
+                  p: 1.25,
+                  bgcolor: "background.default",
+                  height: detailsResize.height,
+                  overflow: "auto",
+                }}
+              >
+                <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 0.75 }}>
+                  Comparison Notes
+                </Typography>
+                {getMatches(selectedFigureData).map((c, i) => (
+                  <Typography
+                    key={`s-${i}`}
+                    variant="caption"
+                    color="text.secondary"
+                    display="block"
+                  >
+                    + {c}
+                  </Typography>
+                ))}
+                {getMismatches(selectedFigureData).map((c, i) => (
+                  <Typography
+                    key={`d-${i}`}
+                    variant="caption"
+                    color="text.secondary"
+                    display="block"
+                  >
+                    - {c}
+                  </Typography>
+                ))}
+              </Box>
             </Box>
-          </Box>
-        )}
+          )}
+        </Box>
 
-        {/* Figure Selection */}
-        <Box
-          sx={{
-            p: 1.25,
-            borderRadius: 1,
-            border: 1,
-            borderColor: "divider",
-            bgcolor: "background.default",
-          }}
-        >
-          <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 1 }}>
-            Figure Selection
-          </Typography>
-          <Stack
-            spacing={1.25}
-            sx={{ maxHeight: 220, overflow: "auto", pr: 0.5 }}
-          >
+        <DragHandle onStart={detailsResize.onStart} onMove={detailsResize.onMove} onEnd={detailsResize.onEnd} />
+
+        {/* Figure list — scrolls independently */}
+        <Box sx={{ flex: 1, minHeight: 0, overflow: "auto" }}>
+          <Stack spacing={1}>
             {displayedFigures.map((fig, i) => (
               <Box
                 key={`${figKey(fig)}-${i}`}
@@ -1912,44 +2024,7 @@ function FiguresContent({
             ))}
           </Stack>
         </Box>
-
-        {/* Comparison Notes */}
-        {!!selectedFigureData && (
-          <Box
-            sx={{
-              p: 1.25,
-              borderRadius: 1,
-              border: 1,
-              borderColor: "divider",
-              bgcolor: "background.default",
-            }}
-          >
-            <Typography variant="subtitle2" fontWeight={700} sx={{ mb: 0.75 }}>
-              Comparison Notes
-            </Typography>
-            {getMatches(selectedFigureData).map((c, i) => (
-              <Typography
-                key={`s-${i}`}
-                variant="caption"
-                color="text.secondary"
-                display="block"
-              >
-                + {c}
-              </Typography>
-            ))}
-            {getMismatches(selectedFigureData).map((c, i) => (
-              <Typography
-                key={`d-${i}`}
-                variant="caption"
-                color="text.secondary"
-                display="block"
-              >
-                - {c}
-              </Typography>
-            ))}
-          </Box>
-        )}
-      </Stack>
+      </Box>
     </TabContentWithChat>
   );
 }
