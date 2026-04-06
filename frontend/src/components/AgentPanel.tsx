@@ -411,6 +411,8 @@ function ZoomableFigureCard({
             bgcolor: "background.default",
             overflow: "hidden",
             borderRadius: 1,
+            border: 1,
+            borderColor: "divider",
             cursor: "zoom-in",
           }}
         >
@@ -418,7 +420,13 @@ function ZoomableFigureCard({
         </Box>
         <Typography
           variant="caption"
-          sx={{ display: "block", textAlign: "center", mt: 0.5, color: titleColor ?? "text.secondary", fontWeight: titleColor ? 700 : 400 }}
+          sx={{
+            display: "block",
+            textAlign: "center",
+            mt: 0.5,
+            color: titleColor ?? "text.secondary",
+            fontWeight: titleColor ? 700 : 400,
+          }}
         >
           {title}
         </Typography>
@@ -1015,13 +1023,21 @@ function ComparisonNotes({
       const upper = part.toUpperCase();
       if (upper === "ACTUAL")
         return (
-          <Box key={i} component="span" sx={{ color: theme.palette.primary.main, fontWeight: 700 }}>
+          <Box
+            key={i}
+            component="span"
+            sx={{ color: theme.palette.primary.main, fontWeight: 700 }}
+          >
             Observed
           </Box>
         );
       if (upper === "EXPECTED")
         return (
-          <Box key={i} component="span" sx={{ color: theme.palette.secondary.main, fontWeight: 700 }}>
+          <Box
+            key={i}
+            component="span"
+            sx={{ color: theme.palette.secondary.main, fontWeight: 700 }}
+          >
             Predicted
           </Box>
         );
@@ -1036,7 +1052,11 @@ function ComparisonNotes({
           <Typography
             variant="caption"
             fontWeight={700}
-            sx={{ color: theme.palette.success.main, display: "block", mb: 0.25 }}
+            sx={{
+              color: theme.palette.success.main,
+              display: "block",
+              mb: 0.25,
+            }}
           >
             Similarities
           </Typography>
@@ -1058,7 +1078,11 @@ function ComparisonNotes({
           <Typography
             variant="caption"
             fontWeight={700}
-            sx={{ color: theme.palette.warning.main, display: "block", mb: 0.25 }}
+            sx={{
+              color: theme.palette.warning.main,
+              display: "block",
+              mb: 0.25,
+            }}
           >
             Differences
           </Typography>

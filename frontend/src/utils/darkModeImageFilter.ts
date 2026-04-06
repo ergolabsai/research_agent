@@ -6,5 +6,5 @@ import type { SxProps, Theme } from "@mui/material";
  * Returns an empty object in light mode so it can be spread unconditionally.
  */
 export function darkModeImgSx(mode: "light" | "dark"): SxProps<Theme> {
-  return mode === "dark" ? { filter: "invert(1) hue-rotate(180deg)" } : {};
+  return mode === "dark" ? { filter: "invert(.881) hue-rotate(170deg)" } : {};
 }
