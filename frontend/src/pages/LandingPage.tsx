@@ -8,6 +8,7 @@ import {
 } from "@mui/material";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { NodeGraphBackground } from "../components/NodeGraphBackground";
 
 export const LandingPage = () => {
   const theme = useTheme();
@@ -38,10 +39,13 @@ export const LandingPage = () => {
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: `linear-gradient(135deg, ${theme.palette.primary.main}40 0%, ${theme.palette.secondary.main}40 100%)`,
+        background: `linear-gradient(135deg, ${theme.palette.primary.main}20 0%, ${theme.palette.secondary.main}40 100%), #0a0a12`,
+        position: "relative",
+        overflow: "hidden",
       }}
     >
-      <Container maxWidth="sm">
+      <NodeGraphBackground />
+      <Container maxWidth="sm" sx={{ position: "relative", zIndex: 1 }}>
         <Stack spacing={4} sx={{ textAlign: "center" }}>
           <Box>
             <Typography
@@ -52,7 +56,12 @@ export const LandingPage = () => {
                 mb: 2,
               }}
             >
-              Ergo Labs: Advisor
+              <Box component="span" sx={{ color: "primary.main" }}>
+                Ergo Labs:{" "}
+              </Box>
+              <Box component="span" sx={{ color: "secondary.main" }}>
+                Advisor
+              </Box>
             </Typography>
             <Typography
               variant="body1"
