@@ -82,6 +82,8 @@ cd frontend && npm run dev:mock
 - **Theming**: 6 MUI themes (3 light, 3 dark), persisted in localStorage. Theme palette includes a `discrete` color array for graph/data-viz UI.
 - **Editor**: MUI TextField-based editor in `EditorPage.tsx` (Draft.js and KaTeX are installed but not currently wired up).
 - **Markdown rendering**: `react-markdown` + `remark-gfm` via `MarkdownRenderer` component (`src/components/MarkdownRenderer.tsx`). Used in the Validate tab to render the overall review.
+- **Graph visualization**: `react-force-graph-2d` in `src/components/GraphContent.tsx` for the paper graph view.
+- **Math rendering**: KaTeX via `src/utils/katexRenderer.ts` (used by `RichView` and `AgentPanel`).
 - **Key components**: `Sidebar`, `AgentPanel`, `GraphContent`, `MarkdownRenderer`, `DocumentItem`, `WorkspaceItem`, `SettingsMenu`.
 - **Validate tab UI**: On completion, shows two MUI Accordion sections: "Validation Results" (markdown-rendered overall review, default expanded) and "Graph Analysis" (node counts, steps without evaluations, contradicted steps as nested accordions). Data comes from separate API calls: `pipelineAPI.results()` for the review, `pipelineAPI.analysis()` for graph analysis.
 
@@ -154,7 +156,7 @@ Pydantic `BaseSettings` from `.env`. Key groups: API keys, LLM (provider/model/t
 
 - CORS is fully open (`allow_origins=["*"]`) — tighten for production
 - `users/search` endpoint has no auth requirement
-- Dead dependencies in package.json: `draft-js`, `react-draft-wysiwyg`, `katex`, `zustand` (installed but not imported)
+- Dead dependencies in package.json: `draft-js`, `react-draft-wysiwyg`, `zustand` (installed but not imported). `katex` IS used in `src/utils/katexRenderer.ts`.
 - `instructor` in `requirements.txt` but unused (structured output uses `with_structured_output()`)
 
 ## TODO
