@@ -22,7 +22,7 @@ The PR template (in `.github/PULL_REQUEST_TEMPLATE.md` or equivalent) carries a 
 - [ ] **`Principal` is the first argument of every new use-case.** Authorization is checked inside the use-case via `authz.require(...)`.
 - [ ] **New ports are `typing.Protocol`,** not ABC.
 - [ ] **Driving adapters do not import driven adapters.** Going through composition is the path.
-- [ ] **If a new use-case has a CLI command, it also has an API route** (or there is a tracked issue to add it). The CLI is first-class per [architecture/0007](../../architecture/decisions/0007-cli-first-driving-adapter.md).
+- [ ] **If a new use-case has a CLI command, it also has an API route** (or there is a tracked issue to add it). The CLI is first-class per [0007 — CLI-first driving adapter](../../decisions/0007-cli-first-driving-adapter.md).
 - [ ] **The change passes the "could an AI agent rebuild this in isolation?" check** ([process/0003](./0003-ai-agent-rebuild-test.md)) for any `core/` file modified.
 - [ ] **`import-linter` is green.**
 

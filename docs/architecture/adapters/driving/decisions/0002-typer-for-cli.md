@@ -9,7 +9,7 @@ superseded-by: []
 
 ## Context
 
-The CLI is the first-class driving adapter ([architecture/0007](../../../architecture/decisions/0007-cli-first-driving-adapter.md)) and must be agent-friendly: `--json` output on every command, predictable exit codes, fast startup.
+The CLI is the first-class driving adapter ([0007 — CLI-first driving adapter](../../../decisions/0007-cli-first-driving-adapter.md)) and must be agent-friendly: `--json` output on every command, predictable exit codes, fast startup.
 
 Two Python CLI frameworks are dominant: **Click** (mature, decorator-based, well-tested) and **Typer** (built on Click, type-hint-driven, more concise). Both meet the functional requirements; the difference is ergonomics.
 
@@ -22,7 +22,7 @@ Use **Typer** as the CLI driving adapter. Commands live under `adapters/driving/
 3. Calls exactly one use-case.
 4. Formats output (human-readable by default; structured JSON when `--json` is passed).
 
-A top-level `advisor` Typer app registers sub-apps for each command group: `validate`, `jobs`, `workspace`, `papers`, `share`, `config`, `admin`, `dev`. Admin and dev sub-apps are registered conditionally (see [architecture/0008](../../../architecture/decisions/0008-one-binary-role-gated.md)).
+A top-level `advisor` Typer app registers sub-apps for each command group: `validate`, `jobs`, `workspace`, `papers`, `share`, `config`, `admin`, `dev`. Admin and dev sub-apps are registered conditionally (see [0008 — One binary, role-gated](../../../decisions/0008-one-binary-role-gated.md)).
 
 ## Consequences
 

@@ -13,7 +13,7 @@ The frontend uses TypeScript interfaces for API responses (`ValidationResult`, `
 
 The hand-mirroring is also error-prone: small typos in optional fields, mismatched casing, fields missing entirely.
 
-Once the core's contracts ([architecture/0002](../../architecture/decisions/0002-adopt-hexagonal-architecture.md)) become authoritative, the frontend types should be *generated* from them, not hand-mirrored.
+Once the core's contracts ([0002 — Adopt hexagonal architecture](../../decisions/0002-adopt-hexagonal-architecture.md)) become authoritative, the frontend types should be *generated* from them, not hand-mirrored.
 
 ## Decision (proposed)
 
@@ -55,7 +55,7 @@ The generated file is committed to git (so the frontend builds without a Python 
 
 Acceptance happens when:
 
-1. The core's contracts are extracted ([architecture migration Step 1](../../architecture/MIGRATION.md)).
+1. The core's contracts are extracted ([architecture migration Step 1](../../MIGRATION.md)).
 2. `pydantic2ts` (or equivalent) is added to the dev dependencies with a documented generator script.
 3. `frontend/src/types/index.ts` is reduced to frontend-only additions plus a `generated.ts` import.
 

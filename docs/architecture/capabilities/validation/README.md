@@ -34,7 +34,7 @@ The validation pipeline is currently an **8-step linear sequence**, expressed as
 make_context → gather_papers → map_logic → find_evidence → evaluate_figures → evaluate_math → score_papers → compile_results
 ```
 
-Each step produces structured state that the next step consumes. The orchestrator is a core service ([architecture/0003](../../architecture/decisions/0003-core-has-no-io.md)); the work each step performs goes through driven ports (LLM, paper index, calculator, object storage).
+Each step produces structured state that the next step consumes. The orchestrator is a core service ([0003 — Core has no I/O](../../decisions/0003-core-has-no-io.md)); the work each step performs goes through driven ports (LLM, paper index, calculator, object storage).
 
 See [decisions/0001-eight-step-linear-graph](./decisions/0001-eight-step-linear-graph.md) for the choice of sequence and why parallelism is deferred.
 

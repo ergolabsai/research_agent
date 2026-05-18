@@ -10,7 +10,7 @@ Short, tracker-style list of bugs and partial implementations. Two rules:
 ### Security
 
 - **CORS is fully open** (`allow_origins=["*"]`). Acceptable in pre-alpha, blocking for production. Implies an ADR: how CORS is configured per environment.
-- **`/users/search` has no auth requirement**. Anyone can list users. Should be fixed in the same pass that introduces `Principal`-flow authz (see [architecture/0005-principal-in-every-usecase](./architecture/decisions/0005-principal-in-every-usecase.md)).
+- **`/users/search` has no auth requirement**. Anyone can list users. Should be fixed in the same pass that introduces `Principal`-flow authz (see [0005-principal-in-every-usecase](./decisions/0005-principal-in-every-usecase.md)).
 
 ### Persistence
 

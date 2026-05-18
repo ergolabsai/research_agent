@@ -9,7 +9,7 @@ superseded-by: []
 
 ## Context
 
-[Architecture/0001](../../architecture/decisions/0001-use-madr-format.md) chose MADR as the format. It does not specify the *workflow* — how new ADRs are proposed, reviewed, accepted, superseded, or rejected. Workflow gaps lead to inconsistent practice: some ADRs land as `accepted` without review; some sit as `proposed` indefinitely; some are edited in place when they should be superseded.
+[0001 — Use MADR format for ADRs](../../decisions/0001-use-madr-format.md) chose MADR as the format. It does not specify the *workflow* — how new ADRs are proposed, reviewed, accepted, superseded, or rejected. Workflow gaps lead to inconsistent practice: some ADRs land as `accepted` without review; some sit as `proposed` indefinitely; some are edited in place when they should be superseded.
 
 ## Decision
 

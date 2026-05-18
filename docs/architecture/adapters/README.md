@@ -26,7 +26,7 @@ A driven adapter:
 
 - **Business logic** — does not belong in an adapter. If a CLI command needs "validate a paper and then list related papers," the right answer is a use-case that does both, not a CLI command calling two use-cases.
 - **Authorization decisions** — handled inside use-cases via `Principal`. Adapters construct the Principal and pass it through.
-- **Cross-adapter imports** — driving adapters do not import driven adapters; driven adapters do not import each other. See [architecture/0006](../architecture/decisions/0006-no-short-circuit-imports.md).
+- **Cross-adapter imports** — driving adapters do not import driven adapters; driven adapters do not import each other. See [0006 — No short-circuit imports](../decisions/0006-no-short-circuit-imports.md).
 
 ## The adapter swap pattern
 

@@ -7,7 +7,7 @@ The user-facing surfaces of the system. Each is a translation layer between an e
 | Adapter | Purpose | Status |
 |---|---|---|
 | [FastAPI HTTP API](./decisions/0001-fastapi-for-http.md) | HTTP/JSON interface used by the React frontend and any HTTP client. | accepted |
-| [Typer CLI](./decisions/0002-typer-for-cli.md) | The CLI binary. First-class adapter per [architecture/0007](../../architecture/decisions/0007-cli-first-driving-adapter.md). | accepted |
+| [Typer CLI](./decisions/0002-typer-for-cli.md) | The CLI binary. First-class adapter per [0007 — CLI-first driving adapter](../../decisions/0007-cli-first-driving-adapter.md). | accepted |
 | [React + MUI frontend](./decisions/0003-react-mui-for-web.md) | The web UI. A driving adapter that calls the HTTP API. | accepted |
 
 ## Conventions all driving adapters follow

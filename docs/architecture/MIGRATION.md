@@ -4,7 +4,7 @@ This is a **time-bound** document. It points into the current codebase with file
 
 ## Status
 
-**Not started.** The bible is in place; no code has been moved yet. The user has indicated the codebase was written in a few days and can be rewritten or scrapped — the migration is therefore *one of three options*:
+**Not started.** The architecture docs are in place; no code has been moved yet. The user has indicated the codebase was written in a few days and can be rewritten or scrapped — the migration is therefore *one of three options*:
 
 1. **Strangler-fig migration** — move files and dependencies incrementally, preserve behavior.
 2. **Greenfield rewrite** — start a new layout, copy logic over file by file from the old code.
@@ -76,7 +76,7 @@ Mode A and Mode C only. Mode B copies content, not files.
 | Current location | New location | Notes |
 |---|---|---|
 | `advisor_pipeline/models/schemas.py` | `core/contracts/validation.py`, `core/contracts/paper.py`, `core/contracts/jobs.py` | Split by aggregate. The current single-file shape is fine to copy then split. |
-| `advisor_pipeline/orchestrator.py` | `core/services/orchestrator.py` | LangGraph coordination is allowed in core ([capabilities/validation/0002](../capabilities/validation/decisions/0002-langgraph-in-core.md)). Per-node I/O moves to port calls. |
+| `advisor_pipeline/orchestrator.py` | `core/services/orchestrator.py` | LangGraph coordination is allowed in core ([capabilities/validation/0002](./capabilities/validation/decisions/0002-langgraph-in-core.md)). Per-node I/O moves to port calls. |
 | `advisor_pipeline/agents/figure_evaluator.py` (or wherever it lives today) | `core/services/figure_evaluator.py` | Constructor takes `LLMClient`. |
 | `advisor_pipeline/agents/math_evaluator.py` | `core/services/math_evaluator.py` | Constructor takes `LLMClient` and `Calculator`. |
 | `advisor_pipeline/agents/librarian.py` | `core/services/librarian.py` | Constructor takes `LLMClient` and `PaperIndex` (+ eventually `PaperLookup`). |
@@ -90,7 +90,7 @@ Mode A and Mode C only. Mode B copies content, not files.
 | `backend/app/storage.py` | `adapters/driven/object_storage/local.py` and `adapters/driven/object_storage/minio.py` | The current branching becomes polymorphism. |
 | `backend/app/models.py` | Stay in adapter land as the SQLModel schema. Mirror the entities as plain Pydantic in `core/contracts/` (User, Document, Workspace, etc.). | The SQLModel models are infrastructure (they know about tables); the contract types are core. |
 | `scripts/start-dev.bat` | `deploy/scripts/start-dev.bat` | Pure relocation. |
-| `docker/docker-compose.yml`, `docker/python.Dockerfile` | Split into per-service Dockerfiles under `deploy/docker/` per [infrastructure/0002](../infrastructure/decisions/0002-docker-compose-topology.md). | |
+| `docker/docker-compose.yml`, `docker/python.Dockerfile` | Split into per-service Dockerfiles under `deploy/docker/` per [infrastructure/0002](./infrastructure/decisions/0002-docker-compose-topology.md). | |
 
 ### Where Principal construction lives
 
@@ -101,14 +101,14 @@ Mode A and Mode C only. Mode B copies content, not files.
 
 ### Frontend touchpoints
 
-- `frontend/src/types/index.ts:139` — hand-mirrored `ValidationResult` interface. Becomes generated ([frontend/0004](../frontend/decisions/0004-generated-types-from-contracts.md)). The generator script lives under `scripts/codegen/` and emits `frontend/src/types/generated.ts`.
+- `frontend/src/types/index.ts:139` — hand-mirrored `ValidationResult` interface. Becomes generated ([frontend/0004](./frontend/decisions/0004-generated-types-from-contracts.md)). The generator script lives under `scripts/codegen/` and emits `frontend/src/types/generated.ts`.
 - `frontend/src/api/client.ts` — axios setup. Stays roughly as-is; its modules (`authAPI`, `documentsAPI`, etc.) become thin wrappers around the generated types.
 
 ### `pyproject.toml`
 
 - Current `pyproject.toml:69-71` declares one editable package. Becomes:
   - Multiple package declarations under `[tool.setuptools.packages.find]` for `core`, `adapters`, `composition`.
-  - A `[tool.importlinter]` section with the boundary contracts from [process/0001](../process/decisions/0001-import-linter-as-ci-gate.md).
+  - A `[tool.importlinter]` section with the boundary contracts from [process/0001](./process/decisions/0001-import-linter-as-ci-gate.md).
   - The script entry point `advisor = composition.cli_app:main` for the CLI.
 
 ---
@@ -137,4 +137,4 @@ Each step's done-criterion:
 
 ## When to archive this document
 
-When all the file moves listed here are complete and the `import-linter` contracts cover the whole project, this file is no longer current — it describes a path no longer being walked. At that point: move to `docs/bible/_archive/MIGRATION-2026.md` or similar, with a header noting the date the migration completed.
+When all the file moves listed here are complete and the `import-linter` contracts cover the whole project, this file is no longer current — it describes a path no longer being walked. At that point: move to `docs/architecture/_archive/MIGRATION-2026.md` or similar, with a header noting the date the migration completed.

@@ -19,7 +19,7 @@ The `core/` layer performs **no I/O of any kind**. Not minimal I/O — none.
 
 **Allowed imports inside `core/`:** Python stdlib (excluding I/O modules — no `socket`, no `urllib`, no `sqlite3`), `pydantic`, `pydantic-settings` *for contract definitions only*, `networkx`, `sympy`, `typing`, `typing_extensions`, `dataclasses`. *Coordination* libraries (e.g., `langgraph` for the validation orchestrator) are allowed *only* if they do not themselves perform I/O.
 
-Enforcement is a hard CI gate via `import-linter`, not a code-review convention. See [process/0001-import-linter-as-ci-gate](../../process/decisions/0001-import-linter-as-ci-gate.md).
+Enforcement is a hard CI gate via `import-linter`, not a code-review convention. See [process/0001-import-linter-as-ci-gate](../process/decisions/0001-import-linter-as-ci-gate.md).
 
 ## Consequences
 
@@ -30,7 +30,7 @@ Enforcement is a hard CI gate via `import-linter`, not a code-review convention.
 
 **Hard:**
 - The first time a use-case "obviously" needs to make an HTTP call to an external API, the answer is "no — define a driven port for it." This will feel like overkill until the second adapter (e.g., the CLI) tries to reuse the same use-case.
-- LangGraph in core requires a careful boundary: the *graph structure* and *node sequencing* are pure; the *work each node does* must go through ports. See [capabilities/validation/0002-langgraph-in-core](../../capabilities/validation/decisions/0002-langgraph-in-core.md).
+- LangGraph in core requires a careful boundary: the *graph structure* and *node sequencing* are pure; the *work each node does* must go through ports. See [capabilities/validation/0002-langgraph-in-core](../capabilities/validation/decisions/0002-langgraph-in-core.md).
 - pydantic-settings can read environment variables, which is technically I/O. By convention, settings are constructed in the composition layer and passed *as values* into the core — the core never imports `pydantic_settings` to read env directly.
 
 **Forecloses:**

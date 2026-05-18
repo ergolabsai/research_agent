@@ -9,7 +9,7 @@ superseded-by: []
 
 ## Context
 
-[Architecture/0002](../../architecture/decisions/0002-adopt-hexagonal-architecture.md) names AI-native development as one of the four pressures the architecture serves. The promise is: an agent rebuilding a single file should be able to do so given only the file's path, the contracts/ports it depends on, and the relevant ADRs — without reading the rest of the codebase.
+[0002 — Adopt hexagonal architecture](../../decisions/0002-adopt-hexagonal-architecture.md) names AI-native development as one of the four pressures the architecture serves. The promise is: an agent rebuilding a single file should be able to do so given only the file's path, the contracts/ports it depends on, and the relevant ADRs — without reading the rest of the codebase.
 
 This is a *property* the architecture is supposed to have. Properties decay if they are not checked. Lint rules check imports; this property requires a different check — a *reasoning* check during code review.
 

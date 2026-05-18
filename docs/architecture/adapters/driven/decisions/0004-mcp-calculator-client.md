@@ -42,7 +42,7 @@ Current implementation: `advisor_pipeline/mcp_client.py` (will move to `adapters
 - Inter-process communication adds latency compared to a direct SymPy import.
 
 **Forecloses:**
-- Direct SymPy imports in core. SymPy is allowed in core ([architecture/0003](../../../architecture/decisions/0003-core-has-no-io.md)'s allow-list), but the *math verification capability* lives behind the port — domain `core/domain/` code may use SymPy for pure-math value objects (e.g., simplifying a formula), but verification goes through the port.
+- Direct SymPy imports in core. SymPy is allowed in core ([0003 — Core has no I/O](../../../decisions/0003-core-has-no-io.md)'s allow-list), but the *math verification capability* lives behind the port — domain `core/domain/` code may use SymPy for pure-math value objects (e.g., simplifying a formula), but verification goes through the port.
 
 ## Alternatives considered
 

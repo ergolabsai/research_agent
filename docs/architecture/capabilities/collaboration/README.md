@@ -25,7 +25,7 @@ The relationship between a document and a *paper* (the validation capability's c
 - `ShareDocument`, `UnshareDocument`, `ListDocumentShares`
 - `UploadAttachment`, `DeleteAttachment`, `GetAttachmentUrl`
 
-Each use-case takes a `Principal` as its first argument ([architecture/0005](../../architecture/decisions/0005-principal-in-every-usecase.md)) and performs ownership / membership checks.
+Each use-case takes a `Principal` as its first argument ([0005 — Principal in every use-case](../../decisions/0005-principal-in-every-usecase.md)) and performs ownership / membership checks.
 
 ## Ports this capability depends on
 

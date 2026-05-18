@@ -28,7 +28,7 @@ The graph is *not* persisted by the domain — persistence is via the `JobStore`
 **Easy:**
 - Use-cases and services pass the `PaperGraph` around as a regular Python object. Queries are method calls, not service calls.
 - The graph is testable in isolation — construct one from a fixture `ValidationResult`, assert on query results.
-- NetworkX is a pure-Python coordination library, allowed in core by [architecture/0003](../../../architecture/decisions/0003-core-has-no-io.md).
+- NetworkX is a pure-Python coordination library, allowed in core by [0003 — Core has no I/O](../../../decisions/0003-core-has-no-io.md).
 
 **Hard:**
 - Serialization for storage (via `JobStore`) is JSON-of-`node_link_data`. The `JobStore` adapter must understand this format. Mitigation: keep the serialization helpers next to the graph code; the adapter calls them rather than re-implementing.

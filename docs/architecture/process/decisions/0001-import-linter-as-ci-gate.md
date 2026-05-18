@@ -9,7 +9,7 @@ superseded-by: []
 
 ## Context
 
-Hexagonal architecture survives only as long as the boundary rules are enforced. [Architecture/0003](../../architecture/decisions/0003-core-has-no-io.md) (core has no I/O) and [0006](../../architecture/decisions/0006-no-short-circuit-imports.md) (no short-circuit imports) describe the rules. The question is *how* they get enforced.
+Hexagonal architecture survives only as long as the boundary rules are enforced. [0003 — Core has no I/O](../../decisions/0003-core-has-no-io.md) and [0006 — No short-circuit imports](../../decisions/0006-no-short-circuit-imports.md) describe the rules. The question is *how* they get enforced.
 
 Three options:
 

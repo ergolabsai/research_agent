@@ -11,11 +11,11 @@ Capabilities **do not** describe HTTP endpoints, CLI commands, or database schem
 
 ## Why capabilities, not current-system folders
 
-The original bible plan organized docs by current code structure: `frontend/`, `backend/`, `pipeline/`. That mirroring made sense for descriptive docs but breaks under hexagonal architecture, where the code reorganizes into `core/`, `adapters/`, `composition/` — orthogonal to what the system *does*.
+An earlier draft of the docs organized by current code structure: `frontend/`, `backend/`, `pipeline/`. That mirroring made sense for descriptive docs but breaks under hexagonal architecture, where the code reorganizes into `core/`, `adapters/`, `composition/` — orthogonal to what the system *does*.
 
 Capabilities survive both: validation is a capability whether the orchestrator lives in `advisor_pipeline/` or `core/services/`. Identity is a capability whether passwords are bcrypt or argon2. Organizing docs by capability makes the docs robust to architectural change.
 
-See [architecture/0002 — Adopt hexagonal architecture](../architecture/decisions/0002-adopt-hexagonal-architecture.md) for the underlying choice.
+See [0002 — Adopt hexagonal architecture](../decisions/0002-adopt-hexagonal-architecture.md) for the underlying choice.
 
 ## Capabilities in this project
 

@@ -9,7 +9,7 @@ superseded-by: []
 
 ## Context
 
-[Architecture/0003 — Core has no I/O](../../../architecture/decisions/0003-core-has-no-io.md) forbids I/O-touching imports in `core/`. The validation orchestrator uses LangGraph's `StateGraph` to express the 8-step sequence. LangChain (which LangGraph depends on) is normally considered an "AI orchestration library that touches I/O." This creates an apparent contradiction.
+[0003 — Core has no I/O](../../../decisions/0003-core-has-no-io.md) forbids I/O-touching imports in `core/`. The validation orchestrator uses LangGraph's `StateGraph` to express the 8-step sequence. LangChain (which LangGraph depends on) is normally considered an "AI orchestration library that touches I/O." This creates an apparent contradiction.
 
 A decision is needed: is LangGraph allowed in core, or must the orchestrator be rewritten as plain Python or moved to an adapter?
 

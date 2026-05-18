@@ -47,7 +47,7 @@ LanceDB is the *current* implementation, provided by a driven adapter (`adapters
 
 ## Alternatives considered
 
-- **Keep direct LanceDB calls but wrap them in a "search helper" module in core** — rejected. A helper module still imports LanceDB into core, breaching [architecture/0003](../../../architecture/decisions/0003-core-has-no-io.md). The port is the right answer.
+- **Keep direct LanceDB calls but wrap them in a "search helper" module in core** — rejected. A helper module still imports LanceDB into core, breaching [0003 — Core has no I/O](../../../decisions/0003-core-has-no-io.md). The port is the right answer.
 - **A more elaborate port with many query primitives** — rejected. The port surfaces what use-cases need; speculative methods go in as use-cases require them.
 - **No port, but a façade in adapters/** — rejected. Without a Protocol in core, the use-case has no type to declare. The port is what makes the use-case's dependency declarable.
 
