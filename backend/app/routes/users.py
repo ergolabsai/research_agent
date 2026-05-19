@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Chelsea Liekhus-Schmaltz and Johnathon Barhydt
+#
+# SPDX-License-Identifier: AGPL-3.0-only
+
 # backend/app/routes/users.py
 from fastapi import APIRouter, Depends
 from sqlmodel import Session, select
