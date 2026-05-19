@@ -72,9 +72,13 @@ for i in "${!INCLUDE_EXTS[@]}"; do
   name_args+=( -name "*.${ext}" )
 done
 
-mapfile -t files < <(
-  find . "${prune_args[@]}" \( "${name_args[@]}" \) -type f -print
-)
+# Populate the files array without `mapfile` (bash 4+) so this also
+# runs on the bash 3.2 that ships with macOS. Uses NUL delimiters so
+# filenames with spaces or newlines are handled safely.
+files=()
+while IFS= read -r -d '' f; do
+  files+=( "$f" )
+done < <(find . "${prune_args[@]}" \( "${name_args[@]}" \) -type f -print0)
 
 if [[ ${#files[@]} -eq 0 ]]; then
   echo "No source files matched. Check INCLUDE_EXTS / EXCLUDE_DIRS."

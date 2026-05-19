@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Chelsea Liekhus-Schmaltz and Johnathon Barhydt
+#
+# SPDX-License-Identifier: AGPL-3.0-only
+
 # backend/app/security.py
 from datetime import timedelta, timezone
 from typing import Optional

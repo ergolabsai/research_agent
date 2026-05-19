@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Chelsea Liekhus-Schmaltz and Johnathon Barhydt
+#
+# SPDX-License-Identifier: AGPL-3.0-only
+
 """Shared LLM utilities replacing BaseAgent's dual-client pattern.
 
 Provides a single LLM instance (Anthropic or OpenRouter) with helper methods for:
