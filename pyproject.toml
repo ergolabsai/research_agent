@@ -1,4 +1,4 @@
-[project]
+﻿[project]
 name = "research-advisor"
 version = "0.1.0"
 description = "Multi-agent research paper validation system"
@@ -67,5 +67,5 @@ requires = ["setuptools>=68.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools.packages.find]
-include = ["backend*", "advisor_pipeline*", "core*"]
+include = ["backend*", "advisor_pipeline*", "core*", "adapters*", "composition*"]
 exclude = ["frontend*", "node_modules*", "scripts*"]

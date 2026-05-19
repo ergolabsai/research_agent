@@ -9,6 +9,7 @@ from datetime import timedelta
 from pydantic import BaseModel
 import secrets
 import uuid
+from typing import Optional
 from app.models import (
     User, UserCreate, UserResponse, TokenResponse
 )
@@ -18,6 +19,10 @@ from app.security import (
     get_current_user_id, REFRESH_TOKEN_EXPIRE_DAYS
 )
 from app.time import now
+from composition.container import get_register_user
+from core.contracts.auth import Principal, Role, UserId
+from core.contracts.errors import DuplicateEmail, DuplicateUsername
+from core.use_cases.identity.register_user import RegisterUser, RegisterUserRequest
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
@@ -27,91 +32,72 @@ class LoginRequest(BaseModel):
     password: str
 
 
+def _resolve_guest_principal(
+    authorization: Optional[str], session: Session
+) -> Optional[Principal]:
+    """Return a guest Principal if the caller holds a valid guest token, else None.
+
+    This DB lookup exists because legacy tokens (minted before the hex migration)
+    do not carry an is_guest claim. Remove once all tokens are minted by JoseTokenIssuer.
+    """
+    if not authorization:
+        return None
+    try:
+        scheme, token = authorization.split(" ")
+        if scheme.lower() != "bearer":
+            return None
+        user_id = verify_token(token)
+        if not user_id:
+            return None
+        row = session.get(User, user_id)
+        if row and (row.email.startswith("guest+") or row.username.startswith("guest_")):
+            return Principal(
+                user_id=UserId(row.id),
+                email=row.email,
+                roles=[Role.GUEST],
+                is_guest=True,
+            )
+    except ValueError:
+        pass
+    return None
+
+
 @router.post("/register", response_model=TokenResponse)
-def register(
+async def register(
     user_create: UserCreate,
     response: Response,
     session: Session = Depends(get_session),
     authorization: str | None = Header(None),
+    register_user: RegisterUser = Depends(get_register_user),
 ):
-    # If a guest is authenticated, convert the existing account instead of creating a new one.
-    guest_user = None
-    if authorization:
-        try:
-            scheme, token = authorization.split(" ")
-            if scheme.lower() == "bearer":
-                user_id = verify_token(token)
-                if user_id:
-                    candidate = session.get(User, user_id)
-                    if candidate and (
-                        candidate.email.startswith("guest+")
-                        or candidate.username.startswith("guest_")
-                    ):
-                        guest_user = candidate
-        except ValueError:
-            guest_user = None
+    principal = _resolve_guest_principal(authorization, session)
 
-    # Check for email/username collisions.
-    existing_email = session.exec(
-        select(User).where(User.email == user_create.email)
-    ).first()
-    if existing_email and (not guest_user or existing_email.id != guest_user.id):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already registered"
+    try:
+        result = await register_user.execute(
+            principal,
+            RegisterUserRequest(
+                email=user_create.email,
+                username=user_create.username,
+                password=user_create.password,
+            ),
         )
+    except DuplicateEmail:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email already registered")
+    except DuplicateUsername:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username already taken")
 
-    existing_username = session.exec(
-        select(User).where(User.username == user_create.username)
-    ).first()
-    if existing_username and (not guest_user or existing_username.id != guest_user.id):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Username already taken"
-        )
-
-    hashed_password = get_password_hash(user_create.password)
-
-    if guest_user:
-        guest_user.email = user_create.email
-        guest_user.username = user_create.username
-        guest_user.hashed_password = hashed_password
-        guest_user.updated_at = now()
-        session.add(guest_user)
-        session.commit()
-        session.refresh(guest_user)
-        user = guest_user
-    else:
-        # Create new user
-        user = User(
-            email=user_create.email,
-            username=user_create.username,
-            hashed_password=hashed_password
-        )
-        session.add(user)
-        session.commit()
-        session.refresh(user)
-
-    # Generate tokens
-    access_token = create_access_token(
-        data={"sub": user.id},
-        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    )
-    refresh_token = create_refresh_token(data={"sub": user.id})
-
-    # Set refresh token as HTTP-only cookie
     response.set_cookie(
         key="refresh_token",
-        value=refresh_token,
-        max_age=REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,  # Convert days to seconds
+        value=result.refresh_token.token,
+        max_age=REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
         httponly=True,
-        secure=True,  # Should be True in production with HTTPS
-        samesite="lax"
+        secure=True,
+        samesite="lax",
     )
 
     return TokenResponse(
-        access_token=access_token,
-        refresh_token=refresh_token
+        access_token=result.access_token,
+        refresh_token=result.refresh_token.token,
     )
 
 
