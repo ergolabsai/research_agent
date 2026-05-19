@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Chelsea Liekhus-Schmaltz and Johnathon Barhydt
+#
+# SPDX-License-Identifier: AGPL-3.0-only
+
 """Thin sync wrapper around the MCP SDK for the calculator server.
 
 Runs the async MCP ClientSession in a background thread so that

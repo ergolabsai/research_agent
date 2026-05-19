@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Chelsea Liekhus-Schmaltz and Johnathon Barhydt
+//
+// SPDX-License-Identifier: AGPL-3.0-only
+
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Typography, Link, Divider, Box } from "@mui/material";

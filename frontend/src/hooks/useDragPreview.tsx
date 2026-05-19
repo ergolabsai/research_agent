@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Chelsea Liekhus-Schmaltz and Johnathon Barhydt
+//
+// SPDX-License-Identifier: AGPL-3.0-only
+
 import { useRef, useState } from "react";
 import { Box, Typography, useTheme } from "@mui/material";
 import { InsertDriveFile as FileTextIcon } from "@mui/icons-material";

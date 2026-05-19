@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Chelsea Liekhus-Schmaltz and Johnathon Barhydt
+#
+# SPDX-License-Identifier: AGPL-3.0-only
+
 """Librarian agent — finds related papers and scores relevancy + convergence.
 
 Replaces the old CitationChecker.  Runs in two passes:

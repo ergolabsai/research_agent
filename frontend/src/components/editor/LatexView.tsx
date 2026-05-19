@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Chelsea Liekhus-Schmaltz and Johnathon Barhydt
+//
+// SPDX-License-Identifier: AGPL-3.0-only
+
 import { useState } from "react";
 import { Box, TextField, IconButton, Tooltip, useTheme } from "@mui/material";
 import { ContentCopy as CopyIcon, Check as CheckIcon } from "@mui/icons-material";

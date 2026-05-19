@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Chelsea Liekhus-Schmaltz and Johnathon Barhydt
+//
+// SPDX-License-Identifier: AGPL-3.0-only
+
 /**
  * Graph analysis fixture data for the demo paper:
  * "Ultrafast isomerization initiated by X-ray core ionization"

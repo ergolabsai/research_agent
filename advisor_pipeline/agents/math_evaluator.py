@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Chelsea Liekhus-Schmaltz and Johnathon Barhydt
+#
+# SPDX-License-Identifier: AGPL-3.0-only
+
 """Math evaluator — validates mathematical evidence using MCP calculator tools.
 
 Uses a LangGraph ReAct agent with calculator tools, then structures

@@ -1,4 +1,8 @@
-﻿import { useParams } from "react-router-dom";
+﻿// SPDX-FileCopyrightText: 2026 Chelsea Liekhus-Schmaltz and Johnathon Barhydt
+//
+// SPDX-License-Identifier: AGPL-3.0-only
+
+import { useParams } from "react-router-dom";
 import {
   Box,
   TextField,
