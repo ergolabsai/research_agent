@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Chelsea Liekhus-Schmaltz and Johnathon Barhydt
+#
+# SPDX-License-Identifier: AGPL-3.0-only
+
 """Visualize a paper graph as an interactive HTML network using pyvis."""
 
 from advisor_pipeline.models.paper_graph import (

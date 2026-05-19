@@ -1,4 +1,9 @@
 #!/usr/bin/env python3
+
+# SPDX-FileCopyrightText: 2026 Chelsea Liekhus-Schmaltz and Johnathon Barhydt
+#
+# SPDX-License-Identifier: AGPL-3.0-only
+
 """
 Test script for the symbolic calculator.
 

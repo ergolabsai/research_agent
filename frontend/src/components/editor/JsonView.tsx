@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Chelsea Liekhus-Schmaltz and Johnathon Barhydt
+//
+// SPDX-License-Identifier: AGPL-3.0-only
+
 import { useState, useEffect } from "react";
 import { Box, TextField, Typography, useTheme } from "@mui/material";
 import type { ContentJson } from "../../types/contentJson";

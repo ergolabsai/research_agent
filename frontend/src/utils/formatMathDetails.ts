@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Chelsea Liekhus-Schmaltz and Johnathon Barhydt
+//
+// SPDX-License-Identifier: AGPL-3.0-only
+
 /** Convert raw math validation details text into well-structured markdown. */
 export function formatMathDetails(raw: string): string {
   return raw

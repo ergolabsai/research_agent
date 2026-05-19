@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Chelsea Liekhus-Schmaltz and Johnathon Barhydt
+#
+# SPDX-License-Identifier: AGPL-3.0-only
+
 """MCP Advisor Server — stdio transport.
 
 Registers prompt templates and tools for the Advisor pipeline.

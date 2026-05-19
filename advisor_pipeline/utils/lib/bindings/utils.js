@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: 2026 Chelsea Liekhus-Schmaltz and Johnathon Barhydt
+//
+// SPDX-License-Identifier: AGPL-3.0-only
+
 function neighbourhoodHighlight(params) {
   // console.log("in nieghbourhoodhighlight");
   allNodes = nodes.get({ returnType: "Object" });

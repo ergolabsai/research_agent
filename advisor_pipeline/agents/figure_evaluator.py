@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: 2026 Chelsea Liekhus-Schmaltz and Johnathon Barhydt
+#
+# SPDX-License-Identifier: AGPL-3.0-only
+
 """Figure evaluator — evaluates whether figures support the claims made about them.
 
 4-stage evaluation per figure:
