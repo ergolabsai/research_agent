@@ -15,6 +15,10 @@ class DuplicateUsername(DomainError):
     pass
 
 
+class InvalidCredentials(DomainError):
+    pass
+
+
 class InvalidToken(DomainError):
     pass
 

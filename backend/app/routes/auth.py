@@ -7,27 +7,27 @@ from datetime import datetime, timedelta, timezone
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, Response, Request, Header, status
-from pydantic import BaseModel
-from sqlmodel import Session, select
+from pydantic import BaseModel, Field
+from sqlmodel import Session
 
 from app.models import User, UserCreate, UserResponse, TokenResponse
 from app.security import (
-    verify_password, get_session,
-    get_current_user_id, ACCESS_TOKEN_EXPIRE_MINUTES, REFRESH_TOKEN_EXPIRE_DAYS,
+    get_session, get_current_user_id, ACCESS_TOKEN_EXPIRE_MINUTES, REFRESH_TOKEN_EXPIRE_DAYS,
 )
-from composition.container import get_register_user, get_token_issuer
+from composition.container import get_login_user, get_register_user, get_token_issuer
 from core.contracts.auth import Principal, Role, UserId
-from core.contracts.errors import DuplicateEmail, DuplicateUsername, ExpiredToken, InvalidToken
+from core.contracts.errors import DuplicateEmail, DuplicateUsername, ExpiredToken, InvalidCredentials, InvalidToken
 from core.contracts.tokens import TokenClaims
 from core.ports.token_issuer import TokenIssuer
+from core.use_cases.identity.login_user import LoginUser, LoginUserRequest
 from core.use_cases.identity.register_user import RegisterUser, RegisterUserRequest
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
 class LoginRequest(BaseModel):
-    identifier: str  # Can be email or username
-    password: str
+    identifier: str = Field(min_length=1)
+    password: str = Field(min_length=1)
 
 
 def _is_guest_user(user: User) -> bool:
@@ -135,37 +135,23 @@ async def try_it_now(
 async def login(
     login_request: LoginRequest,
     response: Response,
-    session: Session = Depends(get_session),
-    token_issuer: TokenIssuer = Depends(get_token_issuer),
+    login_user: LoginUser = Depends(get_login_user),
 ):
-    user = session.exec(
-        select(User).where(
-            (User.email == login_request.identifier) |
-            (User.username == login_request.identifier)
+    try:
+        result = await login_user.execute(
+            LoginUserRequest(
+                identifier=login_request.identifier,
+                password=login_request.password,
+            )
         )
-    ).first()
-
-    if not user or not verify_password(login_request.password, user.hashed_password):
+    except InvalidCredentials:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid email, username, or password",
         )
 
-    now = datetime.now(timezone.utc)
-    is_guest = _is_guest_user(user)
-    claims = TokenClaims(
-        sub=str(user.id),
-        email=user.email,
-        roles=[Role.GUEST if is_guest else Role.USER],
-        is_guest=is_guest,
-        iat=now,
-        exp=now + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
-    )
-    access_token = await token_issuer.mint_access_token(claims)
-    refresh = await token_issuer.mint_refresh_token(UserId(user.id))
-
-    _set_refresh_cookie(response, refresh.token)
-    return TokenResponse(access_token=access_token, refresh_token=refresh.token)
+    _set_refresh_cookie(response, result.refresh_token.token)
+    return TokenResponse(access_token=result.access_token, refresh_token=result.refresh_token.token)
 
 
 @router.post("/refresh", response_model=TokenResponse)

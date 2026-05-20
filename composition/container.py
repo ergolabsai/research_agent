@@ -17,6 +17,7 @@ from adapters.driven.repositories.sqlite_user_repository import SqliteUserReposi
 from advisor_pipeline.config.settings import settings
 from app.security import get_session
 from core.ports.token_issuer import TokenIssuer
+from core.use_cases.identity.login_user import LoginUser
 from core.use_cases.identity.register_user import RegisterUser
 
 # Singletons — stateless, safe to reuse across requests.
@@ -44,6 +45,15 @@ def get_token_issuer() -> TokenIssuer:
             public_key_pem=settings.paseto_public_key,
         )
     return _token_issuer
+
+
+def get_login_user(session: Session = Depends(get_session)) -> LoginUser:
+    """FastAPI dependency that builds a LoginUser use case for the current request."""
+    return LoginUser(
+        user_repo=SqliteUserRepository(session),
+        password_hasher=_password_hasher,
+        token_issuer=get_token_issuer(),
+    )
 
 
 def get_register_user(session: Session = Depends(get_session)) -> RegisterUser:

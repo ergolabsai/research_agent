@@ -16,7 +16,10 @@ class BcryptPasswordHasher:
         return bcrypt.hashpw(password.encode(), salt).decode()
 
     async def verify(self, password: str, hashed: str) -> bool:
-        return bcrypt.checkpw(password.encode(), hashed.encode())
+        try:
+            return bcrypt.checkpw(password.encode(), hashed.encode())
+        except (ValueError, TypeError):
+            return False
 
     async def needs_rehash(self, hashed: str) -> bool:
         # bcrypt encodes the work factor in the hash string: $2b$RR$...
