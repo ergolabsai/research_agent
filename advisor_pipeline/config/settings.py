@@ -19,8 +19,14 @@ class Settings(BaseSettings):
     openai_api_key: Optional[str] = os.getenv("OPENAI_API_KEY", None)
 
     # Backend / SQLite
-    secret_key: str = os.getenv("SECRET_KEY", "change-this-to-a-random-secret-key")
     database_url: str = os.getenv("DATABASE_URL", "sqlite:///./backend/data/app.db")
+
+    # PASETO v4.public — Ed25519 key pair (PEM-encoded).
+    # Generate once: openssl genpkey -algorithm ed25519 -out ed25519_private.pem
+    #                openssl pkey -in ed25519_private.pem -pubout -out ed25519_public.pem
+    # In .env, use a quoted multiline value or collapse with literal \n.
+    paseto_private_key: str = os.getenv("PASETO_PRIVATE_KEY", "")
+    paseto_public_key: str = os.getenv("PASETO_PUBLIC_KEY", "")
 
     # MCP Server
     mcp_server_url: Optional[str] = os.getenv("MCP_SERVER_URL", None)

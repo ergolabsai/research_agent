@@ -15,7 +15,7 @@ pandas
 pydantic
 pydantic-settings
 python-dotenv
-python-jose[cryptography]
+pyseto
 python-multipart
 sqlmodel
 tzdata

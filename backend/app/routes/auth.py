@@ -3,25 +3,23 @@
 # SPDX-License-Identifier: AGPL-3.0-only
 
 # backend/app/routes/auth.py
-from fastapi import APIRouter, Depends, HTTPException, status, Header, Response, Request
-from sqlmodel import Session, select
-from datetime import timedelta
-from pydantic import BaseModel
-import secrets
+from datetime import datetime, timedelta, timezone
 import uuid
-from typing import Optional
-from app.models import (
-    User, UserCreate, UserResponse, TokenResponse
-)
+
+from fastapi import APIRouter, Depends, HTTPException, Response, Request, Header, status
+from pydantic import BaseModel
+from sqlmodel import Session, select
+
+from app.models import User, UserCreate, UserResponse, TokenResponse
 from app.security import (
-    get_password_hash, verify_password, create_access_token,
-    create_refresh_token, verify_token, ACCESS_TOKEN_EXPIRE_MINUTES, get_session,
-    get_current_user_id, REFRESH_TOKEN_EXPIRE_DAYS
+    verify_password, get_session,
+    get_current_user_id, ACCESS_TOKEN_EXPIRE_MINUTES, REFRESH_TOKEN_EXPIRE_DAYS,
 )
-from app.time import now
-from composition.container import get_register_user
+from composition.container import get_register_user, get_token_issuer
 from core.contracts.auth import Principal, Role, UserId
-from core.contracts.errors import DuplicateEmail, DuplicateUsername
+from core.contracts.errors import DuplicateEmail, DuplicateUsername, ExpiredToken, InvalidToken
+from core.contracts.tokens import TokenClaims
+from core.ports.token_issuer import TokenIssuer
 from core.use_cases.identity.register_user import RegisterUser, RegisterUserRequest
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -32,45 +30,53 @@ class LoginRequest(BaseModel):
     password: str
 
 
-def _resolve_guest_principal(
-    authorization: Optional[str], session: Session
-) -> Optional[Principal]:
-    """Return a guest Principal if the caller holds a valid guest token, else None.
+def _is_guest_user(user: User) -> bool:
+    return user.email.startswith("guest+") or user.username.startswith("guest_")
 
-    This DB lookup exists because legacy tokens (minted before the hex migration)
-    do not carry an is_guest claim. Remove once all tokens are minted by JoseTokenIssuer.
-    """
+
+def _set_refresh_cookie(response: Response, token: str) -> None:
+    response.set_cookie(
+        key="refresh_token",
+        value=token,
+        max_age=REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
+        httponly=True,
+        secure=True,
+        samesite="lax",
+    )
+
+
+async def _resolve_guest_principal(
+    authorization: str | None, token_issuer: TokenIssuer
+) -> Principal | None:
+    """Return a guest Principal if the caller holds a valid guest PASETO token, else None."""
     if not authorization:
         return None
     try:
-        scheme, token = authorization.split(" ")
+        scheme, token = authorization.split(" ", 1)
         if scheme.lower() != "bearer":
             return None
-        user_id = verify_token(token)
-        if not user_id:
+        claims = await token_issuer.verify_access_token(token)
+        if not claims.is_guest:
             return None
-        row = session.get(User, user_id)
-        if row and (row.email.startswith("guest+") or row.username.startswith("guest_")):
-            return Principal(
-                user_id=UserId(row.id),
-                email=row.email,
-                roles=[Role.GUEST],
-                is_guest=True,
-            )
-    except ValueError:
-        pass
-    return None
+        return Principal(
+            user_id=UserId(int(claims.sub)),
+            email=claims.email,
+            roles=[Role.GUEST],
+            is_guest=True,
+        )
+    except (ValueError, ExpiredToken, InvalidToken):
+        return None
 
 
 @router.post("/register", response_model=TokenResponse)
 async def register(
     user_create: UserCreate,
     response: Response,
-    session: Session = Depends(get_session),
     authorization: str | None = Header(None),
     register_user: RegisterUser = Depends(get_register_user),
+    token_issuer: TokenIssuer = Depends(get_token_issuer),
 ):
-    principal = _resolve_guest_principal(authorization, session)
+    principal = await _resolve_guest_principal(authorization, token_issuer)
 
     try:
         result = await register_user.execute(
@@ -86,15 +92,7 @@ async def register(
     except DuplicateUsername:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Username already taken")
 
-    response.set_cookie(
-        key="refresh_token",
-        value=result.refresh_token.token,
-        max_age=REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
-        httponly=True,
-        secure=True,
-        samesite="lax",
-    )
-
+    _set_refresh_cookie(response, result.refresh_token.token)
     return TokenResponse(
         access_token=result.access_token,
         refresh_token=result.refresh_token.token,
@@ -102,45 +100,44 @@ async def register(
 
 
 @router.post("/try", response_model=TokenResponse)
-def try_it_now(response: Response, session: Session = Depends(get_session)):
+async def try_it_now(
+    response: Response,
+    session: Session = Depends(get_session),
+    token_issuer: TokenIssuer = Depends(get_token_issuer),
+):
     guest_suffix = uuid.uuid4().hex[:12]
-    guest_email = f"guest+{guest_suffix}@try.me"
-    guest_username = f"guest_{guest_suffix[:8]}"
-    guest_password = secrets.token_urlsafe(24)
-
     user = User(
-        email=guest_email,
-        username=guest_username,
-        hashed_password=get_password_hash(guest_password)
+        email=f"guest+{guest_suffix}@try.me",
+        username=f"guest_{guest_suffix[:8]}",
+        hashed_password="!",  # unusable sentinel — guests authenticate via tokens only
     )
     session.add(user)
     session.commit()
     session.refresh(user)
 
-    access_token = create_access_token(
-        data={"sub": user.id},
-        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    now = datetime.now(timezone.utc)
+    claims = TokenClaims(
+        sub=str(user.id),
+        email=user.email,
+        roles=[Role.GUEST],
+        is_guest=True,
+        iat=now,
+        exp=now + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
     )
-    refresh_token = create_refresh_token(data={"sub": user.id})
+    access_token = await token_issuer.mint_access_token(claims)
+    refresh = await token_issuer.mint_refresh_token(UserId(user.id))
 
-    response.set_cookie(
-        key="refresh_token",
-        value=refresh_token,
-        max_age=REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,
-        httponly=True,
-        secure=True,
-        samesite="lax"
-    )
-
-    return TokenResponse(
-        access_token=access_token,
-        refresh_token=refresh_token
-    )
+    _set_refresh_cookie(response, refresh.token)
+    return TokenResponse(access_token=access_token, refresh_token=refresh.token)
 
 
 @router.post("/login", response_model=TokenResponse)
-def login(login_request: LoginRequest, response: Response, session: Session = Depends(get_session)):
-    # Find user by email or username
+async def login(
+    login_request: LoginRequest,
+    response: Response,
+    session: Session = Depends(get_session),
+    token_issuer: TokenIssuer = Depends(get_token_issuer),
+):
     user = session.exec(
         select(User).where(
             (User.email == login_request.identifier) |
@@ -148,104 +145,88 @@ def login(login_request: LoginRequest, response: Response, session: Session = De
         )
     ).first()
 
-    if not user:
+    if not user or not verify_password(login_request.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email, username, or password"
-        )
-    
-    # Verify password
-    password_match = verify_password(login_request.password, user.hashed_password)
-    
-    if not password_match:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid email, username, or password"
+            detail="Invalid email, username, or password",
         )
 
-    # Generate tokens
-    access_token = create_access_token(
-        data={"sub": user.id},
-        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    now = datetime.now(timezone.utc)
+    is_guest = _is_guest_user(user)
+    claims = TokenClaims(
+        sub=str(user.id),
+        email=user.email,
+        roles=[Role.GUEST if is_guest else Role.USER],
+        is_guest=is_guest,
+        iat=now,
+        exp=now + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
     )
-    refresh_token = create_refresh_token(data={"sub": user.id})
+    access_token = await token_issuer.mint_access_token(claims)
+    refresh = await token_issuer.mint_refresh_token(UserId(user.id))
 
-    # Set refresh token as HTTP-only cookie
-    response.set_cookie(
-        key="refresh_token",
-        value=refresh_token,
-        max_age=REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,  # Convert days to seconds
-        httponly=True,
-        secure=True,  # Should be True in production with HTTPS
-        samesite="lax"
-    )
-
-    return TokenResponse(
-        access_token=access_token,
-        refresh_token=refresh_token
-    )
+    _set_refresh_cookie(response, refresh.token)
+    return TokenResponse(access_token=access_token, refresh_token=refresh.token)
 
 
 @router.post("/refresh", response_model=TokenResponse)
-def refresh(request: Request, response: Response, session: Session = Depends(get_session)):
-    # Read refresh token from HTTP-only cookie
-    refresh_token = request.cookies.get("refresh_token")
-    
-    if not refresh_token:
+async def refresh(
+    request: Request,
+    response: Response,
+    session: Session = Depends(get_session),
+    token_issuer: TokenIssuer = Depends(get_token_issuer),
+):
+    refresh_token_str = request.cookies.get("refresh_token")
+    if not refresh_token_str:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Refresh token not found in cookies"
-        )
-    
-    user_id = verify_token(refresh_token)
-    if not user_id:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid refresh token"
+            detail="Refresh token not found in cookies",
         )
 
-    user = session.get(User, user_id)
+    try:
+        rt = await token_issuer.verify_refresh_token(refresh_token_str)
+    except ExpiredToken:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token has expired",
+        )
+
+    if rt is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
+
+    user = session.get(User, rt.user_id)
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found"
-        )
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
 
-    access_token = create_access_token(
-        data={"sub": user.id},
-        expires_delta=timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    now = datetime.now(timezone.utc)
+    is_guest = _is_guest_user(user)
+    claims = TokenClaims(
+        sub=str(user.id),
+        email=user.email,
+        roles=[Role.GUEST if is_guest else Role.USER],
+        is_guest=is_guest,
+        iat=now,
+        exp=now + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
     )
-    new_refresh_token = create_refresh_token(data={"sub": user.id})
+    access_token = await token_issuer.mint_access_token(claims)
+    new_refresh = await token_issuer.mint_refresh_token(UserId(user.id))
 
-    # Set new refresh token as HTTP-only cookie
-    response.set_cookie(
-        key="refresh_token",
-        value=new_refresh_token,
-        max_age=REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60,  # Convert days to seconds
-        httponly=True,
-        secure=True,  # Should be True in production with HTTPS
-        samesite="lax"
-    )
-
-    return TokenResponse(
-        access_token=access_token,
-        refresh_token=new_refresh_token
-    )
+    _set_refresh_cookie(response, new_refresh.token)
+    return TokenResponse(access_token=access_token, refresh_token=new_refresh.token)
 
 
 @router.get("/me", response_model=UserResponse)
 def get_current_user(
     user_id: int = Depends(get_current_user_id),
-    session: Session = Depends(get_session)
+    session: Session = Depends(get_session),
 ):
     user = session.get(User, user_id)
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found"
+            detail="User not found",
         )
-
     return user
+
 
 @router.post("/logout")
 def logout(response: Response):
