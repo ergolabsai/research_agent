@@ -60,15 +60,11 @@ class SqliteUserRepository:
         return self._to_contract(row) if row else None
 
     async def get_by_identifier(self, identifier: str) -> User | None:
-        # Try email first so that a user whose username happens to equal
-        # another user's email always resolves to the email owner.
         row = self._session.exec(
-            select(SqlUser).where(SqlUser.email == identifier)
+            select(SqlUser).where(
+                (SqlUser.email == identifier) | (SqlUser.username == identifier)
+            )
         ).first()
-        if row is None:
-            row = self._session.exec(
-                select(SqlUser).where(SqlUser.username == identifier)
-            ).first()
         return self._to_contract(row) if row else None
 
     async def update(self, user: User) -> User:

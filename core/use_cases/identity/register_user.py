@@ -66,8 +66,18 @@ class RegisterUser:
         if existing_email and existing_email.id != guest_id:
             raise DuplicateEmail(request.email)
 
+        # Prevent a new email from shadowing an existing username in identifier lookup.
+        email_as_username = await self._user_repo.get_by_username(request.email)
+        if email_as_username and email_as_username.id != guest_id:
+            raise DuplicateEmail(request.email)
+
         existing_username = await self._user_repo.get_by_username(request.username)
         if existing_username and existing_username.id != guest_id:
+            raise DuplicateUsername(request.username)
+
+        # Prevent a new username from shadowing an existing email in identifier lookup.
+        username_as_email = await self._user_repo.get_by_email(request.username)
+        if username_as_email and username_as_email.id != guest_id:
             raise DuplicateUsername(request.username)
 
         hashed = await self._hasher.hash(request.password)
