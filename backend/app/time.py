@@ -2,9 +2,6 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-only
 
-# backend/app/time.py
-from __future__ import annotations
-
 from datetime import datetime, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 

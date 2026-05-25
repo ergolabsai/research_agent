@@ -18,6 +18,7 @@ from advisor_pipeline.config.settings import settings
 from app.security import get_session
 from core.ports.token_issuer import TokenIssuer
 from core.use_cases.identity.login_user import LoginUser
+from core.use_cases.identity.refresh_access_token import RefreshAccessToken
 from core.use_cases.identity.register_user import RegisterUser
 
 # Singletons — stateless, safe to reuse across requests.
@@ -61,5 +62,15 @@ def get_register_user(session: Session = Depends(get_session)) -> RegisterUser:
     return RegisterUser(
         user_repo=SqliteUserRepository(session),
         password_hasher=_password_hasher,
+        token_issuer=get_token_issuer(),
+    )
+
+
+def get_refresh_access_token(
+    session: Session = Depends(get_session),
+) -> RefreshAccessToken:
+    """FastAPI dependency that builds a RefreshAccessToken use case for the current request."""
+    return RefreshAccessToken(
+        user_repo=SqliteUserRepository(session),
         token_issuer=get_token_issuer(),
     )

@@ -14,12 +14,21 @@ from app.models import User, UserCreate, UserResponse, TokenResponse
 from app.security import (
     get_session, get_current_user_id, ACCESS_TOKEN_EXPIRE_MINUTES, REFRESH_TOKEN_EXPIRE_DAYS,
 )
-from composition.container import get_login_user, get_register_user, get_token_issuer
+from composition.container import (
+    get_login_user,
+    get_refresh_access_token,
+    get_register_user,
+    get_token_issuer,
+)
 from core.contracts.auth import Principal, Role, UserId
 from core.contracts.errors import DuplicateEmail, DuplicateUsername, ExpiredToken, InvalidCredentials, InvalidToken
 from core.contracts.tokens import TokenClaims
 from core.ports.token_issuer import TokenIssuer
 from core.use_cases.identity.login_user import LoginUser, LoginUserRequest
+from core.use_cases.identity.refresh_access_token import (
+    RefreshAccessToken,
+    RefreshAccessTokenRequest,
+)
 from core.use_cases.identity.register_user import RegisterUser, RegisterUserRequest
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -28,10 +37,6 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 class LoginRequest(BaseModel):
     identifier: str = Field(min_length=1)
     password: str = Field(min_length=1)
-
-
-def _is_guest_user(user: User) -> bool:
-    return user.email.startswith("guest+") or user.username.startswith("guest_")
 
 
 def _set_refresh_cookie(response: Response, token: str) -> None:
@@ -158,8 +163,7 @@ async def login(
 async def refresh(
     request: Request,
     response: Response,
-    session: Session = Depends(get_session),
-    token_issuer: TokenIssuer = Depends(get_token_issuer),
+    refresh_access_token: RefreshAccessToken = Depends(get_refresh_access_token),
 ):
     refresh_token_str = request.cookies.get("refresh_token")
     if not refresh_token_str:
@@ -169,35 +173,22 @@ async def refresh(
         )
 
     try:
-        rt = await token_issuer.verify_refresh_token(refresh_token_str)
+        result = await refresh_access_token.execute(
+            RefreshAccessTokenRequest(refresh_token=refresh_token_str)
+        )
     except ExpiredToken:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Refresh token has expired",
         )
+    except InvalidToken:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token",
+        )
 
-    if rt is None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
-
-    user = session.get(User, rt.user_id)
-    if not user:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
-
-    now = datetime.now(timezone.utc)
-    is_guest = _is_guest_user(user)
-    claims = TokenClaims(
-        sub=str(user.id),
-        email=user.email,
-        roles=[Role.GUEST if is_guest else Role.USER],
-        is_guest=is_guest,
-        iat=now,
-        exp=now + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES),
-    )
-    access_token = await token_issuer.mint_access_token(claims)
-    new_refresh = await token_issuer.mint_refresh_token(UserId(user.id))
-
-    _set_refresh_cookie(response, new_refresh.token)
-    return TokenResponse(access_token=access_token, refresh_token=new_refresh.token)
+    _set_refresh_cookie(response, result.refresh_token.token)
+    return TokenResponse(access_token=result.access_token, refresh_token=result.refresh_token.token)
 
 
 @router.get("/me", response_model=UserResponse)

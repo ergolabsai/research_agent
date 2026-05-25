@@ -13,3 +13,8 @@ get equations connected
 do simple citation checker
 properly hook up the graph database
 think more about the data graph - do we want the text from the document then evidence?  what is that structure?  Should we get rid of the text option?
+
+Identity use cases to implement:
+- LogoutUser
+- RevokeToken
+- GetCurrentUser

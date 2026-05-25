@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(.\\\\backend\\\\.venv\\\\api\\\\Scripts\\\\python.exe -c \"import core.contracts.auth, core.contracts.users, core.contracts.tokens, core.use_cases.identity.login_user, core.use_cases.identity.register_user, adapters.driven.repositories.sqlite_user_repository, adapters.driven.identity.paseto_token_issuer, adapters.driven.identity.jose_token_issuer; from backend.app import time; print\\('OK'\\)\")"
+    ]
+  }
+}

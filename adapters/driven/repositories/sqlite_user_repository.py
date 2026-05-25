@@ -2,8 +2,6 @@
 #
 # SPDX-License-Identifier: AGPL-3.0-only
 
-from __future__ import annotations
-
 from sqlmodel import Session, select
 
 from app.models import User as SqlUser

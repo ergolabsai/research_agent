@@ -46,9 +46,12 @@ cd frontend && npm run dev:mock
 
 ### Python environment
 
-- Python 3.12, venv at `backend/.venv/api/`
-- Backend deps: `backend/requirements.txt`
-- Pipeline deps: `pyproject.toml` (installed as editable package)
+- Python 3.12, venv at repo root: `.venv/` (gitignored)
+- Interpreter: `.venv/Scripts/python.exe` (Windows) — invoke directly rather than relying on shell activation
+- Setup: `py -3.12 -m venv .venv` then `.venv/Scripts/python.exe -m pip install -e ".[dev]" -r backend/requirements.txt`
+- Combines: project as editable package (`pyproject.toml`, with `dev` extras: pytest, pytest-asyncio, ruff) + backend deps (`backend/requirements.txt`)
+- Run tests: `.venv/Scripts/python.exe -m pytest`
+- Run a script/module: `.venv/Scripts/python.exe -m <module>`
 
 ### Docker
 

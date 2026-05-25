@@ -1,7 +1,7 @@
 @echo off
 
 echo Starting backend...
-start cmd /k ".\backend\.venv\api\Scripts\python.exe -m uvicorn app.main:app --reload --port 8070 --app-dir backend"
+start cmd /k ".\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --port 8070 --app-dir backend"
 timeout /t 2
 
 echo Starting frontend...
