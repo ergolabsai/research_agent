@@ -20,6 +20,8 @@ class Paper(BaseModel):
 
     text: str
     title: str | None = None
+    authors: list[str] | None = None
+    abstract: str | None = None
     figures: list[FigureRef] = []
     bibliography: str | None = None
 

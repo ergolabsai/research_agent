@@ -14,7 +14,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from core.contracts.jobs import JobId
+from core.contracts.jobs import Job
 from core.contracts.paper import Paper
 
 
@@ -23,12 +23,15 @@ from core.contracts.paper import Paper
 
 class ValidatePaperRequest(BaseModel):
     paper: Paper
+    # External identifier for the paper (e.g., DOI, arXiv id). If None, the use case
+    # generates a UUID. Distinct from `Job.id`: a paper may be validated multiple times.
+    paper_id: str | None = None
 
     model_config = {"frozen": True}
 
 
 class ValidatePaperResponse(BaseModel):
-    job_id: JobId
+    job: Job
 
     model_config = {"frozen": True}
 
