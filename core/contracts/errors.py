@@ -25,3 +25,13 @@ class InvalidToken(DomainError):
 
 class ExpiredToken(DomainError):
     pass
+
+
+class Forbidden(DomainError):
+    """Principal lacks the permission required to perform the action."""
+
+    pass
+
+
+class JobNotFound(DomainError):
+    pass
