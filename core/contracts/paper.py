@@ -6,11 +6,17 @@ from pydantic import BaseModel
 
 
 class FigureRef(BaseModel):
-    """Reference to a submitted figure. Bytes live in ObjectStorage; this carries the lookup key."""
+    """Reference to a submitted figure. Bytes live in ObjectStorage; this carries the lookup keys.
+
+    A figure has a required `submitted` image (what the paper shows) and an optional
+    `predicted` image (a baseline the user supplies for the orchestrator to compare against).
+    """
 
     name: str
-    storage_key: str
-    content_type: str
+    submitted_storage_key: str
+    submitted_content_type: str
+    predicted_storage_key: str | None = None
+    predicted_content_type: str | None = None
 
     model_config = {"frozen": True}
 

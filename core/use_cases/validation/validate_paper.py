@@ -43,6 +43,6 @@ class ValidatePaper:
         )
 
         await self._job_store.create(job)
-        await self._pipeline_runner.submit(job.id, request.paper, principal)
+        await self._pipeline_runner.submit(job, request.paper, principal)
 
         return ValidatePaperResponse(job=job)

@@ -108,6 +108,8 @@ type = "independence"
 modules = [
     "adapters.driven.identity",
     "adapters.driven.repositories",
+    "adapters.driven.job_store",
+    "adapters.driven.pipeline_runner",
 ]
 
 # Core performs no I/O. See architecture decision 0003.

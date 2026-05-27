@@ -17,15 +17,17 @@ This port disappears in MIGRATION step 3 when the orchestrator moves to
 from typing import Protocol, runtime_checkable
 
 from core.contracts.auth import Principal
-from core.contracts.jobs import JobId
+from core.contracts.jobs import Job
 from core.contracts.paper import Paper
 
 
 @runtime_checkable
 class PipelineRunner(Protocol):
-    async def submit(self, job_id: JobId, paper: Paper, principal: Principal) -> None:
+    async def submit(self, job: Job, paper: Paper, principal: Principal) -> None:
         """Start the validation pipeline for a job. Returns immediately (fire-and-forget).
 
         Progress and final results are written through `JobStore` by the runner.
+        The full `Job` is passed (not just the id) so the runner has paper_id, title,
+        and timestamps without an extra fetch.
         """
         ...
