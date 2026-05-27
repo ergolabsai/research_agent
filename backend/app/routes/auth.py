@@ -12,10 +12,12 @@ from sqlmodel import Session
 
 from app.models import User, UserCreate, UserResponse, TokenResponse
 from app.security import (
-    get_session, get_current_user_id, ACCESS_TOKEN_EXPIRE_MINUTES, REFRESH_TOKEN_EXPIRE_DAYS,
+    get_session, ACCESS_TOKEN_EXPIRE_MINUTES, REFRESH_TOKEN_EXPIRE_DAYS,
 )
 from composition.container import (
+    get_current_user,
     get_login_user,
+    get_principal,
     get_refresh_access_token,
     get_register_user,
     get_token_issuer,
@@ -24,6 +26,7 @@ from core.contracts.auth import Principal, Role, UserId
 from core.contracts.errors import DuplicateEmail, DuplicateUsername, ExpiredToken, InvalidCredentials, InvalidToken
 from core.contracts.tokens import TokenClaims
 from core.ports.token_issuer import TokenIssuer
+from core.use_cases.identity.get_current_user import GetCurrentUser
 from core.use_cases.identity.login_user import LoginUser, LoginUserRequest
 from core.use_cases.identity.refresh_access_token import (
     RefreshAccessToken,
@@ -192,17 +195,18 @@ async def refresh(
 
 
 @router.get("/me", response_model=UserResponse)
-def get_current_user(
-    user_id: int = Depends(get_current_user_id),
-    session: Session = Depends(get_session),
+async def me(
+    principal: Principal = Depends(get_principal),
+    use_case: GetCurrentUser = Depends(get_current_user),
 ):
-    user = session.get(User, user_id)
-    if not user:
+    try:
+        result = await use_case.execute(principal)
+    except InvalidToken:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="User not found",
+            detail="Invalid token",
         )
-    return user
+    return result.user
 
 
 @router.post("/logout")

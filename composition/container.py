@@ -8,7 +8,7 @@ This is the only module allowed to import from both core and adapters.
 Nothing in core or adapters imports from here.
 """
 
-from fastapi import Depends
+from fastapi import Depends, Header, HTTPException, status
 from sqlmodel import Session
 
 from adapters.driven.identity.bcrypt_password_hasher import BcryptPasswordHasher
@@ -16,7 +16,10 @@ from adapters.driven.identity.paseto_token_issuer import PasetoTokenIssuer
 from adapters.driven.repositories.sqlite_user_repository import SqliteUserRepository
 from advisor_pipeline.config.settings import settings
 from app.security import get_session
+from core.contracts.auth import Principal, UserId
+from core.contracts.errors import ExpiredToken, InvalidToken
 from core.ports.token_issuer import TokenIssuer
+from core.use_cases.identity.get_current_user import GetCurrentUser
 from core.use_cases.identity.login_user import LoginUser
 from core.use_cases.identity.refresh_access_token import RefreshAccessToken
 from core.use_cases.identity.register_user import RegisterUser
@@ -64,6 +67,55 @@ def get_register_user(session: Session = Depends(get_session)) -> RegisterUser:
         password_hasher=_password_hasher,
         token_issuer=get_token_issuer(),
     )
+
+
+async def get_principal(
+    authorization: str | None = Header(None),
+    token_issuer: TokenIssuer = Depends(get_token_issuer),
+) -> Principal:
+    """FastAPI dependency that resolves the authenticated caller's Principal.
+
+    Verifies the bearer access token and builds the Principal from its claims.
+    Raises 401 on any failure — missing header, malformed scheme, expired or invalid token.
+    """
+    if not authorization:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+        )
+    try:
+        scheme, token = authorization.split(" ", 1)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authorization header",
+        )
+    if scheme.lower() != "bearer":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authorization header",
+        )
+    try:
+        claims = await token_issuer.verify_access_token(token)
+    except (ExpiredToken, InvalidToken):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid token",
+        )
+
+    return Principal(
+        user_id=UserId(int(claims.sub)),
+        email=claims.email,
+        roles=claims.roles,
+        is_guest=claims.is_guest,
+    )
+
+
+def get_current_user(
+    session: Session = Depends(get_session),
+) -> GetCurrentUser:
+    """FastAPI dependency that builds a GetCurrentUser use case for the current request."""
+    return GetCurrentUser(user_repo=SqliteUserRepository(session))
 
 
 def get_refresh_access_token(

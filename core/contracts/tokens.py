@@ -6,7 +6,7 @@ from datetime import datetime
 
 from pydantic import BaseModel
 
-from core.contracts.auth import UserId
+from core.contracts.auth import Role, UserId
 
 
 class TokenClaims(BaseModel):
@@ -14,7 +14,7 @@ class TokenClaims(BaseModel):
 
     sub: str
     email: str
-    roles: list[str]
+    roles: list[Role]
     is_guest: bool = False
     iat: datetime
     exp: datetime

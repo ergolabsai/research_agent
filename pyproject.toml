@@ -49,6 +49,7 @@ dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.24.0",
     "ruff>=0.6.0",
+    "import-linter>=2.0",
 ]
 
 [tool.ruff]
@@ -69,3 +70,92 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools.packages.find]
 include = ["backend*", "advisor_pipeline*", "core*", "adapters*", "composition*"]
 exclude = ["frontend*", "node_modules*", "scripts*"]
+
+# Hexagonal boundary enforcement.
+# See docs/architecture/process/decisions/0001-import-linter-as-ci-gate.md
+# Scope is intentionally limited to the new layout (core, adapters, composition).
+# Legacy packages (backend, app, advisor_pipeline) are outside the layered system
+# during migration — they will be folded in as MIGRATION.md steps complete.
+[tool.importlinter]
+root_packages = ["core", "adapters", "composition"]
+include_external_packages = true
+
+# Layered architecture: core is the innermost layer (knows nothing of the others);
+# adapters may use core; composition may use both.
+# See architecture decisions 0002, 0003, 0006, 0009.
+[[tool.importlinter.contracts]]
+name = "Hexagonal layers: composition -> adapters -> core"
+type = "layers"
+layers = [
+    "composition",
+    "adapters",
+    "core",
+]
+
+# Driving and driven adapters are independent of each other, and each driven
+# adapter is self-contained. See architecture decision 0006.
+[[tool.importlinter.contracts]]
+name = "Adapters: driving and driven are independent"
+type = "independence"
+modules = [
+    "adapters.driving",
+    "adapters.driven",
+]
+
+[[tool.importlinter.contracts]]
+name = "Adapters: driven adapters are self-contained"
+type = "independence"
+modules = [
+    "adapters.driven.identity",
+    "adapters.driven.repositories",
+]
+
+# Core performs no I/O. See architecture decision 0003.
+# LangGraph is allowed (coordination only) per capabilities/validation/0002.
+[[tool.importlinter.contracts]]
+name = "Core has no I/O (no web, db, http, LLM SDK, vector store, MCP, cloud)"
+type = "forbidden"
+source_modules = ["core"]
+forbidden_modules = [
+    # Web frameworks
+    "fastapi",
+    "starlette",
+    "flask",
+    # CLI frameworks
+    "click",
+    "typer",
+    # HTTP clients
+    "httpx",
+    "requests",
+    "aiohttp",
+    "urllib3",
+    # Database / ORM
+    "sqlite3",
+    "sqlmodel",
+    "sqlalchemy",
+    "psycopg",
+    "psycopg2",
+    # LLM SDKs
+    "anthropic",
+    "openai",
+    "langchain",
+    "langchain_anthropic",
+    "langchain_core",
+    "langchain_openai",
+    # Vector stores
+    "lancedb",
+    "qdrant_client",
+    # MCP / protocol clients
+    "mcp",
+    # Object storage
+    "boto3",
+    "minio",
+    # Crypto / auth (belong in adapters)
+    "bcrypt",
+    "pyseto",
+    "jose",
+    "cryptography",
+    # Settings reading env (belongs in composition)
+    "pydantic_settings",
+]
+ignore_imports = []

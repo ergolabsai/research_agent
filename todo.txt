@@ -18,3 +18,11 @@ Identity use cases to implement:
 - LogoutUser
 - RevokeToken
 - GetCurrentUser
+
+Refresh-token reuse detection (build on top of RefreshAccessToken rotation):
+- Add family_id + status (active/rotated/revoked) to refresh token storage; new schema/table needed since PASETO adapter has no persistence layer yet
+- Split verify_refresh_token port: raise TokenReuseDetected(family_id) when a rotated token is replayed; None stays for unknown/revoked
+- Add revoke_family(family_id) port method; RefreshAccessToken catches reuse and revokes the whole family before re-raising
+- HTTP: map to 401 with distinct code (e.g. "session_revoked") so frontend clears all auth state and redirects to login
+- Emit a SuspectedTokenReuse domain event for side-channel reactions (logging, user email, on-call alerts) — keep use case free of alerting logic
+- Mitigate false positives from tab races / retries: short rotation grace window (~5s accept-prior-token) or client-side request coalescing
