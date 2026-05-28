@@ -9,7 +9,7 @@ Endpoints for submitting papers for validation, retrieving results,
 and inspecting per-step agent outputs for transparency.
 """
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 from typing import Optional
 from pathlib import Path
@@ -24,16 +24,20 @@ from app.security import get_session
 from app.models import Attachment, Document
 from app.storage import get_presigned_url
 from app.services.pipeline_service import (
-    create_job,
     get_graph_analysis,
     get_job,
     get_job_graph,
     get_step_log,
     get_step_logs,
     list_jobs,
-    run_pipeline_async,
     JobStatus,
 )
+from composition.container import get_principal, get_validate_paper
+from core.contracts.auth import Principal
+from core.contracts.errors import Forbidden
+from core.contracts.paper import FigureRef, Paper
+from core.contracts.validation import ValidatePaperRequest
+from core.use_cases.validation.validate_paper import ValidatePaper
 router = APIRouter(prefix="/api/pipeline", tags=["pipeline"])
 
 
@@ -81,53 +85,48 @@ class StepLogResponse(BaseModel):
 @router.post("/validate", response_model=JobResponse)
 async def submit_validation(
     request: ValidateRequest,
-    background_tasks: BackgroundTasks,
     session: Session = Depends(get_session),
-    user_id: int = Depends(get_current_user_id),
+    principal: Principal = Depends(get_principal),
+    use_case: ValidatePaper = Depends(get_validate_paper),
 ):
     """Submit a paper for validation. Returns a job ID to poll for status."""
-    import uuid
-
-    paper_id = request.paper_id or str(uuid.uuid4())
-
-    figure_refs = request.figures or {}
-    if request.document_id and not figure_refs:
+    if request.figures:
+        figure_refs = _dict_figures_to_refs(request.figures)
+    elif request.document_id:
         figure_refs = _build_figure_refs_from_document(
             session=session,
             document_id=request.document_id,
-            user_id=user_id,
+            user_id=int(principal.user_id),
         )
+    else:
+        figure_refs = []
 
-    job = create_job(
-        paper_id=paper_id,
+    paper = Paper(
+        text=request.paper_text,
         title=request.title,
-        user_id=user_id,
-        paper_text=request.paper_text,
-        bibliography=request.bibliography,
-        figures=figure_refs,
-    )
-
-    background_tasks.add_task(
-        run_pipeline_async,
-        job_id=job.job_id,
-        paper_id=paper_id,
-        paper_text=request.paper_text,
-        title=request.title,
-        user_id=user_id,
-        figures=figure_refs,
         authors=request.authors,
-        abstract=request.abstract or "",
+        abstract=request.abstract or None,
+        figures=figure_refs,
         bibliography=request.bibliography,
     )
 
+    try:
+        result = await use_case.execute(
+            principal,
+            ValidatePaperRequest(paper=paper, paper_id=request.paper_id),
+        )
+    except Forbidden as exc:
+        raise HTTPException(status_code=403, detail=str(exc))
+
+    job = result.job
     return JobResponse(
-        job_id=job.job_id,
-        paper_id=paper_id,
-        title=request.title,
-        status=job.status,
+        job_id=job.id,
+        paper_id=job.paper_id,
+        title=job.title,
+        status=job.status.value,
         current_step=job.current_step,
         total_steps=job.total_steps,
-        step_name="Queued",
+        step_name=job.current_step_name or "Queued",
     )
 
 
@@ -331,16 +330,12 @@ def _build_figure_refs_from_document(
     session: Session,
     document_id: int,
     user_id: int,
-) -> dict[str, dict]:
-    """Build figure references from image attachments on a document.
+) -> list[FigureRef]:
+    """Build FigureRefs from image attachments on a document.
 
-    Each figure entry supports both submitted and predicted images:
-        {
-            "Figure 1": {
-                "submitted": {...},
-                "predicted": {...}
-            }
-        }
+    Files named like 'predicted'/'expected'/'model' fill the predicted slot;
+    everything else fills submitted. If only a predicted image exists for a
+    figure, it doubles as the submitted image so the evaluator still has input.
     """
     document = session.get(Document, document_id)
     if not document:
@@ -352,7 +347,7 @@ def _build_figure_refs_from_document(
         select(Attachment).where(Attachment.document_id == document_id)
     ).all()
 
-    refs: dict[str, dict] = {}
+    slots: dict[str, dict[str, dict[str, str]]] = {}
     for idx, attachment in enumerate(attachments, start=1):
         content_type = (attachment.content_type or "").lower()
         if not content_type.startswith("image/"):
@@ -361,21 +356,51 @@ def _build_figure_refs_from_document(
         figure_name = _derive_figure_name(attachment.filename, idx)
         role = _derive_figure_role(attachment.filename)
 
-        entry = refs.setdefault(figure_name, {})
+        entry = slots.setdefault(figure_name, {})
         if role in entry:
-            # Keep deterministic behavior if multiple files map to same slot.
             role = "submitted"
         entry[role] = {
             "object_key": attachment.object_key,
             "media_type": attachment.content_type,
-            "filename": attachment.filename,
         }
 
-    # Keep evaluator robust: if only predicted exists, reuse it as submitted.
-    for entry in refs.values():
-        if "submitted" not in entry and "predicted" in entry:
-            entry["submitted"] = entry["predicted"]
+    refs: list[FigureRef] = []
+    for name, entry in slots.items():
+        submitted = entry.get("submitted") or entry.get("predicted")
+        if not submitted:
+            continue
+        predicted = entry.get("predicted") if "submitted" in entry else None
+        refs.append(
+            FigureRef(
+                name=name,
+                submitted_storage_key=submitted["object_key"],
+                submitted_content_type=submitted["media_type"],
+                predicted_storage_key=predicted["object_key"] if predicted else None,
+                predicted_content_type=predicted["media_type"] if predicted else None,
+            )
+        )
+    return refs
 
+
+def _dict_figures_to_refs(figures: dict[str, dict]) -> list[FigureRef]:
+    """Convert legacy {name: {submitted, predicted}} request payload to FigureRefs."""
+    refs: list[FigureRef] = []
+    for name, payload in figures.items():
+        if not isinstance(payload, dict):
+            continue
+        submitted = payload.get("submitted") if isinstance(payload.get("submitted"), dict) else payload
+        predicted = payload.get("predicted") if isinstance(payload.get("predicted"), dict) else None
+        if not isinstance(submitted, dict) or not submitted.get("object_key"):
+            continue
+        refs.append(
+            FigureRef(
+                name=name,
+                submitted_storage_key=submitted["object_key"],
+                submitted_content_type=submitted.get("media_type") or "image/png",
+                predicted_storage_key=predicted.get("object_key") if predicted else None,
+                predicted_content_type=(predicted.get("media_type") if predicted else None),
+            )
+        )
     return refs
 
 

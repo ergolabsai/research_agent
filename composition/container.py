@@ -13,6 +13,8 @@ from sqlmodel import Session
 
 from adapters.driven.identity.bcrypt_password_hasher import BcryptPasswordHasher
 from adapters.driven.identity.paseto_token_issuer import PasetoTokenIssuer
+from adapters.driven.job_store.legacy_sqlite import LegacyJobStore
+from adapters.driven.pipeline_runner.legacy import LegacyPipelineRunner
 from adapters.driven.repositories.sqlite_user_repository import SqliteUserRepository
 from advisor_pipeline.config.settings import settings
 from app.security import get_session
@@ -23,6 +25,7 @@ from core.use_cases.identity.get_current_user import GetCurrentUser
 from core.use_cases.identity.login_user import LoginUser
 from core.use_cases.identity.refresh_access_token import RefreshAccessToken
 from core.use_cases.identity.register_user import RegisterUser
+from core.use_cases.validation.validate_paper import ValidatePaper
 
 # Singletons — stateless, safe to reuse across requests.
 _password_hasher = BcryptPasswordHasher(work_factor=12)
@@ -116,6 +119,16 @@ def get_current_user(
 ) -> GetCurrentUser:
     """FastAPI dependency that builds a GetCurrentUser use case for the current request."""
     return GetCurrentUser(user_repo=SqliteUserRepository(session))
+
+
+def get_validate_paper(
+    session: Session = Depends(get_session),
+) -> ValidatePaper:
+    """FastAPI dependency that builds a ValidatePaper use case for the current request."""
+    return ValidatePaper(
+        job_store=LegacyJobStore(session),
+        pipeline_runner=LegacyPipelineRunner(),
+    )
 
 
 def get_refresh_access_token(

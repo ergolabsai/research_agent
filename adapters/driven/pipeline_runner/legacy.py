@@ -49,7 +49,7 @@ class LegacyPipelineRunner:
                 figures=legacy_figures or None,
                 authors=list(paper.authors) if paper.authors else None,
                 abstract=paper.abstract or "",
-                bibliography=None,  # legacy expects dict; Paper carries raw str. See note below.
+                bibliography=paper.bibliography,
             )
         )
 
@@ -77,7 +77,7 @@ def _backfill_paper_context(
     *,
     job_id: str,
     paper_text: str,
-    bibliography: str | None,
+    bibliography: dict[str, str] | None,
     figures: dict[str, dict[str, Any]],
 ) -> None:
     """Populate paper_text / figures_json / bibliography_json on the PipelineJob row.

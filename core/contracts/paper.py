@@ -29,6 +29,6 @@ class Paper(BaseModel):
     authors: list[str] | None = None
     abstract: str | None = None
     figures: list[FigureRef] = []
-    bibliography: str | None = None
+    bibliography: dict[str, str] | None = None
 
     model_config = {"frozen": True}
