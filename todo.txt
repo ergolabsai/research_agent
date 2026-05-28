@@ -17,7 +17,12 @@ think more about the data graph - do we want the text from the document then evi
 Identity use cases to implement:
 - LogoutUser
 - RevokeToken
-- GetCurrentUser
+- GetCurrentUser (done)
+
+ValidatePaper migration — pick up tomorrow:
+- Commit 3c: route migration. In composition/container.py add get_validate_paper factory wiring LegacyJobStore(session) + LegacyPipelineRunner(). In backend/app/routes/pipeline.py the /validate endpoint switches to Depends(get_principal) + ValidatePaper use case; builds Paper from ValidateRequest (figure refs still resolved via _build_figure_refs_from_document, which now returns list[FigureRef] in the new submitted_*/predicted_* shape). Map Forbidden -> HTTP 403. Drop BackgroundTasks (runner handles dispatch). Return JobResponse built from result.job.
+- End-to-end smoke: login -> POST /api/pipeline/validate -> poll /status/{job_id} -> completed.
+- Contract refinement (when bibliography matters again): Paper.bibliography is currently str|None but the legacy orchestrator expects dict[str, str]|None. Runner passes None for now. Decide on the canonical shape and update Paper + LegacyPipelineRunner together.
 
 Refresh-token reuse detection (build on top of RefreshAccessToken rotation):
 - Add family_id + status (active/rotated/revoked) to refresh token storage; new schema/table needed since PASETO adapter has no persistence layer yet
