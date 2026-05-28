@@ -9,7 +9,6 @@ from fastapi import HTTPException, status, Header
 import bcrypt
 import pyseto
 from pyseto import Key
-from cryptography.hazmat.primitives.serialization import load_pem_public_key
 from advisor_pipeline.config.settings import settings
 
 ACCESS_TOKEN_EXPIRE_MINUTES = 15
@@ -24,8 +23,7 @@ _paseto_verify_key: Key | None = None
 def _get_verify_key() -> Key:
     global _paseto_verify_key
     if _paseto_verify_key is None:
-        pub = load_pem_public_key(settings.paseto_public_key.encode())
-        _paseto_verify_key = Key.new(version=4, purpose="public", key=pub)
+        _paseto_verify_key = Key.new(version=4, purpose="public", key=settings.paseto_public_key)
     return _paseto_verify_key
 
 

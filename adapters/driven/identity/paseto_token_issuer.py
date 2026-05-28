@@ -7,7 +7,6 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 import pyseto
-from cryptography.hazmat.primitives.serialization import load_pem_private_key, load_pem_public_key
 from pyseto import Key
 
 from core.contracts.auth import UserId
@@ -29,10 +28,8 @@ class PasetoTokenIssuer:
     _REFRESH_TTL = timedelta(days=7)
 
     def __init__(self, private_key_pem: str, public_key_pem: str) -> None:
-        _priv = load_pem_private_key(private_key_pem.encode(), password=None)
-        _pub = load_pem_public_key(public_key_pem.encode())
-        self._private_key = Key.new(version=4, purpose="public", key=_priv)
-        self._public_key = Key.new(version=4, purpose="public", key=_pub)
+        self._private_key = Key.new(version=4, purpose="public", key=private_key_pem)
+        self._public_key = Key.new(version=4, purpose="public", key=public_key_pem)
 
     # --- helpers ---
 
@@ -62,11 +59,12 @@ class PasetoTokenIssuer:
             # iat stored in payload so it round-trips unchanged
             "iat": claims.iat.astimezone(timezone.utc).isoformat(),
         }
+        exp_seconds = max(1, int((claims.exp - datetime.now(timezone.utc)).total_seconds()))
         token = pyseto.encode(
             self._private_key,
             payload,
             serializer=json,
-            exp=claims.exp.astimezone(timezone.utc),
+            exp=exp_seconds,
         )
         return token.decode()
 
@@ -93,11 +91,12 @@ class PasetoTokenIssuer:
             "jti": token_id,
             "type": "refresh",
         }
+        exp_seconds = max(1, int((expires_at - now).total_seconds()))
         token = pyseto.encode(
             self._private_key,
             payload,
             serializer=json,
-            exp=expires_at,
+            exp=exp_seconds,
         )
         return RefreshToken(
             token=token.decode(),
