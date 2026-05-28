@@ -1,6 +1,6 @@
 ---
 id: architecture-0005
-title: `Principal` flows through every use-case as the first argument
+title: Principal flows through every use-case as the first argument
 status: accepted
 date: 2026-05-17
 supersedes: []
