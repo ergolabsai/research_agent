@@ -14,6 +14,9 @@ from sqlmodel import Session
 from adapters.driven.identity.bcrypt_password_hasher import BcryptPasswordHasher
 from adapters.driven.identity.paseto_token_issuer import PasetoTokenIssuer
 from adapters.driven.job_store.legacy_sqlite import LegacyJobStore
+from adapters.driven.llm.anthropic import ChatLLMClient
+from adapters.driven.mcp.calculator_client import McpCalculatorClient
+from adapters.driven.paper_index.lancedb import LanceDBPaperIndex
 from adapters.driven.pipeline_runner.legacy import LegacyPipelineRunner
 from adapters.driven.repositories.sqlite_user_repository import SqliteUserRepository
 from advisor_pipeline.config.settings import settings
@@ -30,6 +33,16 @@ from core.use_cases.validation.validate_paper import ValidatePaper
 # Singletons — stateless, safe to reuse across requests.
 _password_hasher = BcryptPasswordHasher(work_factor=12)
 _token_issuer: PasetoTokenIssuer | None = None
+
+# Pipeline-side adapters. Constructed eagerly so a misconfigured environment
+# surfaces at startup, not on the first /api/pipeline/validate request. Not
+# injected anywhere yet — Step 1 of the migration wires these into the
+# orchestrator and agents. `McpCalculatorClient` is the class itself (not an
+# instance) because each pipeline run opens its own MCP session via
+# `with McpCalculatorClient() as client:`.
+_llm_client = ChatLLMClient()
+_paper_index = LanceDBPaperIndex()
+_calculator_cls = McpCalculatorClient
 
 
 def get_token_issuer() -> TokenIssuer:

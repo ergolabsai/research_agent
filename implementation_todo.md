@@ -22,10 +22,10 @@ Companion to [docs/architecture/MIGRATION.md](docs/architecture/MIGRATION.md). C
 
 *Why: one-commit refactor that costs nothing — adapters satisfy the new ports by delegating to current free functions. Any regression is structurally impossible because no consumer has switched yet.*
 
-- [ ] `adapters/driven/llm/anthropic.py` — `ChatLLMClient` class whose methods delegate to existing `advisor_pipeline.llm` free functions. Name it `ChatLLMClient` (not `AnthropicLLMClient`) so the OpenRouter branch in `_build_llm` doesn't force a rename later. *Why: `_build_llm` already conditionally wires Anthropic or OpenRouter; the adapter covers both.*
-- [ ] `adapters/driven/mcp/calculator_client.py` — move `CalculatorClient` here unchanged. Threading bridge stays put.
-- [ ] `adapters/driven/paper_index/lancedb.py` — `LanceDBPaperIndex` class delegating to existing `vector_search` / `fts_search`. Module-level `_db_connection` lives on for now.
-- [ ] Smoke checkpoint: wire all three adapters into `composition/container.py` as singletons (don't inject anywhere yet). Confirm `make dev` still starts. *Why: proves the new ports + adapters import cleanly before any consumer changes.*
+- [x] `adapters/driven/llm/anthropic.py` — `ChatLLMClient` class whose methods delegate to existing `advisor_pipeline.llm` free functions. Name it `ChatLLMClient` (not `AnthropicLLMClient`) so the OpenRouter branch in `_build_llm` doesn't force a rename later. *Why: `_build_llm` already conditionally wires Anthropic or OpenRouter; the adapter covers both.*
+- [x] `adapters/driven/mcp/calculator_client.py` — move `CalculatorClient` here unchanged. Threading bridge stays put.
+- [x] `adapters/driven/paper_index/lancedb.py` — `LanceDBPaperIndex` class delegating to existing `vector_search` / `fts_search`. Module-level `_db_connection` lives on for now.
+- [x] Smoke checkpoint: wire all three adapters into `composition/container.py` as singletons (don't inject anywhere yet). Confirm `make dev` still starts. *Why: proves the new ports + adapters import cleanly before any consumer changes.*
 
 ## Step 1 — Migrate agents (one at a time)
 
