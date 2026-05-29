@@ -9,7 +9,7 @@ from fastapi import HTTPException, status, Header
 import bcrypt
 import pyseto
 from pyseto import Key
-from advisor_pipeline.config.settings import settings
+from composition.settings import settings
 
 ACCESS_TOKEN_EXPIRE_MINUTES = 15
 REFRESH_TOKEN_EXPIRE_DAYS = 7

@@ -6,7 +6,7 @@
 import io
 from pathlib import Path
 from datetime import timedelta
-from advisor_pipeline.config.settings import settings
+from composition.settings import settings
 
 LOCAL_BASE = Path("backend/data/attachments")
 

@@ -19,7 +19,7 @@ from langgraph.graph import END, START, StateGraph
 from typing_extensions import TypedDict
 
 from advisor_pipeline.llm import get_structured_output, invoke_text
-from advisor_pipeline.mcp_servers.advisor_server.prompts import (
+from core.services.prompts import (
     EVIDENCE_FINDER,
     CONTEXT_MAKER,
     LOGIC_MAPPER,

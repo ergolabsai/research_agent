@@ -16,7 +16,7 @@
 from typing import Dict, List
 
 from advisor_pipeline.llm import get_structured_output, invoke_text, invoke_vision
-from advisor_pipeline.mcp_servers.advisor_server.prompts import (
+from core.services.prompts import (
     CLAIM_ASSESSOR,
     FIGURE_COMPARATOR,
     FIGURE_DESCRIBER,

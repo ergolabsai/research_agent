@@ -22,7 +22,7 @@ import pandas as pd
 from tenacity import retry, stop_after_attempt, wait_exponential
 
 from advisor_pipeline.llm import get_structured_output, invoke_text
-from advisor_pipeline.mcp_servers.advisor_server.prompts import (
+from core.services.prompts import (
     LIBRARIAN_CONTEXT,
     LIBRARIAN_QUERY_CRAFTER,
     LIBRARIAN_SCORER,

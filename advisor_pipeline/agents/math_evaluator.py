@@ -17,7 +17,7 @@ from langchain_core.tools import StructuredTool, Tool
 from langgraph.prebuilt import create_react_agent
 
 from advisor_pipeline.llm import get_llm, get_structured_output
-from advisor_pipeline.mcp_servers.advisor_server.prompts import MATH_REPORTER, MATH_VERIFIER
+from core.services.prompts import MATH_REPORTER, MATH_VERIFIER
 from advisor_pipeline.models.schemas import Evidence, MathEvaluation
 
 
