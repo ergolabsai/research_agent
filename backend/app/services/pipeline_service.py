@@ -370,6 +370,7 @@ def _extract_step_output(node_name: str, state_update: dict) -> dict:
 # ---------------------------------------------------------------------------
 
 async def run_pipeline_async(
+    orchestrator: AdvisorOrchestrator,
     job_id: str,
     paper_id: str,
     paper_text: str,
@@ -380,7 +381,11 @@ async def run_pipeline_async(
     abstract: str = "",
     bibliography: dict[str, str] | None = None,
 ) -> None:
-    """Run the pipeline in a background thread (it's CPU/IO bound)."""
+    """Run the pipeline in a background thread (it's CPU/IO bound).
+
+    `orchestrator` is constructed once in `composition.container` and passed
+    in here so this module does not import from composition.
+    """
     # Mark job as running
     with _get_session() as session:
         stmt = select(PipelineJob).where(PipelineJob.job_id == job_id)
@@ -392,7 +397,6 @@ async def run_pipeline_async(
     def _run():
         try:
             logger.info("Pipeline job %s started for paper %s", job_id, paper_id)
-            orchestrator = AdvisorOrchestrator()
             hydrated_figures = _hydrate_figure_payloads(figures or {})
 
             # Create step callback for logging

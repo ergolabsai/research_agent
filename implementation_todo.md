@@ -41,10 +41,10 @@ Companion to [docs/architecture/MIGRATION.md](docs/architecture/MIGRATION.md). C
 
 *Why: today's orchestrator re-imports agents inside each node function and instantiates them per-run (orchestrator.py:177, 202, 229, 255). Centralizing in `__init__` removes hidden coupling and lets the use case build the orchestrator once.*
 
-- [ ] Turn `AdvisorOrchestrator` into a class with `__init__(llm, calculator, paper_index, on_step_complete=None)`. Node functions become methods. Agents are constructed once in `__init__` (`self._figure_eval`, `self._math_eval`, `self._librarian`).
-- [ ] Rewire `_build_graph` and `_build_graph_with_callbacks` (orchestrator.py:593-602) to reference bound methods instead of module-level functions. Update the `NODE_FUNCS` dict accordingly. *Why: easy to miss in the "turn into a class" diff; the callback wrapper currently captures free-function references by name.*
-- [ ] Replace direct `invoke_text` / `get_structured_output` calls inside nodes with `self._llm.*` calls.
-- [ ] Smoke checkpoint: orchestrator instantiated in container; `LegacyPipelineRunner` updated to use it. End-to-end `/api/pipeline/validate` returns 200 + job_id.
+- [x] Turn `AdvisorOrchestrator` into a class with `__init__(llm, paper_index, calculator_factory)`. Node functions become methods. Agents are constructed once in `__init__` (`self._figure_eval`, `self._librarian`); `MathEvaluator` stays per-run because its react-agent tools close over the calculator session. `on_step_complete` stays a `run()` arg since it closes over `job_id`.
+- [x] Rewire `_build_graph` and `_build_graph_with_callbacks` (orchestrator.py:593-602) to reference bound methods instead of module-level functions. Update the `NODE_FUNCS` dict accordingly. *Why: easy to miss in the "turn into a class" diff; the callback wrapper currently captures free-function references by name.*
+- [x] Replace direct `invoke_text` / `get_structured_output` calls inside nodes with `self._llm.*` calls.
+- [x] Smoke checkpoint: orchestrator instantiated in container; `LegacyPipelineRunner` updated to use it. End-to-end `/api/pipeline/validate` returns 200 + job_id.
 
 ## Step 3 — Move files into `core/`
 

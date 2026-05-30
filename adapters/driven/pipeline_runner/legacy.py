@@ -16,6 +16,7 @@ from typing import Any
 
 from sqlmodel import Session, select
 
+from advisor_pipeline.orchestrator import AdvisorOrchestrator
 from app.models import PipelineJob
 from app.security import engine
 from app.services.pipeline_service import run_pipeline_async
@@ -26,6 +27,9 @@ from core.contracts.paper import FigureRef, Paper
 
 class LegacyPipelineRunner:
     """Fires the legacy orchestrator via `pipeline_service.run_pipeline_async`."""
+
+    def __init__(self, orchestrator: AdvisorOrchestrator):
+        self._orchestrator = orchestrator
 
     async def submit(self, job: Job, paper: Paper, principal: Principal) -> None:
         legacy_figures = _figures_to_legacy_dict(paper.figures)
@@ -41,6 +45,7 @@ class LegacyPipelineRunner:
 
         asyncio.create_task(
             run_pipeline_async(
+                orchestrator=self._orchestrator,
                 job_id=job.id,
                 paper_id=job.paper_id,
                 paper_text=paper.text,

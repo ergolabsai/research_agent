@@ -18,7 +18,12 @@ import networkx as nx
 from langgraph.graph import END, START, StateGraph
 from typing_extensions import TypedDict
 
-from advisor_pipeline.llm import get_structured_output, invoke_text
+from advisor_pipeline.agents.figure_evaluator import FigureEvaluator
+from advisor_pipeline.agents.librarian import Librarian
+from advisor_pipeline.agents.math_evaluator import MathEvaluator
+from core.ports.calculator import Calculator
+from core.ports.llm_client import LLMClient
+from core.ports.paper_index import PaperIndex
 from core.services.prompts import (
     EVIDENCE_FINDER,
     CONTEXT_MAKER,
@@ -94,263 +99,9 @@ class AdvisorState(TypedDict, total=False):
     validation_result: ValidationResult
 
 
-# ---------------------------------------------------------------------------
-# Node implementations
-# ---------------------------------------------------------------------------
-
-
-def make_context_node(state: AdvisorState) -> dict:
-    """make context to use going forward."""
-    print("STEP 1a: Make some context...")
-    context = invoke_text(
-        CONTEXT_MAKER.format(
-            paper_text=state["paper_text"],
-        )
-    )
-    # Append enrichment to paper text as additional context
-    paper_text = state["paper_text"] + f"\n\n--- Additional Context ---\n{context}"
-
-    return {
-        "paper_text": paper_text,
-    }
-
-
-def map_logic_node(state: AdvisorState) -> dict:
-    """Identify the logical structure of the paper."""
-    print("STEP 1b: Identifying logical steps...")
-    paper_structure = get_structured_output(
-        PaperStructure,
-        LOGIC_MAPPER.format(paper_text=state["paper_text"]),
-        system_prompt=SYSTEM_PROMPT,
-    )
-    print(f"  Identified {len(paper_structure.logical_steps)} logical steps")
-
-    return {"paper_structure": paper_structure}
-
-
-def find_evidence_node(state: AdvisorState) -> dict:
-    """Find evidence supporting each logical step (ALL steps, no cap)."""
-    print("STEP 2: Finding evidence for each logical step...")
-    paper_structure: PaperStructure = state["paper_structure"]
-    paper_text: str = state["paper_text"]
-    figure_names = list(state.get("figures", {}).keys())
-    figure_names_str = ", ".join(figure_names) if figure_names else "None provided"
-
-    all_step_evidence: list[StepEvidence] = []
-    sorted_steps = sorted(paper_structure.logical_steps, key=lambda s: s.step_number)
-
-    for step in sorted_steps:
-        print(f"  Finding evidence for step {step.step_number}: {step.description[:100]}...")
-        step_evidence = get_structured_output(
-            StepEvidence,
-            EVIDENCE_FINDER.format(
-                step_number=step.step_number,
-                step_description=step.description,
-                step_section=step.section,
-                figure_names=figure_names_str,
-                paper_text=paper_text,
-            ),
-            system_prompt=SYSTEM_PROMPT,
-        )
-        step_evidence.step_number = step.step_number
-        all_step_evidence.append(step_evidence)
-
-    total_evidence = sum(len(se.evidence_list) for se in all_step_evidence)
-    print(f"  Found {total_evidence} pieces of evidence across all steps")
-
-    # Build the paper graph from structure + evidence
-    paper_graph = build_paper_graph(
-        paper_structure=paper_structure,
-        step_evidence=all_step_evidence,
-        paper_id=state.get("paper_id", "unknown"),
-    )
-    print(f"  Built paper graph: {paper_graph.number_of_nodes()} nodes, {paper_graph.number_of_edges()} edges")
-
-    return {
-        "step_evidence": all_step_evidence,
-        "paper_graph": paper_graph,
-    }
-
-
-def evaluate_figures_node(state: AdvisorState) -> dict:
-    """Evaluate figure-based evidence."""
-    from advisor_pipeline.agents.figure_evaluator import FigureEvaluator
-
-    # Temporary scaffolding: pulling singletons from composition here is a
-    # backward dependency (advisor_pipeline -> composition) that Step 2
-    # erases when the orchestrator becomes a class with injected ports.
-    from composition.container import _llm_client
-
-    print("STEP 3a: Evaluating figure-based evidence...")
-    figures = state.get("figures", {})
-
-    # Query the paper graph for figure claims
-    G = state["paper_graph"]
-    figure_claims = get_figure_claims(G)
-
-    evaluator = FigureEvaluator(llm=_llm_client)
-    figure_evaluations = evaluator.run(
-        figures=figures,
-        figure_claims=figure_claims,
-        paper_text=state["paper_text"],
-    )
-    print(f"  Evaluated {len(figure_evaluations)} figures")
-
-    # Add evaluation results to the graph
-    add_figure_evaluations(G, figure_evaluations)
-
-    return {"figure_evaluations": figure_evaluations, "paper_graph": G}
-
-
-def evaluate_math_node(state: AdvisorState) -> dict:
-    """Evaluate math-based evidence."""
-    from advisor_pipeline.agents.math_evaluator import MathEvaluator
-
-    # Temporary scaffolding: see note in evaluate_figures_node.
-    from composition.container import _calculator_cls, _llm_client
-
-    print("STEP 3b: Evaluating math-based evidence...")
-
-    # Query the paper graph for math evidence and step claims
-    G = state["paper_graph"]
-    math_evidence = get_evidence_by_type(G, "math")
-    claims = get_step_claims(G)
-
-    with _calculator_cls() as client:
-        evaluator = MathEvaluator(llm=_llm_client, calculator=client)
-        math_evaluations = evaluator.run(
-            evidence_list=math_evidence,
-            paper_text=state["paper_text"],
-            claims=claims,
-        )
-    print(f"  Evaluated {len(math_evaluations)} math items")
-
-    # Add evaluation results to the graph
-    add_math_evaluations(G, math_evaluations)
-
-    return {"math_evaluations": math_evaluations, "paper_graph": G}
-
-
-def gather_papers_node(state: AdvisorState) -> dict:
-    """Librarian pass 1: find cited + related papers, enrich context."""
-    from advisor_pipeline.agents.librarian import Librarian
-
-    # Temporary scaffolding: see note in evaluate_figures_node.
-    from composition.container import _llm_client, _paper_index
-
-    print("STEP 1b: Librarian gathering related papers...")
-    librarian = Librarian(llm=_llm_client, paper_index=_paper_index)
-    librarian_result = librarian.gather_papers(
-        paper_text=state["paper_text"],
-        bibliography=state.get("bibliography", {}),
-        paper_structure=state.get("paper_structure"),
-    )
-    print(f"  Found {len(librarian_result.related_papers)} related papers")
-    print(f"  Search queries used: {librarian_result.search_queries}")
-
-    # Enrich paper text with librarian context
-    enriched = state["paper_text"]
-    if librarian_result.context_summary:
-        enriched += f"\n\n--- Related Work Context ---\n{librarian_result.context_summary}"
-
-    return {
-        "paper_text": enriched,
-        "librarian_result": librarian_result,
-        "related_papers": librarian_result.related_papers,
-    }
-
-
-def score_papers_node(state: AdvisorState) -> dict:
-    """Librarian pass 2: score each related paper for relevancy + convergence."""
-    from advisor_pipeline.agents.librarian import Librarian
-
-    # Temporary scaffolding: see note in evaluate_figures_node.
-    from composition.container import _llm_client, _paper_index
-
-    print("STEP 3c: Scoring related papers...")
-    librarian = Librarian(llm=_llm_client, paper_index=_paper_index)
-    related_papers = state.get("related_papers", [])
-    paper_structure = state["paper_structure"]
-
-    if not related_papers:
-        print("  No related papers to score")
-        return {"librarian_result": state.get("librarian_result", LibrarianResult())}
-
-    scored = librarian.score_papers(
-        paper_text=state["paper_text"],
-        paper_structure=paper_structure,
-        related_papers=related_papers,
-    )
-    print(f"  Scored {len(scored)} papers")
-
-    # Update librarian result with scored papers
-    lib_result = state.get("librarian_result", LibrarianResult())
-    updated_result = LibrarianResult(
-        related_papers=scored,
-        context_summary=lib_result.context_summary,
-        search_queries=lib_result.search_queries,
-    )
-
-    # Add scored results to the paper graph
-    G = state["paper_graph"]
-    add_librarian_results(G, updated_result)
-
-    return {"librarian_result": updated_result, "paper_graph": G}
-
-
-def compile_results_node(state: AdvisorState) -> dict:
-    """Compile all evaluation results into a final assessment."""
-    print("STEP 4: Compiling final assessment...")
-    paper_structure: PaperStructure = state["paper_structure"]
-
-    # Use the graph that has been incrementally updated by evaluation nodes
-    G = state["paper_graph"]
-
-    # Organize validations by step using graph queries
-    step_validations = _organize_by_step_from_graph(G)
-
-    # Count evaluations from graph nodes
-    num_figure_evals = len(get_nodes_by_type(G, "figure"))
-    num_math_evals = len(get_nodes_by_type(G, "math"))
-    num_related_papers = len(get_nodes_by_type(G, "related_paper"))
-
-    # Generate overall review
-    review_prompt = RESULTS_COMPILER.format(
-        paper_title=paper_structure.title,
-        main_claim=paper_structure.main_claim,
-        num_steps=len(paper_structure.logical_steps),
-        num_figure_evals=num_figure_evals,
-        num_math_evals=num_math_evals,
-        num_related_papers=num_related_papers,
-        step_validations_text=_format_step_validations(G),
-        figure_results_text=_format_figure_results_from_graph(G),
-        math_results_text=_format_math_results_from_graph(G),
-        librarian_results_text=_format_librarian_results_from_graph(G),
-    )
-
-    overall_review = get_structured_output(
-        OverAllReview, review_prompt, system_prompt=SYSTEM_PROMPT
-    )
-
-    confidence_score = _calculate_confidence_from_graph(G)
-
-    result = ValidationResult(
-        paper_id=state.get("paper_id", "unknown"),
-        paper_structure=paper_structure,
-        step_validations=step_validations,
-        overall_assessment=overall_review,
-        confidence_score=confidence_score,
-    )
-    print(f"  Final confidence score: {result.confidence_score:.2%}")
-
-    # Save graph to output folder
-    output_folder = state.get("output_folder")
-    if output_folder:
-        graph_path = Path(output_folder) / "paper_graph.json"
-        save_graph(G, graph_path)
-        print(f"  Paper graph saved to {graph_path}")
-
-    return {"validation_result": result, "paper_graph": G}
+# Node implementations live on `AdvisorOrchestrator` (see bottom of file) so
+# they can access injected ports via `self`. Pure graph-query helpers stay as
+# module-level functions because they only operate on the NetworkX graph.
 
 
 # ---------------------------------------------------------------------------
@@ -569,83 +320,11 @@ def _calculate_confidence_from_graph(G: nx.DiGraph) -> float:
 
 
 # ---------------------------------------------------------------------------
-# Graph construction
-# ---------------------------------------------------------------------------
-
-
-def _build_graph() -> StateGraph:
-    workflow = StateGraph(AdvisorState)
-
-    # Add nodes
-    workflow.add_node("make_context", make_context_node)
-    workflow.add_node("gather_papers", gather_papers_node)
-    workflow.add_node("map_logic", map_logic_node)
-    workflow.add_node("find_evidence", find_evidence_node)
-    workflow.add_node("evaluate_figures", evaluate_figures_node)
-    workflow.add_node("evaluate_math", evaluate_math_node)
-    workflow.add_node("score_papers", score_papers_node)
-    workflow.add_node("compile_results", compile_results_node)
-
-    # Edges
-    workflow.add_edge(START, "make_context")
-    workflow.add_edge("make_context", "gather_papers")
-    workflow.add_edge("gather_papers", "map_logic")
-    workflow.add_edge("map_logic", "find_evidence")
-    workflow.add_edge("find_evidence", "evaluate_figures")
-    workflow.add_edge("evaluate_figures", "evaluate_math")
-    workflow.add_edge("evaluate_math", "score_papers")
-    workflow.add_edge("score_papers", "compile_results")
-    workflow.add_edge("compile_results", END)
-
-    return workflow
-
-
-def _build_graph_with_callbacks(base_workflow: StateGraph, callback: StepCallback) -> StateGraph:
-    """Rebuild the graph with wrapper nodes that call the callback after each step."""
-
-    NODE_FUNCS = {
-        "make_context": make_context_node,
-        "gather_papers": gather_papers_node,
-        "map_logic": map_logic_node,
-        "find_evidence": find_evidence_node,
-        "evaluate_figures": evaluate_figures_node,
-        "evaluate_math": evaluate_math_node,
-        "score_papers": score_papers_node,
-        "compile_results": compile_results_node,
-    }
-
-    def _wrap(name, fn):
-        def wrapper(state: AdvisorState) -> dict:
-            t0 = time.time()
-            result = fn(state)
-            duration = time.time() - t0
-            try:
-                callback(name, result, duration)
-            except Exception:
-                pass  # never let logging break the pipeline
-            return result
-        return wrapper
-
-    workflow = StateGraph(AdvisorState)
-    for name, fn in NODE_FUNCS.items():
-        workflow.add_node(name, _wrap(name, fn))
-
-    workflow.add_edge(START, "make_context")
-    workflow.add_edge("make_context", "gather_papers")
-    workflow.add_edge("gather_papers", "map_logic")
-    workflow.add_edge("map_logic", "find_evidence")
-    workflow.add_edge("find_evidence", "evaluate_figures")
-    workflow.add_edge("evaluate_figures", "evaluate_math")
-    workflow.add_edge("evaluate_math", "score_papers")
-    workflow.add_edge("score_papers", "compile_results")
-    workflow.add_edge("compile_results", END)
-
-    return workflow
-
-
-# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
+
+
+CalculatorFactory = Callable[[], Calculator]
 
 
 class AdvisorOrchestrator:
@@ -656,12 +335,297 @@ class AdvisorOrchestrator:
         START -> make_context -> gather_papers -> map_logic -> find_evidence
               -> evaluate_figures -> evaluate_math -> score_papers
               -> compile_results -> END
+
+    Ports are injected at construction time so the orchestrator can be built
+    once and reused across many pipeline runs. ``calculator_factory`` is a
+    zero-arg callable (typically the ``McpCalculatorClient`` class itself)
+    because each run opens its own MCP session via the calculator's sync
+    context-manager protocol.
     """
 
-    def __init__(self):
+    def __init__(
+        self,
+        llm: LLMClient,
+        paper_index: PaperIndex,
+        calculator_factory: CalculatorFactory,
+    ):
         print("Initializing Advisor Orchestrator...")
-        self._workflow = _build_graph()
+        self._llm = llm
+        self._paper_index = paper_index
+        self._calculator_factory = calculator_factory
+        # Stateless agents — built once, reused across runs.
+        self._figure_eval = FigureEvaluator(llm=llm)
+        self._librarian = Librarian(llm=llm, paper_index=paper_index)
+        # MathEvaluator is *not* built here: its react-agent tools close over
+        # the MCP calculator session, which must be opened per-run.
+        self._workflow = self._build_graph()
         print("Orchestrator initialized successfully")
+
+    # ------------------------------------------------------------------
+    # Node implementations (bound methods so they can access self._*)
+    # ------------------------------------------------------------------
+
+    def _make_context_node(self, state: AdvisorState) -> dict:
+        """Make context to use going forward."""
+        print("STEP 1a: Make some context...")
+        context = self._llm.invoke_text(
+            CONTEXT_MAKER.format(paper_text=state["paper_text"])
+        )
+        paper_text = state["paper_text"] + f"\n\n--- Additional Context ---\n{context}"
+        return {"paper_text": paper_text}
+
+    def _map_logic_node(self, state: AdvisorState) -> dict:
+        """Identify the logical structure of the paper."""
+        print("STEP 1b: Identifying logical steps...")
+        paper_structure = self._llm.get_structured_output(
+            PaperStructure,
+            LOGIC_MAPPER.format(paper_text=state["paper_text"]),
+            system_prompt=SYSTEM_PROMPT,
+        )
+        print(f"  Identified {len(paper_structure.logical_steps)} logical steps")
+        return {"paper_structure": paper_structure}
+
+    def _find_evidence_node(self, state: AdvisorState) -> dict:
+        """Find evidence supporting each logical step (ALL steps, no cap)."""
+        print("STEP 2: Finding evidence for each logical step...")
+        paper_structure: PaperStructure = state["paper_structure"]
+        paper_text: str = state["paper_text"]
+        figure_names = list(state.get("figures", {}).keys())
+        figure_names_str = ", ".join(figure_names) if figure_names else "None provided"
+
+        all_step_evidence: list[StepEvidence] = []
+        sorted_steps = sorted(paper_structure.logical_steps, key=lambda s: s.step_number)
+
+        for step in sorted_steps:
+            print(f"  Finding evidence for step {step.step_number}: {step.description[:100]}...")
+            step_evidence = self._llm.get_structured_output(
+                StepEvidence,
+                EVIDENCE_FINDER.format(
+                    step_number=step.step_number,
+                    step_description=step.description,
+                    step_section=step.section,
+                    figure_names=figure_names_str,
+                    paper_text=paper_text,
+                ),
+                system_prompt=SYSTEM_PROMPT,
+            )
+            step_evidence.step_number = step.step_number
+            all_step_evidence.append(step_evidence)
+
+        total_evidence = sum(len(se.evidence_list) for se in all_step_evidence)
+        print(f"  Found {total_evidence} pieces of evidence across all steps")
+
+        paper_graph = build_paper_graph(
+            paper_structure=paper_structure,
+            step_evidence=all_step_evidence,
+            paper_id=state.get("paper_id", "unknown"),
+        )
+        print(
+            f"  Built paper graph: {paper_graph.number_of_nodes()} nodes, "
+            f"{paper_graph.number_of_edges()} edges"
+        )
+
+        return {
+            "step_evidence": all_step_evidence,
+            "paper_graph": paper_graph,
+        }
+
+    def _evaluate_figures_node(self, state: AdvisorState) -> dict:
+        """Evaluate figure-based evidence."""
+        print("STEP 3a: Evaluating figure-based evidence...")
+        figures = state.get("figures", {})
+        G = state["paper_graph"]
+        figure_claims = get_figure_claims(G)
+
+        figure_evaluations = self._figure_eval.run(
+            figures=figures,
+            figure_claims=figure_claims,
+            paper_text=state["paper_text"],
+        )
+        print(f"  Evaluated {len(figure_evaluations)} figures")
+
+        add_figure_evaluations(G, figure_evaluations)
+        return {"figure_evaluations": figure_evaluations, "paper_graph": G}
+
+    def _evaluate_math_node(self, state: AdvisorState) -> dict:
+        """Evaluate math-based evidence."""
+        print("STEP 3b: Evaluating math-based evidence...")
+        G = state["paper_graph"]
+        math_evidence = get_evidence_by_type(G, "math")
+        claims = get_step_claims(G)
+
+        # Per-run MCP session: each pipeline owns its own calculator client.
+        with self._calculator_factory() as client:
+            evaluator = MathEvaluator(llm=self._llm, calculator=client)
+            math_evaluations = evaluator.run(
+                evidence_list=math_evidence,
+                paper_text=state["paper_text"],
+                claims=claims,
+            )
+        print(f"  Evaluated {len(math_evaluations)} math items")
+
+        add_math_evaluations(G, math_evaluations)
+        return {"math_evaluations": math_evaluations, "paper_graph": G}
+
+    def _gather_papers_node(self, state: AdvisorState) -> dict:
+        """Librarian pass 1: find cited + related papers, enrich context."""
+        print("STEP 1b: Librarian gathering related papers...")
+        librarian_result = self._librarian.gather_papers(
+            paper_text=state["paper_text"],
+            bibliography=state.get("bibliography", {}),
+            paper_structure=state.get("paper_structure"),
+        )
+        print(f"  Found {len(librarian_result.related_papers)} related papers")
+        print(f"  Search queries used: {librarian_result.search_queries}")
+
+        enriched = state["paper_text"]
+        if librarian_result.context_summary:
+            enriched += f"\n\n--- Related Work Context ---\n{librarian_result.context_summary}"
+
+        return {
+            "paper_text": enriched,
+            "librarian_result": librarian_result,
+            "related_papers": librarian_result.related_papers,
+        }
+
+    def _score_papers_node(self, state: AdvisorState) -> dict:
+        """Librarian pass 2: score each related paper for relevancy + convergence."""
+        print("STEP 3c: Scoring related papers...")
+        related_papers = state.get("related_papers", [])
+        paper_structure = state["paper_structure"]
+
+        if not related_papers:
+            print("  No related papers to score")
+            return {"librarian_result": state.get("librarian_result", LibrarianResult())}
+
+        scored = self._librarian.score_papers(
+            paper_text=state["paper_text"],
+            paper_structure=paper_structure,
+            related_papers=related_papers,
+        )
+        print(f"  Scored {len(scored)} papers")
+
+        lib_result = state.get("librarian_result", LibrarianResult())
+        updated_result = LibrarianResult(
+            related_papers=scored,
+            context_summary=lib_result.context_summary,
+            search_queries=lib_result.search_queries,
+        )
+
+        G = state["paper_graph"]
+        add_librarian_results(G, updated_result)
+        return {"librarian_result": updated_result, "paper_graph": G}
+
+    def _compile_results_node(self, state: AdvisorState) -> dict:
+        """Compile all evaluation results into a final assessment."""
+        print("STEP 4: Compiling final assessment...")
+        paper_structure: PaperStructure = state["paper_structure"]
+        G = state["paper_graph"]
+
+        step_validations = _organize_by_step_from_graph(G)
+        num_figure_evals = len(get_nodes_by_type(G, "figure"))
+        num_math_evals = len(get_nodes_by_type(G, "math"))
+        num_related_papers = len(get_nodes_by_type(G, "related_paper"))
+
+        review_prompt = RESULTS_COMPILER.format(
+            paper_title=paper_structure.title,
+            main_claim=paper_structure.main_claim,
+            num_steps=len(paper_structure.logical_steps),
+            num_figure_evals=num_figure_evals,
+            num_math_evals=num_math_evals,
+            num_related_papers=num_related_papers,
+            step_validations_text=_format_step_validations(G),
+            figure_results_text=_format_figure_results_from_graph(G),
+            math_results_text=_format_math_results_from_graph(G),
+            librarian_results_text=_format_librarian_results_from_graph(G),
+        )
+        overall_review = self._llm.get_structured_output(
+            OverAllReview, review_prompt, system_prompt=SYSTEM_PROMPT
+        )
+
+        confidence_score = _calculate_confidence_from_graph(G)
+
+        result = ValidationResult(
+            paper_id=state.get("paper_id", "unknown"),
+            paper_structure=paper_structure,
+            step_validations=step_validations,
+            overall_assessment=overall_review,
+            confidence_score=confidence_score,
+        )
+        print(f"  Final confidence score: {result.confidence_score:.2%}")
+
+        output_folder = state.get("output_folder")
+        if output_folder:
+            graph_path = Path(output_folder) / "paper_graph.json"
+            save_graph(G, graph_path)
+            print(f"  Paper graph saved to {graph_path}")
+
+        return {"validation_result": result, "paper_graph": G}
+
+    # ------------------------------------------------------------------
+    # Graph construction
+    # ------------------------------------------------------------------
+
+    def _node_funcs(self) -> Dict[str, Callable[[AdvisorState], dict]]:
+        """Single source of truth for node-name -> bound-method mapping.
+
+        Both `_build_graph` and `_build_graph_with_callbacks` read from here
+        so the two stay in sync when nodes are added or renamed.
+        """
+        return {
+            "make_context": self._make_context_node,
+            "gather_papers": self._gather_papers_node,
+            "map_logic": self._map_logic_node,
+            "find_evidence": self._find_evidence_node,
+            "evaluate_figures": self._evaluate_figures_node,
+            "evaluate_math": self._evaluate_math_node,
+            "score_papers": self._score_papers_node,
+            "compile_results": self._compile_results_node,
+        }
+
+    @staticmethod
+    def _add_edges(workflow: StateGraph) -> None:
+        workflow.add_edge(START, "make_context")
+        workflow.add_edge("make_context", "gather_papers")
+        workflow.add_edge("gather_papers", "map_logic")
+        workflow.add_edge("map_logic", "find_evidence")
+        workflow.add_edge("find_evidence", "evaluate_figures")
+        workflow.add_edge("evaluate_figures", "evaluate_math")
+        workflow.add_edge("evaluate_math", "score_papers")
+        workflow.add_edge("score_papers", "compile_results")
+        workflow.add_edge("compile_results", END)
+
+    def _build_graph(self) -> StateGraph:
+        workflow = StateGraph(AdvisorState)
+        for name, fn in self._node_funcs().items():
+            workflow.add_node(name, fn)
+        self._add_edges(workflow)
+        return workflow
+
+    def _build_graph_with_callbacks(self, callback: StepCallback) -> StateGraph:
+        """Build a fresh graph whose nodes time + report progress to `callback`."""
+
+        def _wrap(name, fn):
+            def wrapper(state: AdvisorState) -> dict:
+                t0 = time.time()
+                result = fn(state)
+                duration = time.time() - t0
+                try:
+                    callback(name, result, duration)
+                except Exception:
+                    pass  # never let logging break the pipeline
+                return result
+            return wrapper
+
+        workflow = StateGraph(AdvisorState)
+        for name, fn in self._node_funcs().items():
+            workflow.add_node(name, _wrap(name, fn))
+        self._add_edges(workflow)
+        return workflow
+
+    # ------------------------------------------------------------------
+    # Public run() entry point
+    # ------------------------------------------------------------------
 
     def run(
         self,
@@ -679,7 +643,8 @@ class AdvisorOrchestrator:
             paper_bib: Dict of citation references.
             output_folder: Folder path to save the final paper graph JSON.
             on_step_complete: Optional callback invoked after each node with
-                (node_name, state_update, duration_seconds).
+                (node_name, state_update, duration_seconds). Stays a per-run
+                arg because it typically closes over job_id.
 
         Returns:
             ValidationResult with complete assessment.
@@ -698,7 +663,7 @@ class AdvisorOrchestrator:
         }
 
         if on_step_complete:
-            graph = _build_graph_with_callbacks(self._workflow, on_step_complete).compile()
+            graph = self._build_graph_with_callbacks(on_step_complete).compile()
         else:
             graph = self._workflow.compile()
 

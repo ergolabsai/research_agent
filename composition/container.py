@@ -22,6 +22,7 @@ from adapters.driven.repositories.sqlite_user_repository import SqliteUserReposi
 from advisor_pipeline.agents.figure_evaluator import FigureEvaluator
 from advisor_pipeline.agents.librarian import Librarian
 from advisor_pipeline.config.settings import settings
+from advisor_pipeline.orchestrator import AdvisorOrchestrator
 from app.security import get_session
 from core.contracts.auth import Principal, UserId
 from core.contracts.errors import ExpiredToken, InvalidToken
@@ -52,6 +53,14 @@ _calculator_cls = McpCalculatorClient
 # that session.
 _figure_evaluator = FigureEvaluator(llm=_llm_client)
 _librarian = Librarian(llm=_llm_client, paper_index=_paper_index)
+
+# Orchestrator built once with its ports. The validate-paper use case threads
+# it through `LegacyPipelineRunner` (Step 4 replaces that runner outright).
+_orchestrator = AdvisorOrchestrator(
+    llm=_llm_client,
+    paper_index=_paper_index,
+    calculator_factory=_calculator_cls,
+)
 
 
 def get_token_issuer() -> TokenIssuer:
@@ -149,7 +158,7 @@ def get_validate_paper(
     """FastAPI dependency that builds a ValidatePaper use case for the current request."""
     return ValidatePaper(
         job_store=LegacyJobStore(session),
-        pipeline_runner=LegacyPipelineRunner(),
+        pipeline_runner=LegacyPipelineRunner(orchestrator=_orchestrator),
     )
 
 
