@@ -21,7 +21,8 @@ import httpx
 import pandas as pd
 from tenacity import retry, stop_after_attempt, wait_exponential
 
-from advisor_pipeline.llm import get_structured_output, invoke_text
+from core.ports.llm_client import LLMClient
+from core.ports.paper_index import PaperIndex
 from core.services.prompts import (
     LIBRARIAN_CONTEXT,
     LIBRARIAN_QUERY_CRAFTER,
@@ -34,7 +35,6 @@ from advisor_pipeline.models.schemas import (
     RelatedPaperScored,
     SearchQueries,
 )
-from advisor_pipeline.utils.lancedb_search import fts_search, vector_search
 
 
 # ---------------------------------------------------------------------------
@@ -111,6 +111,10 @@ class Librarian:
       - ``score_papers`` runs late (after evaluations) to produce final scores
     """
 
+    def __init__(self, llm: LLMClient, paper_index: PaperIndex):
+        self._llm = llm
+        self._paper_index = paper_index
+
     # ------------------------------------------------------------------
     # Pass 1 — Gather papers + enrich context
     # ------------------------------------------------------------------
@@ -140,7 +144,7 @@ class Librarian:
 
         # --- 3. Run LanceDB vector search with crafted queries ---
         for query in search_queries:
-            df = vector_search(query, limit=5)
+            df = self._paper_index.vector_search(query, limit=5)
             for rp in _lancedb_rows_to_related(df, "lancedb_vector"):
                 if rp.paper_id not in found:
                     found[rp.paper_id] = rp
@@ -216,7 +220,7 @@ class Librarian:
     def _find_cited_paper(self, title: str) -> List[RelatedPaper]:
         """Try LanceDB FTS first, fall back to Semantic Scholar."""
         # LanceDB FTS
-        df = fts_search(title, limit=3)
+        df = self._paper_index.fts_search(title, limit=3)
         candidates = _lancedb_rows_to_related(df, "lancedb_fts")
         if candidates:
             return candidates[:1]  # best FTS hit
@@ -240,7 +244,7 @@ class Librarian:
             main_claim=main_claim,
             paper_text_excerpt=excerpt,
         )
-        result = get_structured_output(SearchQueries, prompt)
+        result = self._llm.get_structured_output(SearchQueries, prompt)
         return result.queries[:5]
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=10))
@@ -260,10 +264,10 @@ class Librarian:
             related_abstract=rp.abstract,
             related_source=rp.source,
         )
-        return get_structured_output(RelatedPaperScored, prompt)
+        return self._llm.get_structured_output(RelatedPaperScored, prompt)
 
-    @staticmethod
     def _generate_context_summary(
+        self,
         paper_structure: PaperStructure | None,
         related_papers: List[RelatedPaper],
     ) -> str:
@@ -284,4 +288,4 @@ class Librarian:
             user_main_claim=main_claim,
             related_papers_text=rp_text,
         )
-        return invoke_text(prompt)
+        return self._llm.invoke_text(prompt)

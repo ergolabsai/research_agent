@@ -19,6 +19,8 @@ from adapters.driven.mcp.calculator_client import McpCalculatorClient
 from adapters.driven.paper_index.lancedb import LanceDBPaperIndex
 from adapters.driven.pipeline_runner.legacy import LegacyPipelineRunner
 from adapters.driven.repositories.sqlite_user_repository import SqliteUserRepository
+from advisor_pipeline.agents.figure_evaluator import FigureEvaluator
+from advisor_pipeline.agents.librarian import Librarian
 from advisor_pipeline.config.settings import settings
 from app.security import get_session
 from core.contracts.auth import Principal, UserId
@@ -43,6 +45,13 @@ _token_issuer: PasetoTokenIssuer | None = None
 _llm_client = ChatLLMClient()
 _paper_index = LanceDBPaperIndex()
 _calculator_cls = McpCalculatorClient
+
+# Agents wired with their ports. Stateless after construction; safe to reuse.
+# MathEvaluator is intentionally not a singleton — each pipeline run owns its
+# own MCP calculator session, and the evaluator's react-agent tools close over
+# that session.
+_figure_evaluator = FigureEvaluator(llm=_llm_client)
+_librarian = Librarian(llm=_llm_client, paper_index=_paper_index)
 
 
 def get_token_issuer() -> TokenIssuer:

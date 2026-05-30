@@ -15,7 +15,7 @@
 
 from typing import Dict, List
 
-from advisor_pipeline.llm import get_structured_output, invoke_text, invoke_vision
+from core.ports.llm_client import LLMClient
 from core.services.prompts import (
     CLAIM_ASSESSOR,
     FIGURE_COMPARATOR,
@@ -31,6 +31,9 @@ from advisor_pipeline.models.schemas import (
 
 class FigureEvaluator:
     """Evaluates figure-based evidence without BaseAgent inheritance."""
+
+    def __init__(self, llm: LLMClient):
+        self._llm = llm
 
     def run(
         self,
@@ -118,13 +121,15 @@ class FigureEvaluator:
         return evaluations
 
     def _describe_figure(self, media_type: str, image_data: str) -> str:
-        return invoke_vision(FIGURE_DESCRIBER, media_type, image_data)
+        return self._llm.invoke_vision(FIGURE_DESCRIBER, media_type, image_data)
 
     def _describe_expected(self, figure_name: str, paper_text: str) -> str:
-        return invoke_text(FIGURE_EXPECTED.format(figure_name=figure_name, paper_text=paper_text))
+        return self._llm.invoke_text(
+            FIGURE_EXPECTED.format(figure_name=figure_name, paper_text=paper_text)
+        )
 
     def _compare_descriptions(self, actual: str, expected: str) -> Comparison:
-        return get_structured_output(
+        return self._llm.get_structured_output(
             Comparison,
             FIGURE_COMPARATOR.format(actual_description=actual, expected_description=expected),
         )
@@ -142,7 +147,7 @@ class FigureEvaluator:
         similarities = "\n".join(f"- {s}" for s in comparison.similarities)
         differences = "\n".join(f"- {d}" for d in comparison.differences)
 
-        return get_structured_output(
+        return self._llm.get_structured_output(
             FigureClaimAssessment,
             CLAIM_ASSESSOR.format(
                 figure_name=figure_name,

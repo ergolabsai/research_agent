@@ -16,7 +16,8 @@ from langchain_core.messages import HumanMessage
 from langchain_core.tools import StructuredTool, Tool
 from langgraph.prebuilt import create_react_agent
 
-from advisor_pipeline.llm import get_llm, get_structured_output
+from core.ports.calculator import Calculator
+from core.ports.llm_client import LLMClient
 from core.services.prompts import MATH_REPORTER, MATH_VERIFIER
 from advisor_pipeline.models.schemas import Evidence, MathEvaluation
 
@@ -27,10 +28,11 @@ class MathEvaluator:
     Uses a create_react_agent loop with 4 MCP calculator tools.
     """
 
-    def __init__(self, mcp_client=None):
-        self.mcp_client = mcp_client
+    def __init__(self, llm: LLMClient, calculator: Calculator | None = None):
+        self._llm = llm
+        self.mcp_client = calculator
         self._tools = self._build_tools()
-        self._agent = create_react_agent(get_llm().bind_tools(self._tools), self._tools)
+        self._agent = create_react_agent(self._llm.bind_tools(self._tools), self._tools)
 
     def _build_tools(self) -> list[Tool]:
         mcp_client = self.mcp_client
@@ -159,7 +161,7 @@ class MathEvaluator:
                 claim=claim,
                 agent_result=agent_result,
             )
-            evaluation = get_structured_output(MathEvaluation, prompt)
+            evaluation = self._llm.get_structured_output(MathEvaluation, prompt)
             evaluations.append(evaluation)
 
         return evaluations

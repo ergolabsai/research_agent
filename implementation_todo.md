@@ -31,11 +31,11 @@ Companion to [docs/architecture/MIGRATION.md](docs/architecture/MIGRATION.md). C
 
 *Why: smaller diffs than moving and injecting in one commit. File relocation is a mechanical follow-up once injection is proven.*
 
-- [ ] `FigureEvaluator` → constructor takes `LLMClient`. Replace `invoke_text(...)`, `invoke_vision(...)`, `get_structured_output(...)` with `self._llm.*` calls. **Do not move the file yet.**
-- [ ] `Librarian` → constructor takes `LLMClient` and `PaperIndex`. Drop the `lancedb_search` import.
-- [ ] `MathEvaluator` → constructor takes `LLMClient` and `Calculator`. Replace `get_llm().bind_tools(...)` with `self._llm.bind_tools(...)`.
-- [ ] Add one fixture-driven test per agent using a mock `LLMClient` (and `PaperIndex` / `Calculator` where applicable). *Why: the whole point of DI is testability — without one test exercising the seam, the next refactor will quietly re-couple. Lock in current behavior with a fixture before any file moves.*
-- [ ] Smoke checkpoint: instantiate agents in `composition/container.py` via the new constructors; existing orchestrator still works (it imports agents lazily inside node functions, so a constructor mismatch surfaces immediately).
+- [x] `FigureEvaluator` → constructor takes `LLMClient`. Replace `invoke_text(...)`, `invoke_vision(...)`, `get_structured_output(...)` with `self._llm.*` calls. **Do not move the file yet.**
+- [x] `Librarian` → constructor takes `LLMClient` and `PaperIndex`. Drop the `lancedb_search` import.
+- [x] `MathEvaluator` → constructor takes `LLMClient` and `Calculator`. Replace `get_llm().bind_tools(...)` with `self._llm.bind_tools(...)`.
+- [x] Add one fixture-driven test per agent using a mock `LLMClient` (and `PaperIndex` / `Calculator` where applicable). *Why: the whole point of DI is testability — without one test exercising the seam, the next refactor will quietly re-couple. Lock in current behavior with a fixture before any file moves.*
+- [x] Smoke checkpoint: instantiate agents in `composition/container.py` via the new constructors; existing orchestrator still works (it imports agents lazily inside node functions, so a constructor mismatch surfaces immediately).
 
 ## Step 2 — Migrate the orchestrator
 

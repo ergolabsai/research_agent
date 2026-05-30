@@ -176,6 +176,11 @@ def evaluate_figures_node(state: AdvisorState) -> dict:
     """Evaluate figure-based evidence."""
     from advisor_pipeline.agents.figure_evaluator import FigureEvaluator
 
+    # Temporary scaffolding: pulling singletons from composition here is a
+    # backward dependency (advisor_pipeline -> composition) that Step 2
+    # erases when the orchestrator becomes a class with injected ports.
+    from composition.container import _llm_client
+
     print("STEP 3a: Evaluating figure-based evidence...")
     figures = state.get("figures", {})
 
@@ -183,7 +188,7 @@ def evaluate_figures_node(state: AdvisorState) -> dict:
     G = state["paper_graph"]
     figure_claims = get_figure_claims(G)
 
-    evaluator = FigureEvaluator()
+    evaluator = FigureEvaluator(llm=_llm_client)
     figure_evaluations = evaluator.run(
         figures=figures,
         figure_claims=figure_claims,
@@ -200,7 +205,9 @@ def evaluate_figures_node(state: AdvisorState) -> dict:
 def evaluate_math_node(state: AdvisorState) -> dict:
     """Evaluate math-based evidence."""
     from advisor_pipeline.agents.math_evaluator import MathEvaluator
-    from advisor_pipeline.mcp_client import CalculatorClient
+
+    # Temporary scaffolding: see note in evaluate_figures_node.
+    from composition.container import _calculator_cls, _llm_client
 
     print("STEP 3b: Evaluating math-based evidence...")
 
@@ -209,8 +216,8 @@ def evaluate_math_node(state: AdvisorState) -> dict:
     math_evidence = get_evidence_by_type(G, "math")
     claims = get_step_claims(G)
 
-    with CalculatorClient() as client:
-        evaluator = MathEvaluator(mcp_client=client)
+    with _calculator_cls() as client:
+        evaluator = MathEvaluator(llm=_llm_client, calculator=client)
         math_evaluations = evaluator.run(
             evidence_list=math_evidence,
             paper_text=state["paper_text"],
@@ -228,8 +235,11 @@ def gather_papers_node(state: AdvisorState) -> dict:
     """Librarian pass 1: find cited + related papers, enrich context."""
     from advisor_pipeline.agents.librarian import Librarian
 
+    # Temporary scaffolding: see note in evaluate_figures_node.
+    from composition.container import _llm_client, _paper_index
+
     print("STEP 1b: Librarian gathering related papers...")
-    librarian = Librarian()
+    librarian = Librarian(llm=_llm_client, paper_index=_paper_index)
     librarian_result = librarian.gather_papers(
         paper_text=state["paper_text"],
         bibliography=state.get("bibliography", {}),
@@ -254,8 +264,11 @@ def score_papers_node(state: AdvisorState) -> dict:
     """Librarian pass 2: score each related paper for relevancy + convergence."""
     from advisor_pipeline.agents.librarian import Librarian
 
+    # Temporary scaffolding: see note in evaluate_figures_node.
+    from composition.container import _llm_client, _paper_index
+
     print("STEP 3c: Scoring related papers...")
-    librarian = Librarian()
+    librarian = Librarian(llm=_llm_client, paper_index=_paper_index)
     related_papers = state.get("related_papers", [])
     paper_structure = state["paper_structure"]
 
