@@ -19,7 +19,7 @@ from langgraph.prebuilt import create_react_agent
 from core.ports.calculator import Calculator
 from core.ports.llm_client import LLMClient
 from core.services.prompts import MATH_REPORTER, MATH_VERIFIER
-from advisor_pipeline.models.schemas import Evidence, MathEvaluation
+from core.contracts.validation import Evidence, MathEvaluation
 
 
 class MathEvaluator:

@@ -50,11 +50,12 @@ Companion to [docs/architecture/MIGRATION.md](docs/architecture/MIGRATION.md). C
 
 *Why: the orchestrator can't move to `core/` until everything it imports also lives in core or behind a port. Prep A handled prompts and settings; this is the mechanical relocation.*
 
-- [ ] `advisor_pipeline/orchestrator.py` → `core/services/orchestrator.py`. Update all imports across `composition/`, `backend/app/`, tests.
-- [ ] `advisor_pipeline/agents/*.py` → `core/services/`. Drop the `agents/` subdir; "agent" is an implementation detail.
-- [ ] `advisor_pipeline/models/paper_graph.py` → `core/domain/graph.py`. Pure NetworkX wrapper, no external deps.
-- [ ] Schemas referenced by orchestrator (`PaperStructure`, `Evidence`, `StepEvidence`, `OverAllReview`, etc.) → `core/contracts/validation.py`. Pull over whatever isn't already there. `models/schemas.py` gets emptied.
-- [ ] Smoke checkpoint: re-run `/api/pipeline/validate` end-to-end. Same response shape. Confirm import-linter is green for the new contract.
+- [x] `advisor_pipeline/orchestrator.py` → `core/services/orchestrator.py`. Update all imports across `composition/`, `backend/app/`, tests.
+- [x] `advisor_pipeline/agents/*.py` → `core/services/`. Drop the `agents/` subdir; "agent" is an implementation detail.
+- [x] `advisor_pipeline/models/paper_graph.py` → `core/domain/graph.py`. Pure NetworkX wrapper, no external deps.
+- [x] Schemas referenced by orchestrator (`PaperStructure`, `Evidence`, `StepEvidence`, `OverAllReview`, etc.) → `core/contracts/validation.py`. Pulled over the missing classes (`LibrarianResult`, `RelatedPaperScored`, `SearchQueries`); dropped 3 dead classes (`ContextList`, `ContextString`, `FigureInfo`); `OverAllReview` consolidated onto the existing `OverallAssessment` (identical `review: str` shape). `models/schemas.py` emptied.
+- [x] Smoke checkpoint: container builds the orchestrator; full test suite green (9 passed). *Live `/api/pipeline/validate` not re-run (needs server + API key).*
+- [ ] **DEFERRED — import-linter "Core has no I/O" is RED.** Moving the agents into `core/` surfaced real I/O imports never put behind ports: `core.services.librarian → httpx` (Semantic Scholar) and `core.services.math_evaluator → langchain_core` (ReAct tool-using agent). Plus the pre-existing `core.ports.llm_client → langchain_core` (`BaseChatModel`). Per [ADR 0002](docs/architecture/capabilities/validation/decisions/0002-langgraph-in-core.md) tool-using agents must live in driven adapters and per [ADR 0003] core has no I/O — so these need port abstraction (own follow-up, see notes below). Deferred by decision; Step 4 proceeds in the meantime.
 
 ## Step 4 — Replace `LegacyPipelineRunner` and split `pipeline_service.py`
 

@@ -16,8 +16,8 @@ This script demonstrates how to:
 
 from pathlib import Path
 
-from advisor_pipeline.orchestrator import AdvisorOrchestrator
-from advisor_pipeline.models.paper_graph import (
+from core.services.orchestrator import AdvisorOrchestrator
+from core.domain.graph import (
     get_contradicted_steps,
     get_dependency_chain,
     get_invalid_math,

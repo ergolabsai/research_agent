@@ -28,7 +28,7 @@ from typing import Dict, List, Optional
 
 import networkx as nx
 
-from advisor_pipeline.models.schemas import (
+from core.contracts.validation import (
     Evidence,
     FigureEvaluation,
     LibrarianResult,

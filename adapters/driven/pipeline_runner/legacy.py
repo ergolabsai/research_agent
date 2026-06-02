@@ -16,7 +16,7 @@ from typing import Any
 
 from sqlmodel import Session, select
 
-from advisor_pipeline.orchestrator import AdvisorOrchestrator
+from core.services.orchestrator import AdvisorOrchestrator
 from app.models import PipelineJob
 from app.security import engine
 from app.services.pipeline_service import run_pipeline_async

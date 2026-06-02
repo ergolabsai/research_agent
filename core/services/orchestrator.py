@@ -18,9 +18,9 @@ import networkx as nx
 from langgraph.graph import END, START, StateGraph
 from typing_extensions import TypedDict
 
-from advisor_pipeline.agents.figure_evaluator import FigureEvaluator
-from advisor_pipeline.agents.librarian import Librarian
-from advisor_pipeline.agents.math_evaluator import MathEvaluator
+from core.services.figure_evaluator import FigureEvaluator
+from core.services.librarian import Librarian
+from core.services.math_evaluator import MathEvaluator
 from core.ports.calculator import Calculator
 from core.ports.llm_client import LLMClient
 from core.ports.paper_index import PaperIndex
@@ -31,7 +31,7 @@ from core.services.prompts import (
     RESULTS_COMPILER,
     SYSTEM_PROMPT,
 )
-from advisor_pipeline.models.paper_graph import (
+from core.domain.graph import (
     add_figure_evaluations,
     add_librarian_results,
     add_math_evaluations,
@@ -49,11 +49,11 @@ from advisor_pipeline.models.paper_graph import (
     get_steps,
     save_graph,
 )
-from advisor_pipeline.models.schemas import (
+from core.contracts.validation import (
     FigureEvaluation,
     LibrarianResult,
     MathEvaluation,
-    OverAllReview,
+    OverallAssessment,
     PaperStructure,
     RelatedPaper,
     StepEvidence,
@@ -540,7 +540,7 @@ class AdvisorOrchestrator:
             librarian_results_text=_format_librarian_results_from_graph(G),
         )
         overall_review = self._llm.get_structured_output(
-            OverAllReview, review_prompt, system_prompt=SYSTEM_PROMPT
+            OverallAssessment, review_prompt, system_prompt=SYSTEM_PROMPT
         )
 
         confidence_score = _calculate_confidence_from_graph(G)

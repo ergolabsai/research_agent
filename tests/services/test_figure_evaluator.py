@@ -4,8 +4,8 @@
 
 """FigureEvaluator unit tests against a fake LLMClient."""
 
-from advisor_pipeline.agents.figure_evaluator import FigureEvaluator
-from advisor_pipeline.models.schemas import (
+from core.services.figure_evaluator import FigureEvaluator
+from core.contracts.validation import (
     ClaimValidity,
     Comparison,
     FigureClaimAssessment,

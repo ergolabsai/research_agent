@@ -11,9 +11,9 @@ port through `bind_tools` and `get_structured_output`, and that the run loop
 emits one MathEvaluation per input evidence item.
 """
 
-import advisor_pipeline.agents.math_evaluator as math_evaluator_mod
-from advisor_pipeline.agents.math_evaluator import MathEvaluator
-from advisor_pipeline.models.schemas import Evidence, MathEvaluation
+import core.services.math_evaluator as math_evaluator_mod
+from core.services.math_evaluator import MathEvaluator
+from core.contracts.validation import Evidence, MathEvaluation
 from tests.services.conftest import FakeLLMClient
 
 

@@ -22,7 +22,7 @@ from core.services.prompts import (
     FIGURE_DESCRIBER,
     FIGURE_EXPECTED,
 )
-from advisor_pipeline.models.schemas import (
+from core.contracts.validation import (
     Comparison,
     FigureClaimAssessment,
     FigureEvaluation,

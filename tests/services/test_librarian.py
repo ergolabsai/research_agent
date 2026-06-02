@@ -6,8 +6,8 @@
 
 import pandas as pd
 
-from advisor_pipeline.agents.librarian import Librarian
-from advisor_pipeline.models.schemas import (
+from core.services.librarian import Librarian
+from core.contracts.validation import (
     LogicalStep,
     PaperStructure,
     RelatedPaper,

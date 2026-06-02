@@ -19,10 +19,10 @@ from adapters.driven.mcp.calculator_client import McpCalculatorClient
 from adapters.driven.paper_index.lancedb import LanceDBPaperIndex
 from adapters.driven.pipeline_runner.legacy import LegacyPipelineRunner
 from adapters.driven.repositories.sqlite_user_repository import SqliteUserRepository
-from advisor_pipeline.agents.figure_evaluator import FigureEvaluator
-from advisor_pipeline.agents.librarian import Librarian
+from core.services.figure_evaluator import FigureEvaluator
+from core.services.librarian import Librarian
 from advisor_pipeline.config.settings import settings
-from advisor_pipeline.orchestrator import AdvisorOrchestrator
+from core.services.orchestrator import AdvisorOrchestrator
 from app.security import get_session
 from core.contracts.auth import Principal, UserId
 from core.contracts.errors import ExpiredToken, InvalidToken

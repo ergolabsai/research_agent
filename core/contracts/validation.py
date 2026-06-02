@@ -4,9 +4,10 @@
 
 """Validation pipeline contracts.
 
-Ported from advisor_pipeline/models/schemas.py during MIGRATION step 2.
-The shape of `ValidationResult.overall_assessment` is slated to become fully
-structured per capabilities/validation/0005; that change lands separately.
+Canonical home for the validation schemas as of MIGRATION step 3 (formerly
+advisor_pipeline/models/schemas.py). The shape of `ValidationResult.overall_assessment`
+is slated to become fully structured per capabilities/validation/0005; that change
+lands separately.
 """
 
 from datetime import datetime
@@ -136,6 +137,45 @@ class RelatedPaper(BaseModel):
         description="Positive: conclusions agree. Negative: conclusions contradict.",
     )
     convergence_reasoning: str = ""
+
+
+class RelatedPaperScored(BaseModel):
+    """LLM-produced relevancy + convergence scores for a single related paper."""
+
+    relevancy_score: float = Field(
+        ge=0.0,
+        le=1.0,
+        description="0.0-1.0: how important this paper is for evaluating the user's paper.",
+    )
+    relevancy_reasoning: str
+    convergence_score: float = Field(
+        ge=-1.0,
+        le=1.0,
+        description="Positive: conclusions agree. Negative: conclusions contradict.",
+    )
+    convergence_reasoning: str
+
+
+class LibrarianResult(BaseModel):
+    """Output of the Librarian: related papers with relevancy/convergence scores."""
+
+    related_papers: list[RelatedPaper] = Field(default_factory=list)
+    context_summary: str = ""
+    search_queries: list[str] = Field(
+        default_factory=list, description="The vector search queries crafted by the LLM."
+    )
+
+
+class SearchQueries(BaseModel):
+    """LLM-generated search queries for finding related papers via vector search."""
+
+    queries: list[str] = Field(
+        description=(
+            "3-5 diverse, high-quality search queries to find related papers. "
+            "Each should target a different aspect of the paper (methodology, domain, "
+            "specific techniques, theoretical foundations, etc.)."
+        )
+    )
 
 
 class OverallAssessment(BaseModel):

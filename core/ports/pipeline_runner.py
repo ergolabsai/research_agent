@@ -4,14 +4,13 @@
 
 """Transitional port for kicking off the validation pipeline.
 
-The orchestrator is core territory (see capabilities/validation/0002), but during
-MIGRATION step 2 the legacy `advisor_pipeline.orchestrator` and its singleton
-dependencies (LLM, calculator, paper index) are not yet movable. A driven adapter
-implementing this port wraps the legacy `pipeline_service.run_validation_job` so
-`ValidatePaper` can fire it without importing from `advisor_pipeline` directly.
+The orchestrator now lives in `core.services.orchestrator` (MIGRATION step 3), but
+it is still scheduled through the legacy `pipeline_service.run_validation_job`
+thread-pool runner. A driven adapter implementing this port wraps that runner so
+`ValidatePaper` can fire it without importing the backend service directly.
 
-This port disappears in MIGRATION step 3 when the orchestrator moves to
-`core/services/`; the use case then calls the orchestrator directly.
+This port disappears in MIGRATION step 4 when `LegacyPipelineRunner` is replaced by
+an inline runner that calls the orchestrator directly.
 """
 
 from typing import Protocol, runtime_checkable

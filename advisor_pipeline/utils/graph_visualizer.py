@@ -4,7 +4,7 @@
 
 """Visualize a paper graph as an interactive HTML network using pyvis."""
 
-from advisor_pipeline.models.paper_graph import (
+from core.domain.graph import (
     get_nodes_by_type,
     get_steps,
     load_graph,

@@ -28,7 +28,7 @@ from core.services.prompts import (
     LIBRARIAN_QUERY_CRAFTER,
     LIBRARIAN_SCORER,
 )
-from advisor_pipeline.models.schemas import (
+from core.contracts.validation import (
     LibrarianResult,
     PaperStructure,
     RelatedPaper,

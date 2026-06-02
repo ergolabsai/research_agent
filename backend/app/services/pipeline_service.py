@@ -27,8 +27,8 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
-from advisor_pipeline.orchestrator import AdvisorOrchestrator
-from advisor_pipeline.models.paper_graph import (
+from core.services.orchestrator import AdvisorOrchestrator
+from core.domain.graph import (
     build_graph_from_validation,
     get_contradicted_steps,
     get_invalid_math,
@@ -41,7 +41,7 @@ from advisor_pipeline.models.paper_graph import (
     get_nodes_by_type,
     save_graph,
 )
-from advisor_pipeline.models.schemas import ValidationResult
+from core.contracts.validation import ValidationResult
 from app.models import PipelineJob, PipelineStepLog
 from app.security import engine
 from app.storage import get_object_bytes
